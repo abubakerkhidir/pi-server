@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+*.log
+.DS_Store
+uploads/
+users/
+package-lock.json
+.pi-server/

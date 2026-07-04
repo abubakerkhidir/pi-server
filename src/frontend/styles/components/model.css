@@ -1,0 +1,102 @@
+/* Model Selector */
+.model-selector {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-dim);
+  background: transparent;
+  flex-shrink: 0;
+  transition: color 0.15s;
+  user-select: none;
+  position: relative;
+}
+
+.model-selector:hover {
+  color: var(--text);
+}
+
+.model-current {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-arrow {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.model-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+  min-width: 180px;
+  z-index: 50;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+/* Tool formatter base */
+.tool-filepath {
+  font-size: 12px;
+  color: var(--accent);
+  padding: 6px 12px;
+  background: var(--surface3);
+  border-radius: 6px 6px 0 0;
+  font-family: monospace;
+  word-break: break-all;
+}
+
+.tool-output-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
+  line-height: 1.5;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.tool-cmd {
+  font-size: 12px;
+  color: var(--text);
+  padding: 6px 12px;
+  background: var(--surface3);
+  font-family: monospace;
+  border-radius: 6px 6px 0 0;
+  word-break: break-all;
+}
+
+.tool-pattern, .tool-query, .tool-url {
+  font-size: 12px;
+  color: var(--text-dim);
+  padding: 6px 12px;
+  font-family: monospace;
+  word-break: break-all;
+}
+
+.tool-question {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text);
+  border-left: 3px solid var(--accent);
+  background: var(--surface2);
+  margin-bottom: 4px;
+  border-radius: 4px;
+}
+
+.tool-answer {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.5;
+}

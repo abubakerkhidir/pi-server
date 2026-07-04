@@ -1,0 +1,180 @@
+/* Tool params display */
+.tool-params {
+  padding: 6px 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--surface3);
+  border-bottom: 1px solid var(--border);
+  margin: 0;
+  overflow-x: auto;
+  font-family: "SF Mono", "Fira Code", monospace;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.typing {
+  display: flex;
+  gap: 4px;
+  padding: 8px 0;
+}
+
+.typing span {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: bounce 1.4s infinite ease-in-out;
+}
+
+.typing span:nth-child(2) { animation-delay: 0.16s; }
+.typing span:nth-child(3) { animation-delay: 0.32s; }
+
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+/* Collapsible Blocks (thinking + tool) */
+.thinking-block {
+  margin: 8px 0;
+  border: 1px solid var(--thinking-border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--thinking-bg);
+}
+
+.tool-block {
+  margin: 8px 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface2);
+}
+
+.tool-block .cb-header {
+  background: var(--surface3);
+}
+
+.cb-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  transition: background 0.2s;
+  user-select: text;
+}
+
+.cb-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.arr-btn {
+  font-size: 9px;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+  padding: 2px 3px;
+  border-radius: 3px;
+  transition: background 0.15s, color 0.15s;
+  line-height: 1;
+}
+
+.arr-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+
+.arr-btn.arr-hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.cb-label {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  user-select: text;
+  cursor: default;
+}
+
+.cb-header .spinner {
+  display: inline-block;
+  width: 12px; height: 12px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  flex-shrink: 0;
+}
+
+.tool-status {
+  display: flex;
+  align-items: center;
+}
+
+.tool-status.done {
+  color: var(--accent);
+  font-weight: bold;
+}
+
+.tool-status.error {
+  color: var(--danger);
+  font-weight: bold;
+}
+
+.tool-args {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 1;
+  min-width: 0;
+  user-select: text;
+  cursor: default;
+}
+
+.cb-body {
+  overflow-y: auto;
+}
+
+.cb-body.collapsed {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cb-content {
+  padding: 4px 12px 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  font-family: "SF Mono", "Fira Code", monospace;
+}
+
+.tool-output {
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+  font-family: "SF Mono", "Fira Code", monospace;
+  max-height: 300px;
+  overflow-y: auto;
+  border-bottom: 1px solid var(--border);
+}
+
+.tool-footer {
+  padding: 6px 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: "SF Mono", "Fira Code", monospace;
+  background: var(--surface3);
+}
+
+.tool-footer.tool-error {
+  color: var(--danger);
+}

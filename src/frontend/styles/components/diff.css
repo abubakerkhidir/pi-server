@@ -1,0 +1,61 @@
+/* Tool diff display (edit tool) */
+.tool-diff {
+  padding: 4px 12px 12px;
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.diff-old {
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.08);
+  padding: 1px 0;
+}
+
+.diff-new {
+  color: var(--accent);
+  background: rgba(16, 185, 129, 0.08);
+  padding: 1px 0;
+}
+
+.diff-hunk {
+  color: var(--text-muted);
+  font-weight: 600;
+  padding: 4px 0 2px;
+}
+
+.diff-line {
+  white-space: pre-wrap;
+  padding: 0 8px;
+}
+
+.diff-line::before {
+  display: inline-block;
+  width: 20px;
+  text-align: right;
+  margin-right: 8px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.diff-old .diff-line::before {
+  content: "-";
+  color: var(--danger);
+}
+
+.diff-new .diff-line::before {
+  content: "+";
+  color: var(--accent);
+}
+
+.diff-ctx {
+  color: var(--text-dim);
+  padding: 0 8px;
+  white-space: pre-wrap;
+}
+
+.diff-ctx::before {
+  content: " ";
+  display: inline-block;
+  width: 28px;
+}

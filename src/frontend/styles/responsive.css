@@ -1,0 +1,12 @@
+/* Responsive */
+@media (max-width: 799px) {
+  .sidebar.collapsed ~ .sidebar-toggle-floating { display: flex; }
+}
+
+@media (max-width: 640px) {
+  .header { padding: 10px 16px; }
+  .message { max-width: 100%; padding: 0 12px; }
+  .input-wrapper { max-width: 100%; }
+  .input-area { padding: 10px 12px 14px; }
+  .auth-box { padding: 24px 20px; }
+}
