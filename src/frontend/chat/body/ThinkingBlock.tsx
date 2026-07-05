@@ -1,13 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import type { ThinkingBlockProps } from "@/frontend/types";
 
-export default function ThinkingBlock({
-  content,
-  isStreaming = false,
-  maxLines = 3,
-}: ThinkingBlockProps) {
-  const [state, setState] = useState<0 | 1 | 2>(isStreaming ? 1 : 0); // 0=hidden, 1=partial, 2=full
+export default function ThinkingBlock({ entity, userSettings }: ThinkingBlockProps) {
+  const [state, setState] = useState<0 | 1 | 2>(0); // 0=collapsed, 1=partial, 2=full
   const bodyRef = useRef<HTMLDivElement>(null);
+  const maxLines = userSettings.thinking_lines || 3;
 
   const lineHeight = useCallback((els: Element[]) => {
     for (const el of els) {
@@ -76,11 +73,10 @@ export default function ThinkingBlock({
         >
           ▲
         </span>
-        {isStreaming && <span className="spinner" />}
         <span className="cb-label">Thinking</span>
       </div>
       <div className="cb-body" ref={bodyRef}>
-        <div className="cb-content">{content}</div>
+        <div className="cb-content">{entity.content}</div>
       </div>
     </div>
   );

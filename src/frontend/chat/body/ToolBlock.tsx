@@ -1,58 +1,9 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import type { ToolBlockProps } from "@/frontend/types";
-import { escapeHtmlSimple, extractText } from "@/frontend/lib/escapeHtml";
+import { escapeHtmlSimple } from "@/frontend/lib/escapeHtml";
 import { formatToolResult } from "@/frontend/lib/formatters";
 
-export default function ToolBlock({id,name,args,result,isError = false,maxLines = 5,isWrite = false,onToolUpdate,onToolEnd,onToolRemove,isComplete = false}: ToolBlockProps) {
-  // 0 = collapsed, 1 = expanded
-  const [expanded, setExpanded] = useState(isComplete && result !== undefined);
-  let { bodyContent, footerContent } = extractBodyAndFooter(name, result, args, isComplete)
-  const subtitle = getSubtitle(args, name);
-  const arrHidden = "arr-hidden";
-  const maxHight = (maxLines * 21)+'px'
-  return (
-    <div className="tool-block" data-tool-id={id}>
-      <div className="cb-header">
-        <span className={`arr-btn ${expanded ? arrHidden : ""}`} title="Expand" onClick={() => setExpanded(true)}>▶</span>
-        <span className={`arr-btn ${!expanded ? arrHidden : ""}`} title="Collapse" onClick={() => setExpanded(false)}>▲</span>
-        <span className={`tool-status ${isComplete ? (isError ? "error" : "done") : ""}`}>
-          {isComplete ? (isError ? "✗" : "✓") : ""}
-        </span>
-        {!isComplete && !result && <span className="spinner" />}
-        <span className="cb-label">
-          <span className="cb-tool-name">{name}</span>
-          {subtitle && <span className="cb-tool-subtitle">{subtitle}</span>}
-        </span>
-      </div>
-      <div className="cb-body" hidden={expanded} style={{maxHeight:maxHight}}>
-        <div dangerouslySetInnerHTML={{ __html: bodyContent }} />
-        {footerContent && (<div dangerouslySetInnerHTML={{ __html: footerContent }} />)}
-      </div>
-    </div>
-  );
-}
-
-function extractBodyAndFooter(name: string, result: unknown, args: Record<string, unknown>, isComplete : boolean) {
-  let bodyContent = "";
-  let footerContent = "";
-  let isWrite = name === "write"
-  if ((isComplete && result !== undefined) || isWrite){
-    const formatted = formatToolResult(name, result, args as Record<string, unknown>);
-    if (formatted) {
-      bodyContent = formatted.bodyHtml;
-      if (formatted.footerHtml) footerContent = formatted.footerHtml;
-    } else {
-      const fullArgsStr = args ? escapeHtmlSimple(JSON.stringify(args, null, 2)) : "";
-      bodyContent = name === "edit" ? "" : (fullArgsStr ? `<pre class="tool-params">${fullArgsStr}</pre>` : "") + '<div class="tool-output"></div>';
-    }
-  }else{
-    const fullArgsStr = args ? escapeHtmlSimple(JSON.stringify(args, null, 2)) : "";
-    bodyContent = (fullArgsStr ? `<pre class="tool-params">${fullArgsStr}</pre>` : "") +'<div class="tool-output"></div>';
-  }
-  return { bodyContent, footerContent };
-}
-
-function getSubtitle(args: Record<string, unknown>, name: string) {
+function getSubtitle(args: Record<string, unknown> | undefined, name: string): string {
   if (!args) return "";
   if (name === "write" || name === "ctx_write" || name === "read" || name === "ctx_read") {
     return String(args.path || args.filePath || args.file || "");
@@ -72,3 +23,76 @@ function getSubtitle(args: Record<string, unknown>, name: string) {
   return "";
 }
 
+export default function ToolBlock({ entity, userSettings }: ToolBlockProps) {
+  const [expanded, setExpanded] = useState(entity.isComplete && entity.result !== undefined);
+  const subtitle = getSubtitle(entity.args, entity.name);
+  const maxLines = userSettings.tool_lines || 5;
+  const arrHidden = "arr-hidden";
+
+  const formatted = useMemo(
+    () => (entity.isComplete ? formatToolResult(entity.name, entity.result, entity.args) : null),
+    [entity.name, entity.result, entity.args, entity.isComplete],
+  );
+
+  const bodyContent = useMemo(() => {
+    if (entity.isComplete && formatted) {
+      return formatted.bodyHtml;
+    }
+    // Streaming / incomplete: show args
+    const fullArgsStr = entity.args ? escapeHtmlSimple(JSON.stringify(entity.args, null, 2)) : "";
+    return entity.name === "edit" && !formatted
+      ? ""
+      : (fullArgsStr ? `<pre class="tool-params">${fullArgsStr}</pre>` : "") + '<div class="tool-output"></div>';
+  }, [entity.args, entity.name, entity.isComplete, formatted]);
+
+  const footerContent = useMemo(() => {
+    if (entity.isComplete && formatted && formatted.footerHtml) {
+      return formatted.footerHtml;
+    }
+    // Fallback footer for incomplete or unformatted tools
+    const isWrite = entity.name === "write" || entity.name === "ctx_write";
+    if (isWrite && entity.args?.content) {
+      const c = typeof entity.args.content === "string" ? entity.args.content : JSON.stringify(entity.args.content);
+      const lines = c.split("\n").length;
+      return `<div class="tool-footer">Written ${lines.toLocaleString()} lines / ${c.length.toLocaleString()} chars</div>`;
+    }
+    return `<div class="tool-footer">${escapeHtmlSimple(entity.name)}${subtitle ? " — " + escapeHtmlSimple(subtitle) : ""}</div>`;
+  }, [entity.name, entity.args, entity.isComplete, subtitle, formatted]);
+
+  const maxH = expanded ? "" : maxLines * 21 + "px";
+
+  return (
+    <div className="tool-block" data-tool-id={entity.id}>
+      <div className="cb-header">
+        <span
+          className={`arr-btn ${expanded ? arrHidden : ""}`}
+          title="Expand"
+          onClick={() => setExpanded(true)}
+        >
+          ▶
+        </span>
+        <span
+          className={`arr-btn ${!expanded ? arrHidden : ""}`}
+          title="Collapse"
+          onClick={() => setExpanded(false)}
+        >
+          ▲
+        </span>
+        <span
+          className={`tool-status ${entity.isComplete ? (entity.isError ? "error" : "done") : ""}`}
+        >
+          {entity.isComplete ? (entity.isError ? "✗" : "✓") : ""}
+        </span>
+        {!entity.isComplete && !entity.result && <span className="spinner" />}
+        <span className="cb-label">
+          <span className="cb-tool-name">{entity.name}</span>
+          {subtitle && <span className="cb-tool-subtitle">{subtitle}</span>}
+        </span>
+      </div>
+      <div className="cb-body" hidden={expanded} style={{ maxHeight: maxH }}>
+        <div dangerouslySetInnerHTML={{ __html: bodyContent }} />
+        {footerContent && <div dangerouslySetInnerHTML={{ __html: footerContent }} />}
+      </div>
+    </div>
+  );
+}

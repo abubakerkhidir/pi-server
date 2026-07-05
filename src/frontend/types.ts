@@ -16,19 +16,9 @@ export interface ChatMessage {
   content: string;
 }
 
-export interface ToolEntry {
-  id: string;
-  name: string;
-  args: string;
-  result: string;
-  is_error?: boolean;
-}
 
-export interface SessionHistory {
-  messages: ChatMessage[];
-  tools: ToolEntry[];
-  thinking: { content: string }[];
-}
+
+
 
 export interface ModelGroup {
   provider: string;
@@ -71,7 +61,55 @@ export interface StreamEvent {
   data: Record<string, unknown>;
 }
 
-// ====== Chat Types ======
+// ====== Entity Types (stream entities) ======
+
+export interface MsgData {
+  type: "msg";
+  id: string;
+  content: string; // raw markdown text
+  sealed?: boolean; // true when thinking is sealed before this msg
+}
+
+export interface ToolData {
+  type: "tool";
+  id: string; // from agent (tool_call_id)
+  name: string;
+  args: Record<string, unknown> | undefined;
+  partialResult: unknown | undefined;
+  result: unknown | undefined;
+  isError: boolean;
+  isComplete: boolean;
+  sealed?:boolean
+}
+
+export interface ThinkData {
+  type: "think";
+  id: string; // locally generated
+  content: string;
+  sealed?:boolean
+}
+
+export type AgentReplyEntity = MsgData | ToolData | ThinkData;
+
+export interface UserMsg {
+  content: string;
+  files?: string[];
+}
+
+export interface AgentReply {
+  id: string;
+  entities: AgentReplyEntity[];
+}
+
+export interface ChatRecord {
+  id: string;
+  userMsg: UserMsg;
+  agentReply: AgentReply;
+}
+
+export interface ChatState {
+  records: ChatRecord[];
+}
 
 export type UserSettings = {
   send_on_enter?: boolean;
@@ -91,12 +129,7 @@ export type UserSettings = {
   tools_enabled?: string[];
 };
 
-export interface StreamMessageState {
-  flowDiv: HTMLDivElement;
-  rawText: string;
-  thinkingBlocks: Map<HTMLDivElement, { ctrl: unknown; sealed: boolean }>;
-  toolIndicators: Map<string, HTMLDivElement>;
-}
+
 
 // ====== React Component Props ======
 
@@ -108,31 +141,16 @@ export interface ChatLayoutProps {
   onLogout: () => void;
 }
 
-export interface ChatMessageProps {
-  message: ChatMessage;
-  role: "user" | "assistant";
-  isStreaming?: boolean;
-  flowDiv?: HTMLDivElement;
-}
+
 
 export interface ToolBlockProps {
-  id: string;
-  name: string;
-  args: Record<string, unknown>;
-  result?: unknown;
-  isError?: boolean;
-  maxLines?: number;
-  isWrite?: boolean;
-  onToolUpdate: (id: string, partialResult: unknown) => void;
-  onToolEnd: (id: string, result: unknown, isError: boolean) => void;
-  onToolRemove: (id: string) => void;
-  isComplete?: boolean;
+  entity: ToolData;
+  userSettings: { tool_lines: number; thinking_lines: number };
 }
 
 export interface ThinkingBlockProps {
-  content: string;
-  isStreaming?: boolean;
-  maxLines?: number;
+  entity: ThinkData;
+  userSettings: { tool_lines: number; thinking_lines: number };
 }
 
 export interface SettingsModalProps {

@@ -1,416 +1,162 @@
-import { useRef } from "react";
-import { marked } from "marked";
+import { useState, useRef, useCallback } from "react";
 import { createChatStream, type AbortChatStream } from "@/frontend/api";
-import { escapeHtmlSimple, extractText } from "@/frontend/lib/escapeHtml";
-import { formatToolResult } from "@/frontend/lib/formatters";
+import type { AgentReplyEntity, MsgData, ToolData, ThinkData } from "@/frontend/types";
 
-marked.setOptions({ breaks: true, gfm: true });
+let thinkCounter = 0;
+let msgCounter = 0;
+const nextThinkId = () => `think-${++thinkCounter}`;
+const nextMsgId = () => `msg-${++msgCounter}`;
 
-interface ThinkingBlockData {
-  el: HTMLDivElement;
-  bodyEl: HTMLDivElement | null;
-  contentEl: HTMLDivElement | null;
-  sealed: boolean;
-}
-
-interface StreamState {
-  flowDiv: HTMLDivElement;
-  rawText: string;
-  toolIndicators: Map<string, HTMLDivElement>;
-  lastEl: HTMLDivElement | null;
-  thinkingBlocks: ThinkingBlockData[];
+interface StreamResult {
+  entities: AgentReplyEntity[];
+  endFlag: boolean;
+  sessionId: string | null;
 }
 
 interface UseChatStreamOptions {
   currentSessionId: string | null;
   isProcessing: boolean;
   userSettings: { tool_lines: number; thinking_lines: number };
-  chatRef: React.RefObject<HTMLDivElement | null>;
-  welcomeRef: React.RefObject<HTMLDivElement | null>;
-  setCurrentSessionId: (id: string | null) => void;
-  setIsProcessing: (v: boolean) => void;
-  setUploadedFiles: (f: File[]) => void;
-  loadSessions: () => Promise<void>;
 }
 
-const toolDetails = (name: string, args: Record<string, unknown> | undefined): string => {
-  if (["write", "read", "ctx_read", "ctx_write", "edit", "ctx_edit"].includes(name)) return String(args?.path || args?.file) || "";
-  if (["bash", "shell", "ctx_shell"].includes(name)) return String(args?.command || args?.cmd) || "";
-  if (["grep", "ctx_search", "ctx_semantic_search"].includes(name)) return String(args?.pattern || args?.query) || "";
-  if (["ls", "ctx_tree", "ctx_glob", "find", "glob"].includes(name)) return String(args?.path || args?.pattern || args?.glob) || "";
-  return "";
-};
+export function useChatStream({ currentSessionId, isProcessing, userSettings }: UseChatStreamOptions) {
+  const [entities, setEntities] = useState<AgentReplyEntity[]>([]);
+  const [endFlag, setEndFlag] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
-export function useChatStream({
-  currentSessionId, isProcessing, userSettings, chatRef, welcomeRef,
-  setCurrentSessionId, setIsProcessing, setUploadedFiles, loadSessions,
-}: UseChatStreamOptions) {
-  const streamStateRef = useRef<StreamState | null>(null);
+  const currentSessionIdRef = useRef(currentSessionId);
+  const isProcessingRef = useRef(isProcessing);
+  currentSessionIdRef.current = currentSessionId;
+  isProcessingRef.current = isProcessing;
 
-  const addUserMessage = (text: string) => {
-    if (welcomeRef.current) welcomeRef.current.style.display = "none";
-    const el = document.createElement("div");
-    el.className = "message user";
-    el.innerHTML = `<div class="message-header">You</div><div class="message-content"><p>${escapeHtmlSimple(text)}</p></div>`;
-    chatRef.current?.appendChild(el);
-    chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight });
-  };
+  const resetState = useCallback(() => {
+    setEntities([]);
+    setEndFlag(false);
+    setSessionId(null);
+  }, []);
 
-  const handleSend = async (prompt: string, files: File[]) => {
-    if (!prompt || isProcessing) return;
-    setIsProcessing(true); setUploadedFiles([]);
-    addUserMessage(prompt);
-    const msg = document.createElement("div");
-    msg.className = "message assistant";
-    msg.innerHTML = `<div class="message-header">PI</div><div class="message-content"><div class="message-flow"></div><div class="typing" id="typingIndicator"><span></span><span></span><span></span></div></div>`;
-    chatRef.current?.appendChild(msg);
-    chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight });
-    const flowDiv = msg.querySelector(".message-flow") as HTMLDivElement;
-    const sm: StreamState = { flowDiv, rawText: "", toolIndicators: new Map(), lastEl: null, thinkingBlocks: [] };
-    streamStateRef.current = sm;
-    const createThinkingBlock = (): HTMLDivElement => {
-      const tb = document.createElement("div");
-      tb.className = "thinking-block";
-      tb.innerHTML = `<div class="cb-header thinking-header"><span class="arr-btn arr-expand" title="Expand">▶</span><span class="arr-btn arr-up arr-hidden" title="Collapse">▲</span><span class="cb-label">Thinking</span></div><div class="cb-body" style="display:none;"><div class="cb-content"></div></div>`;
-      const bodyEl = tb.querySelector(".cb-body") as HTMLDivElement;
-      const contentEl = bodyEl?.querySelector(".cb-content") as HTMLDivElement;
-      sm.thinkingBlocks.push({ el: tb, bodyEl, contentEl, sealed: false });
-      flowDiv.appendChild(tb); return tb;
-    };
-    let abortStream: AbortChatStream | null = null;
+  const getLastEntity = (typ:string,next:AgentReplyEntity[])=>{
+      return  [...next].reverse().find((e) => e.type === typ);
+  }
+  const sealLastEntity = (typ:string,next:AgentReplyEntity[])=>{
+	const msgEntity = getLastEntity(typ,next);
+	if(msgEntity) msgEntity.sealed = true;
+  }
 
-    const handleToggleClick = (e: MouseEvent) => {
-      const btn = (e.target as HTMLElement)?.closest(".arr-btn");
-      if (!btn) return;
-      const header = btn.closest(".cb-header");
-      if (!header) return;
-      const body = header.parentElement?.querySelector(".cb-body") as HTMLDivElement;
-      if (!body) return;
-      const expandBtn = header.querySelector(".arr-expand") as HTMLElement;
-      const upBtn = header.querySelector(".arr-up") as HTMLElement;
-      const isExpanded = body.classList.contains("expanded");
-      if (isExpanded) {
-        // Collapse
-        body.classList.remove("expanded");
-        body.classList.add("collapsed");
-        // Clear inline display so CSS class controls visibility
-        body.style.display = "";
-        let lh = 21;
-        const cs = getComputedStyle(body);
-        const lhVal = cs.lineHeight;
-        if (lhVal === "normal") {
-          const fs = parseFloat(cs.fontSize);
-          if (fs && !isNaN(fs)) lh = fs * 1.6;
-        } else {
-          const parsed = parseFloat(lhVal);
-          if (parsed && !isNaN(parsed) && parsed > 0) lh = parsed;
-        }
-        const maxLines = header.classList.contains("thinking-header") ? (userSettings.thinking_lines || 3) : (userSettings.tool_lines || 5);
-        body.style.maxHeight = (lh * maxLines) + "px";
-        body.style.overflow = "hidden";
-        expandBtn?.classList.remove("arr-hidden"); upBtn?.classList.add("arr-hidden");
-      } else {
-        // Expand to full height
-        body.classList.remove("collapsed");
-        body.classList.add("expanded");
-        // Clear inline display so element is visible
-        body.style.display = "";
-        body.style.maxHeight = ""; body.style.overflow = ""; body.style.webkitLineClamp = "unset";
-        expandBtn?.classList.add("arr-hidden"); upBtn?.classList.remove("arr-hidden");
+  const handleSend = useCallback(
+    async (prompt: string, files: File[]): Promise<AbortChatStream> => {
+      if (!prompt || isProcessingRef.current) {
+        return () => {};
       }
-      e.preventDefault();
-    };
+      resetState();
 
-    // Set up delegation on chat container
-    chatRef.current?.addEventListener("click", handleToggleClick);
+      // Create the MsgData for the assistant text response (empty initially)
+      const msgId = nextMsgId();
+      setEntities([{ type: "msg", id: msgId, content: "", sealed: false }]);
 
-    // Extract readable title from tool args (path, command, pattern, etc.)
-    const getToolSubtitle = (name: string, args: Record<string, unknown> | undefined): string => {
-      if (name === "write" || name === "ctx_write" || name === "read" || name === "ctx_read") {
-        return String(args?.path || args?.filePath || args?.file || "");
-      }
-      if (name === "bash" || name === "shell" || name === "ctx_shell") {
-        return String(args?.command || args?.cmd || "");
-      }
-      if (name === "grep" || name === "ctx_search" || name === "ctx_semantic_search") {
-        return String(args?.pattern || args?.query || "");
-      }
-      if (name === "ls" || name === "ctx_tree" || name === "ctx_glob" || name === "find" || name === "glob") {
-        return String(args?.path || args?.pattern || args?.glob || "");
-      }
-      if (name === "edit" || name === "ctx_edit") {
-        return String(args?.path || args?.file || "");
-      }
-      return "";
-    };
+      let abortStream: AbortChatStream | null = null;
+      const textBuffer: string[] = [];
 
-    const handleToolStart = (data: Record<string, unknown>, containerEl: HTMLDivElement & {
-      _toolName: string; _toolArgs: Record<string, unknown> | undefined; _isWrite: boolean;
-      _writeLines?: number; _writeChars?: number; _startTime?: number; _counterInterval?: ReturnType<typeof setInterval>;
-    }) => {
-      const toolName = data.name as string, toolArgs = data.args as Record<string, unknown> | undefined;
-      const isWrite = toolName === "write", isEdit = toolName === "edit";
-      containerEl._toolName = toolName; containerEl._toolArgs = toolArgs; containerEl._isWrite = isWrite;
-      const subtitle = getToolSubtitle(toolName, toolArgs);
-      let bodyHtml = "", footerHtml = "";
-      if (isWrite && toolArgs && toolArgs.content) {
-        const c = typeof toolArgs.content === "string" ? toolArgs.content : JSON.stringify(toolArgs.content);
-        const lines = c.split("\n").length, chars = c.length;
-        footerHtml = `<div class="tool-footer" data-lines="${lines}" data-chars="${chars}">Written ${lines.toLocaleString()} lines / ${chars.toLocaleString()} chars</div>`;
-        containerEl._writeLines = lines; containerEl._writeChars = chars; containerEl._startTime = Date.now();
-      }
-      if (!isEdit) {
-        const fullArgs = toolArgs ? escapeHtmlSimple(JSON.stringify(toolArgs, null, 2)) : "";
-        bodyHtml = (fullArgs ? `<pre class="tool-params">${fullArgs}</pre>` : "") + '<div class="tool-output"></div>';
-      }
-      // New title format: tool_name (bold) + subtitle (smaller) + 2 arrows (▶ expand, ▲ collapse)
-      const headerHtml = `<div class="cb-header"><span class="arr-btn arr-expand arr-hidden" title="Expand">▶</span><span class="arr-btn arr-up" title="Collapse">▲</span><span class="tool-status"><span class="spinner"></span></span><span class="cb-label"><span class="cb-tool-name">${escapeHtmlSimple(toolName)}</span>${subtitle ? ` <span class="cb-tool-subtitle">${escapeHtmlSimple(subtitle)}</span>` : ""}</span></div><div class="cb-body">${bodyHtml}${footerHtml}</div>`;
-      containerEl.innerHTML = headerHtml;
-      const ctrl = containerEl.querySelector(".cb-body");
-      if (ctrl instanceof HTMLElement) {
-        ctrl.style.maxHeight = (21 * (userSettings.tool_lines || 5)) + "px";
-        ctrl.style.overflow = "hidden"; ctrl.style.webkitLineClamp = String(userSettings.tool_lines || 5);
-        ctrl.classList.add("collapsed");
-      }
-      if (isWrite) {
-        containerEl._counterInterval = setInterval(() => {
-          const elapsed = Math.floor((Date.now() - (containerEl._startTime || Date.now())) / 1000);
-          const footer = containerEl.querySelector(".tool-footer");
-          if (footer) footer.textContent = `Writing — ${(containerEl._writeLines || 0).toLocaleString()} lines / ${(containerEl._writeChars || 0).toLocaleString()} chars (${elapsed}s)`;
-        }, 1000);
-      }
-    };
-
-    const handleToolEnd = (id: string, data: Record<string, unknown>, block: HTMLDivElement) => {
-      const blockEl = block as unknown as HTMLDivElement & { _counterInterval?: ReturnType<typeof setInterval>; _toolName: string; _toolArgs: Record<string, unknown> | undefined; _isEdit?: boolean };
-      if (blockEl._counterInterval) { clearInterval(blockEl._counterInterval); blockEl._counterInterval = undefined; }
-      const header = block.querySelector(".cb-header");
-      (header?.querySelector(".spinner") as HTMLElement)?.remove();
-      const statusEl = header?.querySelector(".tool-status");
-      if (statusEl) {
-        // Backend sends isError (capital I) — use bracket notation to match
-        const isErr = data["isError"] as boolean;
-        statusEl.innerHTML = isErr ? "✗" : "✓";
-        statusEl.className = `tool-status ${isErr ? "error" : "done"}`;
-      }
-      const isEdit = blockEl._isEdit === true;
-      if (data.result && !isEdit) { const oe = block.querySelector(".tool-output"); if (oe) oe.textContent += extractText(data.result); }
-      const formatted = formatToolResult(blockEl._toolName, data.result, blockEl._toolArgs);
-      if (formatted) {
-        const body = block.querySelector(".cb-body");
-        if (body instanceof HTMLElement) {
-          body.innerHTML = formatted.bodyHtml;
-          // Expand body FIRST so footer isn't clipped by overflow:hidden / line-clamp
-          body.classList.remove("collapsed"); body.classList.add("expanded");
-          body.style.display = "";
-          body.style.maxHeight = ""; body.style.overflow = ""; body.style.webkitLineClamp = "unset";
-          // Update arrows: show collapse ▲ button
-          const header = block.querySelector(".cb-header");
-          (header?.querySelector(".arr-expand") as HTMLElement)?.classList.add("arr-hidden");
-          (header?.querySelector(".arr-up") as HTMLElement)?.classList.remove("arr-hidden");
-          if (formatted.footerHtml) body.insertAdjacentHTML("beforeend", formatted.footerHtml);
-        }
-      } else {
-        // Generate fallback footer from args if no formatter provided one
-        const toolName = blockEl._toolName;
-        const toolArgs = blockEl._toolArgs as Record<string, unknown> | undefined;
-        const isWriteTool = toolName === "write" || toolName === "ctx_write";
-        let fallbackFooter = "";
-        if (isWriteTool && toolArgs?.content) {
-          const contentStr = typeof toolArgs.content === "string" ? toolArgs.content : JSON.stringify(toolArgs.content);
-          const lines = contentStr.split("\n").length;
-          const chars = contentStr.length;
-          fallbackFooter = `<div class="tool-footer">Written ${lines.toLocaleString()} lines / ${chars.toLocaleString()} chars</div>`;
-        } else {
-          const path = String(toolArgs?.path || toolArgs?.filePath || toolArgs?.file || "");
-          fallbackFooter = `<div class="tool-footer">${escapeHtmlSimple(toolName)}${path ? " — " + escapeHtmlSimple(path) : ""}</div>`;
-        }
-        const body = block.querySelector(".cb-body");
-        if (body instanceof HTMLElement) {
-          body.classList.remove("collapsed"); body.classList.add("expanded");
-          body.style.display = "";
-          body.style.maxHeight = ""; body.style.overflow = ""; body.style.webkitLineClamp = "unset";
-          // Update arrows
-          const header = block.querySelector(".cb-header");
-          (header?.querySelector(".arr-expand") as HTMLElement)?.classList.add("arr-hidden");
-          (header?.querySelector(".arr-up") as HTMLElement)?.classList.remove("arr-hidden");
-          body.insertAdjacentHTML("beforeend", fallbackFooter);
-        }
-      }
-    };
-
-    const finalizeTools = () => {
-      for (const [, b] of sm.toolIndicators) {
-        const header = b.querySelector(".cb-header"), spinner = header?.querySelector(".spinner"), statusEl = header?.querySelector(".tool-status");
-        if (spinner) spinner.remove();
-        if (statusEl) { statusEl.innerHTML = "✓"; statusEl.className = "tool-status done"; }
-      }
-      sm.toolIndicators.clear();
-    };
-
-    const sealLastThinking = () => {
-      const tb = sm.thinkingBlocks[sm.thinkingBlocks.length - 1];
-      if (!tb || tb.sealed) return;
-      tb.sealed = true;
-      (tb.el.querySelector(".spinner") as HTMLElement)?.remove();
-      // Collapse thinking block: show ▶ arrow, clear inline display first
-      (tb.el.querySelector(".arr-expand") as HTMLElement)?.classList.remove("arr-hidden");
-      (tb.el.querySelector(".arr-up") as HTMLElement)?.classList.add("arr-hidden");
-      const body = tb.bodyEl;
-      if (body) {
-        body.classList.remove("expanded"); body.classList.add("collapsed");
-        body.style.display = ""; // Clear inline display:none so collapsed CSS controls visibility
-        let lh = 21;
-        const cs = getComputedStyle(body);
-        const lhVal = cs.lineHeight;
-        if (lhVal === "normal") {
-          const fs = parseFloat(cs.fontSize);
-          if (fs && !isNaN(fs)) lh = fs * 1.6;
-        } else {
-          const parsed = parseFloat(lhVal);
-          if (parsed && !isNaN(parsed) && parsed > 0) lh = parsed;
-        }
-        body.style.maxHeight = (lh * (userSettings.thinking_lines || 3)) + "px";
-        body.style.overflow = "hidden";
-      }
-    };
-    const sealAllThinking = () => {
-      for (let i = sm.thinkingBlocks.length - 1; i >= 0; i--) {
-        const tb = sm.thinkingBlocks[i]; if (!tb.sealed) {
-          tb.sealed = true;
-          (tb.el.querySelector(".spinner") as HTMLElement)?.remove();
-          (tb.el.querySelector(".arr-expand") as HTMLElement)?.classList.remove("arr-hidden");
-          (tb.el.querySelector(".arr-up") as HTMLElement)?.classList.add("arr-hidden");
-          const body = tb.bodyEl;
-          if (body) {
-            body.classList.remove("expanded"); body.classList.add("collapsed");
-            body.style.display = "";
-            let lh = 21;
-            const cs = getComputedStyle(body);
-            const lhVal = cs.lineHeight;
-            if (lhVal === "normal") {
-              const fs = parseFloat(cs.fontSize);
-              if (fs && !isNaN(fs)) lh = fs * 1.6;
-            } else {
-              const parsed = parseFloat(lhVal);
-              if (parsed && !isNaN(parsed) && parsed > 0) lh = parsed;
+      abortStream = createChatStream(
+        currentSessionIdRef.current,
+        prompt,
+        files.length > 0 ? files : undefined,
+        (event: string, data: Record<string, unknown>) => {
+          setEntities((prev) => {
+            const next = [...prev];
+            switch (event) {
+              case "session": {
+                setSessionId(data.sessionId as string);
+                break;
+              }
+              case "thinking": {
+		sealLastEntity("msg",next)
+                const content = String(data.content || "");
+                const lastThink = getLastEntity("think",next);
+                if (lastThink && !(lastThink as ThinkData).sealed) {
+                  (lastThink as ThinkData).content += content;
+                } else {
+                  // New thinking block
+                  next.push({ type: "think", id: nextThinkId(), content });
+                }
+                break;
+              }
+              case "text": {
+                sealLastEntity("think",next);
+                const content = String(data.content || "");
+		const lastMsg = getLastEntity("msg",next);
+		if (lastMsg && !(lastMsg as MsgData).sealed) {
+                  (lastMsg as MsgData).content += content;
+                } else {
+                  next.push({ type: "msg", id: nextMsgId(), content });
+                }
+                break;
+              }
+              case "tool_start": {
+		sealLastEntity("think",next);
+                sealLastEntity("msg",next);
+                const toolData: ToolData = {
+                  type: "tool",
+                  id: data.id as string,
+                  name: data.name as string,
+                  args: data.args as Record<string, unknown> | undefined,
+                  partialResult: undefined,
+                  result: undefined,
+                  isError: false,
+                  isComplete: false,
+                };
+                next.push(toolData);
+                break;
+              }
+              case "tool_update": {
+                const toolId = data.id as string;
+                const idx = next.findIndex((e) => e.type === "tool" && (e as ToolData).id === toolId && !(e as ToolData).isComplete);
+                if (idx >= 0) {
+                  (next[idx] as ToolData).partialResult = data.partialResult;
+                }
+                break;
+              }
+              case "tool_end": {
+                const toolId = data.id as string;
+                const idx = next.findIndex((e) => e.type === "tool" && (e as ToolData).id === toolId && !(e as ToolData).isComplete);
+                if (idx >= 0) {
+                  (next[idx] as ToolData).result = data.result;
+                  (next[idx] as ToolData).isError = !!data.isError;
+                  (next[idx] as ToolData).isComplete = true;
+                }
+                break;
+              }
+              case "done": {
+                // Seal the last thinking/msg entity
+                for (let i = next.length - 1; i >= 0; i--) {
+                  next[i].sealed = true;
+                }
+                setEndFlag(true);
+                break;
+              }
+              case "error": {
+		for (let i = next.length - 1; i >= 0; i--) {
+                  next[i].sealed = true;
+                }
+                setEndFlag(true);
+                break;
+              }
             }
-            body.style.maxHeight = (lh * (userSettings.thinking_lines || 3)) + "px";
-            body.style.overflow = "hidden";
+            return next;
+          });
+        },
+        (err: Error) => {
+	  for (let i = entities.length - 1; i >= 0; i--) {
+              entities[i].sealed = true;
           }
-        }
-      }
-    };
-    const appendToThinking = (content: string) => {
-      const tb = sm.thinkingBlocks[sm.thinkingBlocks.length - 1];
-      if (tb?.bodyEl && tb?.contentEl) { tb.bodyEl.style.display = "block"; tb.contentEl.textContent += content; }
-    };
-    const updateScroll = () => chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight });
+          setEndFlag(true);
+        },
+      );
 
-    abortStream = createChatStream(
-      currentSessionId, prompt, files.length > 0 ? files : undefined,
-      (event: string, data: Record<string, unknown>) => {
-        switch (event) {
-          case "session": {
-            setCurrentSessionId(data.sessionId as string);
-            const mt = document.getElementById("modelTags");
-            if (mt && (data.model as Record<string, unknown>)?.name)
-              mt.innerHTML = `<span style="font-size:11px;color:var(--text-dim);">${escapeHtmlSimple((data.model as Record<string, unknown>).name as string)}</span>`;
-            break;
-          }
-          case "thinking": {
-            const lastBlock = sm.thinkingBlocks[sm.thinkingBlocks.length - 1];
-            if (lastBlock && !lastBlock.sealed) appendToThinking(String(data.content || ""));
-            else { const tb = createThinkingBlock(); sm.lastEl = tb; appendToThinking(String(data.content || "")); }
-            updateScroll();
-            break;
-          }
-          case "text": {
-            sealLastThinking();
-            let mdEl = sm.lastEl;
-            if (!mdEl || mdEl.classList.contains("tool-block") || mdEl.classList.contains("thinking-block")) {
-              mdEl = document.createElement("div"); mdEl.className = "markdown";
-              flowDiv.appendChild(mdEl); sm.lastEl = mdEl; sm.rawText = "";
-            }
-            sm.rawText += String(data.content || "");
-            mdEl.innerHTML = (marked.parse(sm.rawText) as string).replace(/\n+$/, "");
-            updateScroll();
-            break;
-          }
-          case "tool_start": {
-            sealLastThinking();
-            const toolId = data.id as string;
-            const container = document.createElement("div");
-            container.className = "tool-block"; container.dataset.toolId = toolId;
-            const containerEl = container as unknown as HTMLDivElement & {
-              _toolName: string; _toolArgs: Record<string, unknown> | undefined; _isWrite: boolean;
-              _writeLines?: number; _writeChars?: number; _startTime?: number; _counterInterval?: ReturnType<typeof setInterval>;
-            };
-            handleToolStart(data, containerEl);
-            flowDiv.appendChild(container); sm.lastEl = container;
-            sm.toolIndicators.set(toolId, container);
-            updateScroll();
-            break;
-          }
-          case "tool_update": {
-            const block = sm.toolIndicators.get(data.id as string);
-            const outputEl = block?.querySelector(".tool-output");
-            if (outputEl && data.partialResult) outputEl.textContent += extractText(data.partialResult);
-            updateScroll();
-            break;
-          }
-          case "tool_end": {
-            const id = data.id as string, block = sm.toolIndicators.get(id);
-            if (block) handleToolEnd(id, data, block);
-            sm.toolIndicators.delete(id);
-            updateScroll();
-            break;
-          }
-          case "done": {
-            sealAllThinking();
-            const ti = msg.querySelector("#typingIndicator");
-            if (ti instanceof HTMLElement) ti.style.display = "none";
-            finalizeTools(); setIsProcessing(false); loadSessions();
-            updateScroll();
-            break;
-          }
-          case "error": {
-            sealAllThinking();
-            const ti = msg.querySelector("#typingIndicator");
-            if (ti instanceof HTMLElement) ti.style.display = "none";
-            const errorDiv = document.createElement("p") as HTMLParagraphElement;
-            errorDiv.style.color = "var(--danger)";
-            errorDiv.textContent = `Error: ${(data.error as string) || "Unknown error"}`;
-            flowDiv.appendChild(errorDiv);
-            setIsProcessing(false);
-            updateScroll();
-            break;
-          }
-        }
-      },
-      (err: Error) => {
-        sealAllThinking();
-        const ti = msg.querySelector("#typingIndicator");
-        if (ti instanceof HTMLElement) ti.style.display = "none";
-        const errorDiv = document.createElement("p") as HTMLParagraphElement;
-        errorDiv.style.color = "var(--danger)";
-        errorDiv.textContent = `Error: ${err.message}`;
-        flowDiv.appendChild(errorDiv);
-        setIsProcessing(false);
-        updateScroll();
-      },
-    );
-    const observer = new MutationObserver(() => {
-      if (!document.body.contains(msg) && abortStream) { abortStream(); observer.disconnect(); }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-  };
+      return abortStream;
+    },
+    [isProcessing, resetState],
+  );
 
-  const handleNewChat = () => {
-    setCurrentSessionId(null);
-    if (welcomeRef.current) welcomeRef.current.style.display = "";
-    chatRef.current?.querySelectorAll(".message")?.forEach((m) => m.remove());
-    streamStateRef.current = null; setUploadedFiles([]); setIsProcessing(false); loadSessions();
-  };
-  return { handleSend, handleNewChat, streamStateRef };
+  return { entities, endFlag, sessionId, handleSend, resetState };
 }
