@@ -24,7 +24,7 @@ interface StreamState {
 interface UseChatStreamOptions {
   currentSessionId: string | null;
   isProcessing: boolean;
-  userSettings: { tool_lines: number };
+  userSettings: { tool_lines: number; thinking_lines: number };
   chatRef: React.RefObject<HTMLDivElement | null>;
   welcomeRef: React.RefObject<HTMLDivElement | null>;
   setCurrentSessionId: (id: string | null) => void;
@@ -71,7 +71,7 @@ export function useChatStream({
     const createThinkingBlock = (): HTMLDivElement => {
       const tb = document.createElement("div");
       tb.className = "thinking-block";
-      tb.innerHTML = `<div class="cb-header"><span class="arr-btn arr-expand" title="Expand">▶</span><span class="arr-btn arr-down arr-hidden" title="Expand fully">▼</span><span class="arr-btn arr-up arr-hidden" title="Collapse">▲</span><span class="cb-label">Thinking</span></div><div class="cb-body" style="display:none;"><div class="cb-content"></div></div>`;
+      tb.innerHTML = `<div class="cb-header thinking-header"><span class="arr-btn arr-expand" title="Expand">▶</span><span class="arr-btn arr-up arr-hidden" title="Collapse">▲</span><span class="cb-label">Thinking</span></div><div class="cb-body" style="display:none;"><div class="cb-content"></div></div>`;
       const bodyEl = tb.querySelector(".cb-body") as HTMLDivElement;
       const contentEl = bodyEl?.querySelector(".cb-content") as HTMLDivElement;
       sm.thinkingBlocks.push({ el: tb, bodyEl, contentEl, sealed: false });
@@ -87,22 +87,62 @@ export function useChatStream({
       const body = header.parentElement?.querySelector(".cb-body") as HTMLDivElement;
       if (!body) return;
       const expandBtn = header.querySelector(".arr-expand") as HTMLElement;
-      const downBtn = header.querySelector(".arr-down") as HTMLElement;
       const upBtn = header.querySelector(".arr-up") as HTMLElement;
-      const isExpanded = body.style.display !== "none" && !body.classList.contains("collapsed");
+      const isExpanded = body.classList.contains("expanded");
       if (isExpanded) {
-        body.style.display = "none"; body.classList.add("collapsed");
-        expandBtn?.classList.remove("arr-hidden"); downBtn?.classList.add("arr-hidden"); upBtn?.classList.add("arr-hidden");
+        // Collapse
+        body.classList.remove("expanded");
+        body.classList.add("collapsed");
+        // Clear inline display so CSS class controls visibility
+        body.style.display = "";
+        let lh = 21;
+        const cs = getComputedStyle(body);
+        const lhVal = cs.lineHeight;
+        if (lhVal === "normal") {
+          const fs = parseFloat(cs.fontSize);
+          if (fs && !isNaN(fs)) lh = fs * 1.6;
+        } else {
+          const parsed = parseFloat(lhVal);
+          if (parsed && !isNaN(parsed) && parsed > 0) lh = parsed;
+        }
+        const maxLines = header.classList.contains("thinking-header") ? (userSettings.thinking_lines || 3) : (userSettings.tool_lines || 5);
+        body.style.maxHeight = (lh * maxLines) + "px";
+        body.style.overflow = "hidden";
+        expandBtn?.classList.remove("arr-hidden"); upBtn?.classList.add("arr-hidden");
       } else {
-        body.style.display = ""; body.classList.remove("collapsed");
+        // Expand to full height
+        body.classList.remove("collapsed");
+        body.classList.add("expanded");
+        // Clear inline display so element is visible
+        body.style.display = "";
         body.style.maxHeight = ""; body.style.overflow = ""; body.style.webkitLineClamp = "unset";
-        expandBtn?.classList.add("arr-hidden"); downBtn?.classList.remove("arr-hidden"); upBtn?.classList.remove("arr-hidden");
+        expandBtn?.classList.add("arr-hidden"); upBtn?.classList.remove("arr-hidden");
       }
       e.preventDefault();
     };
 
     // Set up delegation on chat container
     chatRef.current?.addEventListener("click", handleToggleClick);
+
+    // Extract readable title from tool args (path, command, pattern, etc.)
+    const getToolSubtitle = (name: string, args: Record<string, unknown> | undefined): string => {
+      if (name === "write" || name === "ctx_write" || name === "read" || name === "ctx_read") {
+        return String(args?.path || args?.filePath || args?.file || "");
+      }
+      if (name === "bash" || name === "shell" || name === "ctx_shell") {
+        return String(args?.command || args?.cmd || "");
+      }
+      if (name === "grep" || name === "ctx_search" || name === "ctx_semantic_search") {
+        return String(args?.pattern || args?.query || "");
+      }
+      if (name === "ls" || name === "ctx_tree" || name === "ctx_glob" || name === "find" || name === "glob") {
+        return String(args?.path || args?.pattern || args?.glob || "");
+      }
+      if (name === "edit" || name === "ctx_edit") {
+        return String(args?.path || args?.file || "");
+      }
+      return "";
+    };
 
     const handleToolStart = (data: Record<string, unknown>, containerEl: HTMLDivElement & {
       _toolName: string; _toolArgs: Record<string, unknown> | undefined; _isWrite: boolean;
@@ -111,6 +151,7 @@ export function useChatStream({
       const toolName = data.name as string, toolArgs = data.args as Record<string, unknown> | undefined;
       const isWrite = toolName === "write", isEdit = toolName === "edit";
       containerEl._toolName = toolName; containerEl._toolArgs = toolArgs; containerEl._isWrite = isWrite;
+      const subtitle = getToolSubtitle(toolName, toolArgs);
       let bodyHtml = "", footerHtml = "";
       if (isWrite && toolArgs && toolArgs.content) {
         const c = typeof toolArgs.content === "string" ? toolArgs.content : JSON.stringify(toolArgs.content);
@@ -122,7 +163,9 @@ export function useChatStream({
         const fullArgs = toolArgs ? escapeHtmlSimple(JSON.stringify(toolArgs, null, 2)) : "";
         bodyHtml = (fullArgs ? `<pre class="tool-params">${fullArgs}</pre>` : "") + '<div class="tool-output"></div>';
       }
-      containerEl.innerHTML = `<div class="cb-header"><span class="arr-btn arr-expand arr-hidden" title="Expand">▶</span><span class="arr-btn arr-down arr-hidden" title="Expand fully">▼</span><span class="arr-btn arr-up" title="Collapse">▲</span><span class="tool-status"><span class="spinner"></span></span><span class="cb-label">${escapeHtmlSimple(toolName + (toolArgs ? "(" + JSON.stringify(toolArgs).slice(0, 97) + ")" : ""))}</span></div><div class="cb-body">${bodyHtml}${footerHtml}</div>`;
+      // New title format: tool_name (bold) + subtitle (smaller) + 2 arrows (▶ expand, ▲ collapse)
+      const headerHtml = `<div class="cb-header"><span class="arr-btn arr-expand arr-hidden" title="Expand">▶</span><span class="arr-btn arr-up" title="Collapse">▲</span><span class="tool-status"><span class="spinner"></span></span><span class="cb-label"><span class="cb-tool-name">${escapeHtmlSimple(toolName)}</span>${subtitle ? ` <span class="cb-tool-subtitle">${escapeHtmlSimple(subtitle)}</span>` : ""}</span></div><div class="cb-body">${bodyHtml}${footerHtml}</div>`;
+      containerEl.innerHTML = headerHtml;
       const ctrl = containerEl.querySelector(".cb-body");
       if (ctrl instanceof HTMLElement) {
         ctrl.style.maxHeight = (21 * (userSettings.tool_lines || 5)) + "px";
@@ -158,7 +201,13 @@ export function useChatStream({
         if (body instanceof HTMLElement) {
           body.innerHTML = formatted.bodyHtml;
           // Expand body FIRST so footer isn't clipped by overflow:hidden / line-clamp
-          body.style.maxHeight = ""; body.style.overflow = ""; body.style.webkitLineClamp = "unset"; body.classList.remove("collapsed");
+          body.classList.remove("collapsed"); body.classList.add("expanded");
+          body.style.display = "";
+          body.style.maxHeight = ""; body.style.overflow = ""; body.style.webkitLineClamp = "unset";
+          // Update arrows: show collapse ▲ button
+          const header = block.querySelector(".cb-header");
+          (header?.querySelector(".arr-expand") as HTMLElement)?.classList.add("arr-hidden");
+          (header?.querySelector(".arr-up") as HTMLElement)?.classList.remove("arr-hidden");
           if (formatted.footerHtml) body.insertAdjacentHTML("beforeend", formatted.footerHtml);
         }
       } else {
@@ -178,7 +227,13 @@ export function useChatStream({
         }
         const body = block.querySelector(".cb-body");
         if (body instanceof HTMLElement) {
-          body.style.maxHeight = ""; body.style.overflow = ""; body.style.webkitLineClamp = "unset"; body.classList.remove("collapsed");
+          body.classList.remove("collapsed"); body.classList.add("expanded");
+          body.style.display = "";
+          body.style.maxHeight = ""; body.style.overflow = ""; body.style.webkitLineClamp = "unset";
+          // Update arrows
+          const header = block.querySelector(".cb-header");
+          (header?.querySelector(".arr-expand") as HTMLElement)?.classList.add("arr-hidden");
+          (header?.querySelector(".arr-up") as HTMLElement)?.classList.remove("arr-hidden");
           body.insertAdjacentHTML("beforeend", fallbackFooter);
         }
       }
@@ -198,8 +253,26 @@ export function useChatStream({
       if (!tb || tb.sealed) return;
       tb.sealed = true;
       (tb.el.querySelector(".spinner") as HTMLElement)?.remove();
+      // Collapse thinking block: show ▶ arrow, clear inline display first
       (tb.el.querySelector(".arr-expand") as HTMLElement)?.classList.remove("arr-hidden");
-      tb.bodyEl?.classList.add("collapsed");
+      (tb.el.querySelector(".arr-up") as HTMLElement)?.classList.add("arr-hidden");
+      const body = tb.bodyEl;
+      if (body) {
+        body.classList.remove("expanded"); body.classList.add("collapsed");
+        body.style.display = ""; // Clear inline display:none so collapsed CSS controls visibility
+        let lh = 21;
+        const cs = getComputedStyle(body);
+        const lhVal = cs.lineHeight;
+        if (lhVal === "normal") {
+          const fs = parseFloat(cs.fontSize);
+          if (fs && !isNaN(fs)) lh = fs * 1.6;
+        } else {
+          const parsed = parseFloat(lhVal);
+          if (parsed && !isNaN(parsed) && parsed > 0) lh = parsed;
+        }
+        body.style.maxHeight = (lh * (userSettings.thinking_lines || 3)) + "px";
+        body.style.overflow = "hidden";
+      }
     };
     const sealAllThinking = () => {
       for (let i = sm.thinkingBlocks.length - 1; i >= 0; i--) {
@@ -207,7 +280,24 @@ export function useChatStream({
           tb.sealed = true;
           (tb.el.querySelector(".spinner") as HTMLElement)?.remove();
           (tb.el.querySelector(".arr-expand") as HTMLElement)?.classList.remove("arr-hidden");
-          tb.bodyEl?.classList.add("collapsed");
+          (tb.el.querySelector(".arr-up") as HTMLElement)?.classList.add("arr-hidden");
+          const body = tb.bodyEl;
+          if (body) {
+            body.classList.remove("expanded"); body.classList.add("collapsed");
+            body.style.display = "";
+            let lh = 21;
+            const cs = getComputedStyle(body);
+            const lhVal = cs.lineHeight;
+            if (lhVal === "normal") {
+              const fs = parseFloat(cs.fontSize);
+              if (fs && !isNaN(fs)) lh = fs * 1.6;
+            } else {
+              const parsed = parseFloat(lhVal);
+              if (parsed && !isNaN(parsed) && parsed > 0) lh = parsed;
+            }
+            body.style.maxHeight = (lh * (userSettings.thinking_lines || 3)) + "px";
+            body.style.overflow = "hidden";
+          }
         }
       }
     };
@@ -259,18 +349,21 @@ export function useChatStream({
             handleToolStart(data, containerEl);
             flowDiv.appendChild(container); sm.lastEl = container;
             sm.toolIndicators.set(toolId, container);
+            updateScroll();
             break;
           }
           case "tool_update": {
             const block = sm.toolIndicators.get(data.id as string);
             const outputEl = block?.querySelector(".tool-output");
             if (outputEl && data.partialResult) outputEl.textContent += extractText(data.partialResult);
+            updateScroll();
             break;
           }
           case "tool_end": {
             const id = data.id as string, block = sm.toolIndicators.get(id);
             if (block) handleToolEnd(id, data, block);
             sm.toolIndicators.delete(id);
+            updateScroll();
             break;
           }
           case "done": {
@@ -278,6 +371,7 @@ export function useChatStream({
             const ti = msg.querySelector("#typingIndicator");
             if (ti instanceof HTMLElement) ti.style.display = "none";
             finalizeTools(); setIsProcessing(false); loadSessions();
+            updateScroll();
             break;
           }
           case "error": {
@@ -287,7 +381,9 @@ export function useChatStream({
             const errorDiv = document.createElement("p") as HTMLParagraphElement;
             errorDiv.style.color = "var(--danger)";
             errorDiv.textContent = `Error: ${(data.error as string) || "Unknown error"}`;
-            flowDiv.appendChild(errorDiv); setIsProcessing(false);
+            flowDiv.appendChild(errorDiv);
+            setIsProcessing(false);
+            updateScroll();
             break;
           }
         }
@@ -299,7 +395,9 @@ export function useChatStream({
         const errorDiv = document.createElement("p") as HTMLParagraphElement;
         errorDiv.style.color = "var(--danger)";
         errorDiv.textContent = `Error: ${err.message}`;
-        flowDiv.appendChild(errorDiv); setIsProcessing(false);
+        flowDiv.appendChild(errorDiv);
+        setIsProcessing(false);
+        updateScroll();
       },
     );
     const observer = new MutationObserver(() => {

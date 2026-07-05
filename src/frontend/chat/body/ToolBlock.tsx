@@ -16,10 +16,10 @@ export default function ToolBlock({
   onToolRemove,
   isComplete = false,
 }: ToolBlockProps) {
-  const [state, setState] = useState<0 | 1 | 2>(isComplete ? 2 : 1);
+  // 0 = collapsed, 1 = expanded
+  const [expanded, setExpanded] = useState(isComplete && result !== undefined);
   const [elapsed, setElapsed] = useState(0);
   const bodyRef = useRef<HTMLDivElement>(null);
-  const outputRef = useRef<HTMLDivElement>(null);
   const startTimeRef = useRef<number>(Date.now());
 
   // Update elapsed time for write operations
@@ -35,51 +35,52 @@ export default function ToolBlock({
   useEffect(() => {
     if (!bodyRef.current) return;
     const el = bodyRef.current;
-
-    if (state === 0) {
-      el.style.maxHeight = "0px";
-      el.style.overflow = "hidden";
-      el.style.display = "none";
-      el.style.webkitLineClamp = "0";
+    if (expanded) {
+      el.classList.remove("collapsed");
+      el.classList.add("expanded");
+      el.style.maxHeight = "";
+      el.style.overflow = "";
+      el.style.webkitLineClamp = "unset";
+    } else {
+      el.classList.remove("expanded");
       el.classList.add("collapsed");
-    } else if (state === 1) {
       let lh = 21;
       const cs = getComputedStyle(el);
       const lhVal = cs.lineHeight;
       if (lhVal === "normal") {
         const fs = parseFloat(cs.fontSize);
-        if (fs && !isNaN(fs)) lh = fs * 1.5;
+        if (fs && !isNaN(fs)) lh = fs * 1.6;
       } else {
         const parsed = parseFloat(lhVal);
         if (parsed && !isNaN(parsed) && parsed > 0) lh = parsed;
       }
       el.style.maxHeight = (lh * maxLines) + "px";
       el.style.overflow = "hidden";
-      el.style.display = "";
-      el.style.webkitLineClamp = String(maxLines);
-      el.classList.add("collapsed");
-    } else {
-      el.style.maxHeight = "";
-      el.style.overflow = "";
-      el.style.display = "";
-      el.style.webkitLineClamp = "unset";
-      el.classList.remove("collapsed");
     }
-  }, [state, maxLines]);
-
-  // Auto-collapse if no result on complete
-  useEffect(() => {
-    if (isComplete && result !== undefined && name === "edit") {
-      // Edit tools get their result from onToolEnd
-    }
-  }, [isComplete, result, name]);
-
-  const getArgsSummary = () => {
-    const str = args ? JSON.stringify(args) : "";
-    return name + (str ? "(" + str.slice(0, 97) + ")" : "");
-  };
+  }, [expanded, maxLines]);
 
   const isEdit = name === "edit";
+
+  // Extract readable subtitle from tool args
+  const getSubtitle = (): string => {
+    if (!args) return "";
+    if (name === "write" || name === "ctx_write" || name === "read" || name === "ctx_read") {
+      return String(args.path || args.filePath || args.file || "");
+    }
+    if (name === "bash" || name === "shell" || name === "ctx_shell") {
+      return String(args.command || args.cmd || "");
+    }
+    if (name === "grep" || name === "ctx_search" || name === "ctx_semantic_search") {
+      return String(args.pattern || args.query || "");
+    }
+    if (name === "ls" || name === "ctx_tree" || name === "ctx_glob" || name === "find" || name === "glob") {
+      return String(args.path || args.pattern || args.glob || "");
+    }
+    if (name === "edit" || name === "ctx_edit") {
+      return String(args.path || args.file || "");
+    }
+    return "";
+  };
 
   // Build the formatted output
   let bodyContent = "";
@@ -102,10 +103,6 @@ export default function ToolBlock({
     if (formatted) {
       bodyContent = formatted.bodyHtml;
       if (formatted.footerHtml) footerContent = formatted.footerHtml;
-      // Auto-expand on format
-      if (formatted.bodyHtml.includes("tool-diff") || formatted.bodyHtml.includes("tool-output-text")) {
-        useEffect(() => setState(2), []);
-      }
     } else {
       const fullArgsStr = args ? escapeHtmlSimple(JSON.stringify(args, null, 2)) : "";
       bodyContent = isEdit
@@ -119,31 +116,30 @@ export default function ToolBlock({
       '<div class="tool-output"></div>';
   }
 
+  const subtitle = getSubtitle();
   const arrHidden = "arr-hidden";
 
   return (
     <div className="tool-block" data-tool-id={id}>
       <div className="cb-header">
         <span
-          className={`arr-btn ${state === 0 ? "" : arrHidden}`}
+          className={`arr-btn ${expanded ? arrHidden : ""}`}
           title="Expand"
-          onClick={() => setState(1)}
-        />
+          onClick={() => setExpanded(true)}
+        >▶</span>
         <span
-          className={`arr-btn ${state === 1 ? "" : arrHidden}`}
-          title="Expand fully"
-          onClick={() => setState(2)}
-        />
-        <span
-          className={`arr-btn ${state === 2 ? "" : arrHidden}`}
+          className={`arr-btn ${!expanded ? arrHidden : ""}`}
           title="Collapse"
-          onClick={() => (state === 2 ? setState(1) : setState(0))}
-        />
+          onClick={() => setExpanded(false)}
+        >▲</span>
         <span className={`tool-status ${isComplete ? (isError ? "error" : "done") : ""}`}>
           {isComplete ? (isError ? "✗" : "✓") : ""}
         </span>
         {!isComplete && !isEdit && !result && <span className="spinner" />}
-        <span className="cb-label">{escapeHtmlSimple(getArgsSummary())}</span>
+        <span className="cb-label">
+          <span className="cb-tool-name">{name}</span>
+          {subtitle && <span className="cb-tool-subtitle">{subtitle}</span>}
+        </span>
       </div>
       <div className="cb-body" ref={bodyRef}>
         <div dangerouslySetInnerHTML={{ __html: bodyContent }} />

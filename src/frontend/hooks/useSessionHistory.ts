@@ -6,7 +6,7 @@ import { marked } from "marked";
 
 marked.setOptions({ breaks: true, gfm: true });
 
-function setupToggleDelegation(chatRef: RefObject<HTMLDivElement | null>) {
+function setupToggleDelegation(chatRef: RefObject<HTMLDivElement | null>, thinkingLines: number = 3, toolLines: number = 5) {
   const handleToggleClick = (e: MouseEvent) => {
     const btn = (e.target as HTMLElement)?.closest(".arr-btn");
     if (!btn) return;
@@ -14,24 +14,40 @@ function setupToggleDelegation(chatRef: RefObject<HTMLDivElement | null>) {
     if (!header) return;
     const body = header.parentElement?.querySelector(".cb-body") as HTMLDivElement;
     if (!body) return;
-    const isExpanded = body.style.display !== "none" && !body.classList.contains("collapsed");
     const expandBtn = header.querySelector(".arr-expand") as HTMLElement;
-    const downBtn = header.querySelector(".arr-down") as HTMLElement;
     const upBtn = header.querySelector(".arr-up") as HTMLElement;
+    const isExpanded = body.classList.contains("expanded");
     if (isExpanded) {
-      body.style.display = "none";
+      // Collapse
+      body.classList.remove("expanded");
       body.classList.add("collapsed");
+      body.style.display = "";
+      let lh = 21;
+      try {
+        const cs = getComputedStyle(body);
+        const lhVal = cs.lineHeight;
+        if (lhVal === "normal") {
+          const fs = parseFloat(cs.fontSize);
+          if (fs && !isNaN(fs)) lh = fs * 1.6;
+        } else {
+          const parsed = parseFloat(lhVal);
+          if (parsed && !isNaN(parsed) && parsed > 0) lh = parsed;
+        }
+      } catch { /* ignore */ }
+      const maxLines = header.classList.contains("thinking-header") ? thinkingLines : toolLines;
+      body.style.maxHeight = (lh * maxLines) + "px";
+      body.style.overflow = "hidden";
       if (expandBtn) expandBtn.classList.remove("arr-hidden");
-      if (downBtn) downBtn.classList.add("arr-hidden");
       if (upBtn) upBtn.classList.add("arr-hidden");
     } else {
-      body.style.display = "";
+      // Expand
       body.classList.remove("collapsed");
+      body.classList.add("expanded");
+      body.style.display = "";
       body.style.maxHeight = "";
       body.style.overflow = "";
       body.style.webkitLineClamp = "unset";
       if (expandBtn) expandBtn.classList.add("arr-hidden");
-      if (downBtn) downBtn.classList.remove("arr-hidden");
       if (upBtn) upBtn.classList.remove("arr-hidden");
     }
     e.preventDefault();
@@ -64,7 +80,7 @@ export async function loadSessionHistory(
     let thinkingAttached = false;
 
     // Set up toggle delegation after messages are created
-    setTimeout(() => setupToggleDelegation(chatRef), 0);
+    setTimeout(() => setupToggleDelegation(chatRef, 3, 5), 0);
 
     for (const msg of h.messages) {
       if (msg.role === "user") {
@@ -81,7 +97,7 @@ export async function loadSessionHistory(
         if (allThinking && !thinkingAttached) {
           const tb = document.createElement("div");
           tb.className = "thinking-block";
-          tb.innerHTML = `<div class="cb-header"><span class="arr-btn arr-expand" title="Expand">▶</span><span class="arr-btn arr-down arr-hidden" title="Expand fully">▼</span><span class="arr-btn arr-up arr-hidden" title="Collapse">▲</span><span class="cb-label">Thinking</span></div><div class="cb-body" style="display:none;"><div class="cb-content"></div></div>`;
+          tb.innerHTML = `<div class="cb-header thinking-header"><span class="arr-btn arr-expand" title="Expand">▶</span><span class="arr-btn arr-up arr-hidden" title="Collapse">▲</span><span class="cb-label">Thinking</span></div><div class="cb-body" style="display:none;"><div class="cb-content"></div></div>`;
           (tb.querySelector(".cb-content") as HTMLDivElement).textContent = allThinking;
           flow.appendChild(tb); thinkingAttached = true;
         }
@@ -96,9 +112,12 @@ export async function loadSessionHistory(
           try { result = JSON.parse(lastEntry.result || "null"); } catch { /* ignore */ }
 
           const formatted = formatToolResult(first.name, result, args);
-          const body = formatted ? formatted.bodyHtml : `<pre class="tool-params">${escapeHtmlSimple(JSON.stringify(args, null, 2))}</pre><div class="tool-output"></div>`;
+          // Include BOTH body content AND footer in the body HTML
+          const bodyContent = formatted ? formatted.bodyHtml : `<pre class="tool-params">${escapeHtmlSimple(JSON.stringify(args, null, 2))}</pre><div class="tool-output"></div>`;
+          const footerContent = formatted?.footerHtml ? formatted.footerHtml : "";
 
-          const toolLabel = (first.name as string).toLowerCase().replace(/_/g, " ");
+          // Tool name as-is (no lowercase, no underscore replacement)
+          const toolLabel = first.name as string;
           const detailKeys = ["write", "read", "ctx_read", "ctx_write", "edit", "ctx_edit"];
           const cmdKeys = ["bash", "shell", "ctx_shell"];
           const searchKeys = ["grep", "ctx_search", "ctx_semantic_search"];
@@ -110,12 +129,12 @@ export async function loadSessionHistory(
           else if (globKeys.includes(first.name)) detail = ((args.path || args.pattern || args.glob) as string) || "";
 
           const titleHtml = detail
-            ? `<span style="font-weight:bold;text-transform:lowercase;">${escapeHtmlSimple(toolLabel)}</span><span style="font-size:0.9em;color:var(--text-muted);margin-left:4px;">${escapeHtmlSimple(detail)}</span>`
-            : `<span style="font-weight:bold;text-transform:lowercase;">${escapeHtmlSimple(toolLabel)}</span>`;
+            ? `<span class="cb-tool-name">${escapeHtmlSimple(toolLabel)}</span><span class="cb-tool-subtitle">${escapeHtmlSimple(detail)}</span>`
+            : `<span class="cb-tool-name">${escapeHtmlSimple(toolLabel)}</span>`;
 
           const tb = document.createElement("div");
           tb.className = "tool-block";
-          tb.innerHTML = `<div class="cb-header" style="background:var(--surface3);"><span class="arr-btn arr-expand" title="Expand">▶</span><span class="arr-btn arr-down arr-hidden" title="Expand fully">▼</span><span class="arr-btn arr-up arr-hidden" title="Collapse">▲</span><span class="tool-status ${first.is_error ? "error" : "done"}">${first.is_error ? "✗" : "✓"}</span><span class="cb-label">${titleHtml}</span></div><div class="cb-body collapsed" style="display:none;">${body}</div>`;
+          tb.innerHTML = `<div class="cb-header"><span class="arr-btn arr-expand" title="Expand">▶</span><span class="arr-btn arr-up arr-hidden" title="Collapse">▲</span><span class="tool-status ${first.is_error ? "error" : "done"}">${first.is_error ? "✗" : "✓"}</span><span class="cb-label">${titleHtml}</span></div><div class="cb-body collapsed">${bodyContent}${footerContent}</div>`;
           flow.appendChild(tb);
         }
 

@@ -92,10 +92,20 @@
 
 .cb-label {
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
   user-select: text;
   cursor: default;
+}
+
+.cb-tool-name {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.cb-tool-subtitle {
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 4px;
 }
 
 .cb-header .spinner {
@@ -146,6 +156,10 @@
   overflow: hidden;
 }
 
+.cb-body.expanded {
+  overflow-y: auto;
+}
+
 .cb-content {
   padding: 4px 12px 12px;
   font-size: 13px;
@@ -153,6 +167,10 @@
   color: var(--text-muted);
   white-space: pre-wrap;
   font-family: "SF Mono", "Fira Code", monospace;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  width: 100%;
+  display: block;
 }
 
 .tool-output {
