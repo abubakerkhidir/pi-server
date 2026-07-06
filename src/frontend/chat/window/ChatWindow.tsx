@@ -1,8 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useRef, useEffect } from "react";
 import { marked } from "marked";
 import type { ChatState, UserSettings, UserMsg } from "@/frontend/types";
 import ToolBlock from "../body/ToolBlock";
 import ThinkingBlock from "../body/ThinkingBlock";
+import TextBlock from "../body/TextBlock";
 
 marked.setOptions({ breaks: true, gfm: true });
 
@@ -25,29 +26,32 @@ function escapeHtml(str: string): string {
 }
 
 export default function ChatWindow({ chatState, userSettings }: ChatWindowProps) {
+  const chatRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom whenever records change (happens on every stream tick)
+  useEffect(() => {
+    const el = chatRef.current;
+    if (!el) return;
+    // Only auto-scroll during streaming (when last record has unsealed entities)
+    const lastRecord = chatState.records[chatState.records.length - 1];
+    if (!lastRecord) return;
+    const hasUnsealed = lastRecord.agentReply.entities.some((e) => !e.sealed);
+    if (!hasUnsealed) return;
+    handleScrolToBtm(chatRef, false)
+  }, [chatState.records]);
+
   const renderedRecords = useMemo(() => {
     return chatState.records.map((record) => {
       // User message
       const userHtml = renderUserMsg(record.userMsg);
-
       // Agent reply entities
       const entityJsx: React.ReactNode[] = [];
-      let textBuffer = "";
-      let textDivKey = 0;
-
       for (const entity of record.agentReply.entities) {
-        if (entity.type === "msg") {
-          textBuffer += entity.content;
-        } else {
-          // Flush any accumulated text before non-msg entity
-          if (textBuffer) {
-            const parsed = marked.parse(textBuffer) || "";
+	  if (entity.type === "msg") {
             entityJsx.push(
-              <div className="markdown" key={`msg-${textDivKey++}`} dangerouslySetInnerHTML={{ __html: parsed as string }} />,
+              <TextBlock key={entity.id} entity={entity} />,
             );
-            textBuffer = "";
-          }
-          if (entity.type === "think") {
+          } else if (entity.type === "think") {
             entityJsx.push(
               <ThinkingBlock key={entity.id} entity={entity} userSettings={userSettings} />,
             );
@@ -56,23 +60,13 @@ export default function ChatWindow({ chatState, userSettings }: ChatWindowProps)
               <ToolBlock key={entity.id} entity={entity} userSettings={userSettings} />,
             );
           }
-        }
       }
-
-      // Flush remaining text
-      if (textBuffer) {
-        const parsed = marked.parse(textBuffer) || "";
-        entityJsx.push(
-          <div className="markdown" key={`msg-${textDivKey++}`} dangerouslySetInnerHTML={{ __html: parsed as string }} />,
-        );
-      }
-
       return { userHtml, entityJsx, agentId: record.agentReply.id, userId: record.id };
     });
   }, [chatState, userSettings]);
 
   return (
-    <div className="chat" id="chatMessages">
+    <div className="chat" id="chatMessages" >
       {/* User messages + agent replies interleaved */}
       {renderedRecords.map((rec) => (
         <div key={rec.userId}>
@@ -88,6 +82,18 @@ export default function ChatWindow({ chatState, userSettings }: ChatWindowProps)
           </div>
         </div>
       ))}
+      <div ref={chatRef} />
     </div>
   );
+}
+
+export function handleScrolToBtm(endRef: React.RefObject<HTMLDivElement | null>, small: boolean) {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    setTimeout(() => {
+        endRef.current?.scrollIntoView({ behavior: "smooth" });
+        // Additional mobile scroll fix
+        if (small) {
+            window.scrollTo(0, document.body.scrollHeight);
+        }
+    }, 100);
 }

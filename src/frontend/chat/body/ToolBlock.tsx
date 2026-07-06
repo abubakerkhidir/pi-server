@@ -24,7 +24,8 @@ function getSubtitle(args: Record<string, unknown> | undefined, name: string): s
 }
 
 export default function ToolBlock({ entity, userSettings }: ToolBlockProps) {
-  const [expanded, setExpanded] = useState(entity.isComplete && entity.result !== undefined);
+  // Always start collapsed — user must click to expand
+  const [expanded, setExpanded] = useState(false);
   const subtitle = getSubtitle(entity.args, entity.name);
   const maxLines = userSettings.tool_lines || 5;
   const arrHidden = "arr-hidden";
@@ -60,6 +61,7 @@ export default function ToolBlock({ entity, userSettings }: ToolBlockProps) {
   }, [entity.name, entity.args, entity.isComplete, subtitle, formatted]);
 
   const maxH = expanded ? "" : maxLines * 21 + "px";
+  const disVal = expanded? 'block':'none'
 
   return (
     <div className="tool-block" data-tool-id={entity.id}>
@@ -89,7 +91,7 @@ export default function ToolBlock({ entity, userSettings }: ToolBlockProps) {
           {subtitle && <span className="cb-tool-subtitle">{subtitle}</span>}
         </span>
       </div>
-      <div className="cb-body" hidden={expanded} style={{ maxHeight: maxH }}>
+      <div className="cb-body" hidden={expanded} style={{ maxHeight: maxH, display:disVal }}>
         <div dangerouslySetInnerHTML={{ __html: bodyContent }} />
         {footerContent && <div dangerouslySetInnerHTML={{ __html: footerContent }} />}
       </div>
