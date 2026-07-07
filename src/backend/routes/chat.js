@@ -1,5 +1,6 @@
 import { Router } from "express";
 import fs from "fs";
+import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import upload from "../middleware/upload.js";
 import { authMiddleware } from "../middleware/auth.js";
@@ -13,6 +14,7 @@ import {
   fileToImageContent,
   cleanupFrameDirs,
 } from "../pi-video.js";
+import { generateSessionName } from "../generateSessionName.js";
 
 const router = Router();
 
@@ -22,6 +24,9 @@ export function setPiManager(manager) {
   piManager = manager;
 }
 
+// ─────────────────────────────────────────────────────────
+//  POST /api/chat/stream — SSE chat stream
+// ─────────────────────────────────────────────────────────
 router.post("/chat/stream", authMiddleware, upload.array("files", 20), async (req, res) => {
   const { prompt, sessionId } = req.body;
   if (!prompt) {
@@ -36,6 +41,7 @@ router.post("/chat/stream", authMiddleware, upload.array("files", 20), async (re
   const tempDirs = [];
 
   try {
+    // ── Handle uploaded files (images, video, other) ──
     if (req.files && req.files.length > 0) {
       const videoFiles = req.files.filter(isVideoFile);
       const imageFiles = req.files.filter(isImageFile);
@@ -55,13 +61,6 @@ router.post("/chat/stream", authMiddleware, upload.array("files", 20), async (re
       for (const img of imageFiles) {
         images.push(fileToImageContent(img.path, img.mimetype));
       }
-
-      if (otherFiles.length > 0) {
-        const fileList = otherFiles.map(f => {
-          const savedPath = f.path;
-          return `${f.originalname} (saved at: ${savedPath})`;
-        }).join(", ");
-      }
     }
 
     res.writeHead(200, {
@@ -76,16 +75,24 @@ router.post("/chat/stream", authMiddleware, upload.array("files", 20), async (re
     }
 
     let fullText = "";
-    let thinkingSeq = 0;
-    let toolSeq = 0;
 
     const { session, piSessionId } = await piManager.getOrCreateSession(
       req.user.userId, sessionId
     );
 
     const dbSessionId = sessionId || piSessionId;
-    const modelInfo = session.model ? { id: session.model.id, name: session.model.name, input: session.model.input, reasoning: session.model.reasoning } : null;
 
+    // ── Diagnostic: log how many history records exist for this session ──
+    const historyCount = db.prepare(
+      "SELECT COUNT(*) AS c FROM chat_records WHERE session_id = ?"
+    ).get(dbSessionId);
+    const recordCount = historyCount ? historyCount.c : 0;
+    console.log(`[chat] prompt from user, session=${dbSessionId}, history_records=${recordCount}`);
+    const modelInfo = session.model
+      ? { id: session.model.id, name: session.model.name, input: session.model.input, reasoning: session.model.reasoning }
+      : null;
+
+    // ── Session metadata ──
     const existing = db.prepare("SELECT id FROM session_metadata WHERE id = ?").get(dbSessionId);
     if (!existing) {
       const title = prompt.replace(/\n/g, " ").substring(0, 80).trim() || "Chat";
@@ -96,76 +103,209 @@ router.post("/chat/stream", authMiddleware, upload.array("files", 20), async (re
       db.prepare("UPDATE session_metadata SET updated_at = datetime('now') WHERE id = ?").run(dbSessionId);
     }
 
-    const msgId = uuidv4();
-    const fileInfo = req.files?.length ? req.files.map(f => f.originalname).join(", ") : "";
-    db.prepare("INSERT INTO chat_messages (id, session_id, role, content) VALUES (?, ?, ?, ?)").run(
-      msgId, dbSessionId, "user",
-      prompt + (fileInfo ? `\n[Attached files: ${fileInfo}]` : "")
-    );
+    // ── Create a chat record for this exchange ──
+    const recordId = uuidv4();
+    db.prepare(
+      "INSERT INTO chat_records (id, session_id, user_msg_content) VALUES (?, ?, ?)"
+    ).run(recordId, dbSessionId, prompt);
 
-    let promptImageCount = images.length;
-    let promptText = prompt;
+    // ── Save uploaded file metadata ──
+    if (req.files && req.files.length > 0) {
+      const fileInsert = db.prepare(
+        "INSERT INTO chat_files (id, record_id, session_id, type, file_name, file_path, file_size, mime_type) VALUES (?, ?, ?, 'upload', ?, ?, ?, ?)"
+      );
+      for (const f of req.files) {
+        fileInsert.run(uuidv4(), recordId, dbSessionId, f.originalname, f.path, f.size, f.mimetype || "application/octet-stream");
+      }
+    }
 
-    res.write(`event: session\ndata: ${JSON.stringify({ sessionId: dbSessionId, model: modelInfo })}\n\n`);
+    res.write(`event: session\ndata: ${JSON.stringify({ sessionId: dbSessionId, model: modelInfo, recordId })}\n\n`);
 
     req.on("close", () => {
       piManager.abort(piSessionId).catch(() => {});
     });
 
-    await piManager.prompt(piSessionId, promptText, {
-      images: promptImageCount > 0 ? images : undefined,
+    // ══════════════════════════════════════════════════════
+    //  Entity buffering — mirrors frontend useChatStream
+    // ══════════════════════════════════════════════════════
+    let entityBuf = [];          // in-memory buffer of entities (think/msg/tool)
+    let entitySeq = 0;
+
+    /** Find the last unsealed entity of a given type from the buffer */
+    function lastEntity(type) {
+      return [...entityBuf].reverse().find((e) => e.type === type && !e.saved);
+    }
+
+    /** Persist an entity to DB */
+    function saveEntity(entity) {
+      if (entity.saved) return;
+
+      // Calculate duration if start time was recorded
+      let durationMs = null;
+      if (entity.startedAt) {
+        durationMs = Date.now() - entity.startedAt;
+      }
+
+      // Calculate content length for think entities
+      let contentLength = null;
+      if (entity.type === 'think') {
+        contentLength = (entity.content || '').length;
+      }
+
+      const stmt = db.prepare(`
+        INSERT INTO chat_entities (record_id, session_id, seq, type, content,
+                                   tool_name, tool_args, tool_result,
+                                   tool_is_error, is_complete,
+                                   duration_ms, content_length)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      stmt.run(
+        recordId, dbSessionId, entitySeq++,
+        entity.type,
+        entity.type === 'think' || entity.type === 'msg' ? entity.content : null,
+        entity.type === 'tool' ? entity.toolName : null,
+        entity.type === 'tool' ? JSON.stringify(entity.toolArgs ?? {}) : null,
+        entity.type === 'tool' ? JSON.stringify(entity.result ?? null) : null,
+        entity.type === 'tool' ? (entity.isError ? 1 : 0) : 0,
+        entity.type === 'tool' ? (entity.isComplete ? 1 : 0) : 0,
+        durationMs,
+        contentLength,
+      );
+      entity.saved = true;
+    }
+
+    /** Seal the last unsealed entity of a given type and persist it */
+    function sealAndSave(type) {
+      const ent = lastEntity(type);
+      if (ent && !ent.saved) {
+        ent.sealed = true;
+        saveEntity(ent);
+      }
+    }
+
+    await piManager.prompt(piSessionId, prompt, {
+      images: images.length > 0 ? images : undefined,
       onEvent: (event) => {
         switch (event.type) {
-          case "text":
+          // ── Text delta ──
+          case "text": {
             fullText += event.content;
+            // Seal any open thinking block before appending text
+            sealAndSave('think');
+            const lastMsg = lastEntity('msg');
+            if (lastMsg && !lastMsg.saved) {
+              lastMsg.content += event.content;
+            } else {
+              entityBuf.push({ type: 'msg', content: event.content, saved: false });
+            }
             res.write(`event: text\ndata: ${JSON.stringify({ content: event.content })}\n\n`);
             break;
-          case "thinking":
-            thinkingSeq++;
-            db.prepare("INSERT INTO thinking_entries (id, session_id, seq, content) VALUES (?, ?, ?, ?)").run(
-              uuidv4(), dbSessionId, thinkingSeq, event.content
-            );
+          }
+
+          // ── Thinking delta ──
+          case "thinking": {
+            const lastThink = lastEntity('think');
+            if (lastThink && !lastThink.saved) {
+              lastThink.content += event.content;
+            } else {
+              // Seal previous msg before starting think
+              sealAndSave('msg');
+              entityBuf.push({
+                type: 'think',
+                content: event.content,
+                startedAt: Date.now(),  // start timing here
+                saved: false,
+              });
+            }
             res.write(`event: thinking\ndata: ${JSON.stringify({ content: event.content })}\n\n`);
             break;
-          case "tool_start":
-            toolSeq++;
-            db.prepare("INSERT INTO tool_entries (id, session_id, seq, tool_call_id, name, args) VALUES (?, ?, ?, ?, ?, ?)").run(
-              uuidv4(), dbSessionId, toolSeq, event.id, event.name, JSON.stringify(event.args || {})
-            );
+          }
+
+          // ── Tool started ──
+          case "tool_start": {
+            sealAndSave('think');
+            sealAndSave('msg');
+            entityBuf.push({
+              type: 'tool',
+              toolId: event.id,          // tool_call_id for matching updates/end
+              toolName: event.name,
+              toolArgs: event.args ?? {},
+              result: null,
+              isError: false,
+              isComplete: false,
+              startedAt: Date.now(),     // start timing here
+              saved: false,
+            });
             res.write(`event: tool_start\ndata: ${JSON.stringify({ id: event.id, name: event.name, args: event.args })}\n\n`);
             break;
-          case "tool_update":
-            {
-              const existing = db.prepare("SELECT id FROM tool_entries WHERE session_id = ? AND tool_call_id = ? AND name = ?").get(dbSessionId, event.id, event.name);
-              if (existing) {
-                const partialStr = typeof event.partialResult === "string" ? event.partialResult : JSON.stringify(event.partialResult || "");
-                db.prepare("UPDATE tool_entries SET partial_result = COALESCE(partial_result, '') || ? WHERE id = ?").run(partialStr, existing.id);
-              }
-            }
+          }
+
+          // ── Tool partial result ──
+          case "tool_update": {
+            const tool = entityBuf.find(
+              (e) => e.type === 'tool' && e.toolId === event.id && !e.saved
+            );
+            if (tool) tool.partialResult = event.partialResult;
             res.write(`event: tool_update\ndata: ${JSON.stringify({ id: event.id, name: event.name, partialResult: event.partialResult })}\n\n`);
             break;
-          case "tool_end":
-            {
-              const existing = db.prepare("SELECT id FROM tool_entries WHERE session_id = ? AND tool_call_id = ? AND name = ?").get(dbSessionId, event.id, event.name);
-              if (existing) {
-                const resultStr = typeof event.result === "string" ? event.result : JSON.stringify(event.result || "");
-                db.prepare("UPDATE tool_entries SET result = ?, is_error = ? WHERE id = ?").run(resultStr, event.isError ? 1 : 0, existing.id);
-              }
+          }
+
+          // ── Tool completed ──
+          case "tool_end": {
+            const tool = entityBuf.find(
+              (e) => e.type === 'tool' && e.toolId === event.id && !e.saved
+            );
+            if (tool) {
+              tool.result = event.result;
+              tool.isError = !!event.isError;
+              tool.isComplete = true;
+              saveEntity(tool); // persist immediately — tool is done
             }
             res.write(`event: tool_end\ndata: ${JSON.stringify({ id: event.id, name: event.name, args: event.args, result: event.result, isError: event.isError })}\n\n`);
             break;
+          }
+
+          // ── Stream end ──
           case "done": {
-            const assistId = uuidv4();
-            db.prepare("INSERT INTO chat_messages (id, session_id, role, content) VALUES (?, ?, ?, ?)").run(
-              assistId, dbSessionId, "assistant", fullText || "(no text response)"
-            );
-            res.write(`event: done\ndata: ${JSON.stringify({})}\n\n`);
-            res.end();
+            // Save any remaining unsaved entities
+            for (const ent of entityBuf) {
+              if (!ent.saved) saveEntity(ent);
+            }
+            // Update record with agent_reply_id
+            db.prepare("UPDATE chat_records SET agent_reply_id = ? WHERE id = ?")
+              .run(uuidv4(), recordId);
             break;
           }
         }
       },
     });
+
+    // ── Generate session name on first exchange ──
+    const userMsgCount = db.prepare(
+      "SELECT COUNT(*) AS c FROM chat_records WHERE session_id = ?"
+    ).get(dbSessionId);
+
+    if (userMsgCount && userMsgCount.c === 1) {
+      try {
+        const name = await generateSessionName(prompt, fullText);
+        db.prepare("UPDATE session_metadata SET name = ?, updated_at = datetime('now') WHERE id = ?")
+          .run(name, dbSessionId);
+
+        const sessionMeta = db.prepare(
+          "SELECT id, name, created_at, updated_at FROM session_metadata WHERE id = ?"
+        ).get(dbSessionId);
+
+        res.write(`event: session_name\ndata: ${JSON.stringify(sessionMeta)}\n\n`);
+      } catch (err) {
+        console.error("Session naming failed:", err);
+      }
+    }
+
+    // ── Signal completion ──
+    if (!res.writableEnded) {
+      res.write(`event: done\ndata: ${JSON.stringify({})}\n\n`);
+      res.end();
+    }
   } catch (err) {
     if (!res.writableEnded) {
       res.write(`event: error\ndata: ${JSON.stringify({ error: err.message })}\n\n`);
@@ -178,19 +318,106 @@ router.post("/chat/stream", authMiddleware, upload.array("files", 20), async (re
   }
 });
 
+// ─────────────────────────────────────────────────────────
+//  GET /api/chat/history/:sessionId — load session history
+// ─────────────────────────────────────────────────────────
 router.get("/chat/history/:sessionId", authMiddleware, (req, res) => {
   const db = getDb();
   const { sessionId } = req.params;
 
-  const meta = db.prepare("SELECT id, name FROM session_metadata WHERE id = ? AND user_id = ?").get(sessionId, req.user.userId);
+  const meta = db.prepare(
+    "SELECT id, name FROM session_metadata WHERE id = ? AND user_id = ?"
+  ).get(sessionId, req.user.userId);
   if (!meta) return res.status(404).json({ error: "Session not found" });
 
-  const messages = db.prepare("SELECT id, role, content, created_at FROM chat_messages WHERE session_id = ? ORDER BY created_at ASC, id ASC").all(sessionId);
-  const thinking = db.prepare("SELECT seq, content FROM thinking_entries WHERE session_id = ? ORDER BY seq ASC").all(sessionId);
-  const tools = db.prepare("SELECT seq, tool_call_id AS id, name, args, result, is_error FROM tool_entries WHERE session_id = ? ORDER BY seq ASC").all(sessionId);
-  res.json({ sessionId: meta.id, name: meta.name, messages, thinking, tools });
+  // ── Load records with entities ──
+  const records = db.prepare(
+    "SELECT id, user_msg_content, agent_reply_id, created_at FROM chat_records WHERE session_id = ? ORDER BY created_at ASC"
+  ).all(sessionId);
+
+  const result = [];
+  for (const rec of records) {
+    // Entities
+    const entities = db.prepare(
+      "SELECT type, content, tool_name, tool_args, tool_result, tool_is_error, is_complete, duration_ms, content_length FROM chat_entities WHERE record_id = ? ORDER BY seq ASC"
+    ).all(rec.id);
+
+    const entityList = entities.map((e) => {
+      if (e.type === 'think') {
+        return {
+          type: 'think',
+          content: e.content,
+          duration: e.duration_ms ? Math.round(e.duration_ms / 1000) : undefined,
+          totalLength: e.content_length || (e.content || '').length,
+        };
+      }
+      if (e.type === 'msg')   return { type: 'msg', content: e.content };
+      if (e.type === 'tool') {
+        let args = {};
+        let result = null;
+        try { args = JSON.parse(e.tool_args || '{}'); } catch {}
+        try { result = JSON.parse(e.tool_result || 'null'); } catch {}
+        return {
+          type: 'tool',
+          name: e.tool_name,
+          args,
+          result,
+          isError: !!e.tool_is_error,
+          isComplete: !!e.is_complete,
+          duration: e.duration_ms ? Math.round(e.duration_ms / 1000) : undefined,
+        };
+      }
+      return null;
+    }).filter(Boolean);
+
+    // Uploaded files metadata
+    const files = db.prepare(
+      "SELECT id, type, file_name, file_size, mime_type, created_at FROM chat_files WHERE record_id = ? ORDER BY created_at ASC"
+    ).all(rec.id);
+
+    result.push({
+      id: rec.id,
+      userMsg: { content: rec.user_msg_content },
+      agentReply: { id: rec.agent_reply_id || '', entities: entityList },
+      created_at: rec.created_at,
+      files: files.map((f) => ({
+        id: f.id,
+        type: f.type,
+        fileName: f.file_name,
+        fileSize: f.file_size,
+        mimeType: f.mime_type,
+        createdAt: f.created_at,
+      })),
+    });
+  }
+
+  res.json({ sessionId: meta.id, name: meta.name, records: result });
 });
 
+// ─────────────────────────────────────────────────────────
+//  GET /api/chat/file/:id — download an uploaded file
+// ─────────────────────────────────────────────────────────
+router.get("/chat/file/:id", authMiddleware, (req, res) => {
+  const db = getDb();
+  const file = db.prepare(
+    `SELECT f.*, r.session_id FROM chat_files f
+     JOIN chat_records r ON r.id = f.record_id
+     JOIN session_metadata s ON s.id = r.session_id
+     WHERE f.id = ? AND s.user_id = ?`
+  ).get(req.params.id, req.user.userId);
+
+  if (!file) return res.status(404).json({ error: "File not found" });
+
+  if (!fs.existsSync(file.file_path)) {
+    return res.status(404).json({ error: "File no longer exists on disk" });
+  }
+
+  res.download(file.file_path, file.file_name);
+});
+
+// ─────────────────────────────────────────────────────────
+//  POST /api/chat/session — lookup session by id
+// ─────────────────────────────────────────────────────────
 router.post("/chat/session", authMiddleware, (req, res) => {
   const db = getDb();
   const dbSessionId = req.body.sessionId;

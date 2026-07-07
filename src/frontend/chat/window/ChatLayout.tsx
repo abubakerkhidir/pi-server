@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { getSettings, getModels, getSessions, getUsername } from "@/frontend/api";
-import type { ChatLayoutProps, UserSettings, ChatState, ChatRecord } from "@/frontend/types";
+import type { ChatLayoutProps, UserSettings, ChatState, ChatRecord, Session } from "@/frontend/types";
 import ChatSidebar from "../../sidebar/ChatSidebar";
 import ChatHeader from "./ChatHeader";
 import ChatWindow from "./ChatWindow";
@@ -10,33 +10,97 @@ import { useChatStream } from "@/frontend/hooks/useChatStream";
 import { loadSessionHistory } from "@/frontend/hooks/useSessionHistory";
 import { v4 as uuidv4 } from "uuid";
 
+const PAGE_SIZE = 20;
+
 export default function ChatLayout({ onLogout }: ChatLayoutProps) {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [sessions, setSessions] = useState<{ id: string; name: string | null; updated_at: string }[]>([]);
-  const [userSettings, setUserSettings] = useState<UserSettings>({ tools_enabled: [], thinking_lines: 3, tool_lines: 5 });
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [sessionTotal, setSessionTotal] = useState(0);
+  const [sessionsLoaded, setSessionsLoaded] = useState(false); // lazy init flag
+  const [userSettings, setUserSettings] = useState<UserSettings>({
+    tools_enabled: [],
+    thinking_lines: 3,
+    tool_lines: 5,
+  });
   const [showSettings, setShowSettings] = useState(false);
   const [currentModel, setCurrentModel] = useState("Coding Agent");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Sidebar collapsed by default on narrow screens (< 800px)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(window.innerWidth < 800);
+
+  // Listen for resize to auto-collapse below 800px
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 799px)");
+    const handler = (e: MediaQueryListEvent | MediaQueryList) => {
+      if (e.matches) setSidebarCollapsed(true);
+    };
+    if (mq.matches) setSidebarCollapsed(true);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
   const [userPrompt, setUserPrompt] = useState("");
+  const [showScrollDown, setShowScrollDown] = useState(false);
 
   // Chat state
   const [chatState, setChatState] = useState<ChatState>({ records: [] });
 
   const currentSessionIdRef = useRef(currentSessionId);
-  useEffect(() => { currentSessionIdRef.current = currentSessionId; }, [currentSessionId]);
+  useEffect(() => {
+    currentSessionIdRef.current = currentSessionId;
+  }, [currentSessionId]);
 
-  const loadSessions = useCallback(async () => {
-    try { setSessions(await getSessions() as { id: string; name: string | null; updated_at: string }[]); } catch { /* ignore */ }
+  const isProcessingRef = useRef(isProcessing);
+  useEffect(() => {
+    isProcessingRef.current = isProcessing;
+  }, [isProcessing]);
+
+  // Track next offset for pagination
+  const loadMoreOffsetRef = useRef(0);
+
+  // ── Lazy session loading (page renders first, then sessions fetch async) ──
+  const loadSessions = useCallback(async (loadMore = false) => {
+    try {
+      const offset = loadMore ? loadMoreOffsetRef.current : 0;
+      const result = await getSessions(PAGE_SIZE, offset);
+      const data = result as { sessions: Session[]; total: number };
+      if (loadMore) {
+        setSessions((prev) => [...prev, ...data.sessions]);
+      } else {
+        setSessions(data.sessions);
+      }
+      loadMoreOffsetRef.current = offset + data.sessions.length;
+      setSessionTotal(data.total);
+      setSessionsLoaded(true);
+    } catch {
+      /* ignore */
+    }
   }, []);
 
-  useEffect(() => { loadSessions(); }, [loadSessions]);
+  const reloadSessions = useCallback(() => {
+    loadMoreOffsetRef.current = 0;
+    loadSessions(false);
+  }, [loadSessions]);
+
+  // Initial fetch — runs after mount, doesn't block render
   useEffect(() => {
-    getSettings().then((s) => setUserSettings({ ...userSettings, ...(s as UserSettings) })).catch(() => {});
-    getModels().then((r) => {
-      const first = ((r as { groups: { models: { name: string }[] }[] }).groups || []).flatMap((g) => g.models)[0];
-      if (first) setCurrentModel(first.name);
-    }).catch(() => {});
+    loadSessions(false);
+  }, [loadSessions]);
+
+  useEffect(() => {
+    getSettings()
+      .then((s) => setUserSettings({ ...userSettings, ...(s as UserSettings) }))
+      .catch(() => {});
+    getModels()
+      .then((r) => {
+        const first = ((r as { groups: { models: { name: string }[] }[] }).groups || []).flatMap(
+          (g) => g.models,
+        )[0];
+        if (first) setCurrentModel(first.name);
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const { handleSend, resetState } = useChatStream({
@@ -44,32 +108,54 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
     userSettings,
   });
 
-  /* ── onStreamEnd — sets isProcessing = false when stream finishes ── */
   const handleStreamEnd = useCallback(() => {
     setIsProcessing(false);
+    // Ensure URL hash reflects the session (in case session_name didn't fire)
+    const sid = currentSessionIdRef.current;
+    if (sid && window.location.hash !== `#${sid}`) {
+      window.history.replaceState(null, "", `#${sid}`);
+    }
   }, []);
 
-  /* ── onEntityUpdate — called after EVERY SSE event for streaming UI updates ── */
-  const onEntityUpdate = useCallback((entities: import("@/frontend/types").AgentReplyEntity[]) => {
-    setChatState((prev) => {
-      const last = prev.records[prev.records.length - 1];
-      if (!last) return prev;
-      last.agentReply.entities = entities;
-      return { records: [...prev.records] };
-    });
-  }, []);
+  const onEntityUpdate = useCallback(
+    (entities: import("@/frontend/types").AgentReplyEntity[]) => {
+      setChatState((prev) => {
+        const last = prev.records[prev.records.length - 1];
+        if (!last) return prev;
+        last.agentReply.entities = entities;
+        return { records: [...prev.records] };
+      });
+    },
+    [],
+  );
 
-  /* ── Send handler ──────────────────────────────────────
-   *
-   * 1. Create a ChatRecord (empty agentReply) so the UI has a placeholder
-   * 2. Fire up the stream — onEntityUpdate fires for each SSE token
-   * 3. handleStreamEnd is called when done/error/abort
-   */
+  const handleSessionName = useCallback(
+    (session: Session) => {
+      const updatedAt = session.updated_at || new Date().toISOString();
+      setSessions((prev) => {
+        const existing = prev.find((s) => s.id === session.id);
+        if (existing) {
+          return [
+            { id: session.id, name: session.name, updated_at: updatedAt },
+            ...prev.filter((s) => s.id !== session.id),
+          ];
+        }
+        return [{ id: session.id, name: session.name, updated_at: updatedAt }, ...prev];
+      });
+      // Update URL hash so session can be resumed after refresh.
+      // Use replaceState to avoid triggering hashchange events mid-stream.
+      if (window.location.hash !== `#${session.id}`) {
+        window.history.replaceState(null, "", `#${session.id}`);
+      }
+    },
+    [],
+  );
+
   const handleSendWrapper = useCallback(
     (prompt: string, files: File[]) => {
       if (!prompt || isProcessing) return;
+      setUserPrompt("");
 
-      // Create record (empty agentReply)
       const userId = uuidv4();
       const userRecord: ChatRecord = {
         id: userId,
@@ -78,19 +164,33 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
       };
       setChatState((prev) => ({ records: [...prev.records, userRecord] }));
 
-      // Start streaming
       setIsProcessing(true);
-      handleSend(prompt, files, onEntityUpdate, handleStreamEnd);
+      handleSend(
+        prompt,
+        files,
+        onEntityUpdate,
+        handleStreamEnd,
+        handleSessionName,
+        (sessionId) => {
+          // Update currentSessionId so follow-up messages reuse this session.
+          // Don't set window.location.hash here — that would trigger a hashchange
+          // event mid-stream and cause a history reload race.
+          setCurrentSessionId(sessionId);
+        },
+      );
     },
-    [isProcessing, handleSend, onEntityUpdate, handleStreamEnd],
+    [isProcessing, handleSend, onEntityUpdate, handleStreamEnd, handleSessionName],
   );
 
-  /* ── Session / sidebar handlers ──────────────────────── */
   const handleNewChat = () => {
     setChatState({ records: [] });
     setCurrentSessionId(null);
     resetState();
-    loadSessions();
+    reloadSessions();
+    // Clear URL hash so a fresh session will be created
+    if (window.location.hash) {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
   };
 
   const handleResumeSession = async (sessionId: string | null) => {
@@ -105,14 +205,13 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
 
   const handleModelSelect = (model: { name: string }) => setCurrentModel(model.name);
 
-  /* ── Session loading ─────────────────────────────────── */
   const loadAndShowSession = async (sessionId: string) => {
     if (sessionId === currentSessionIdRef.current) return;
     try {
       const state = await loadSessionHistory(sessionId);
       setChatState(state);
       setCurrentSessionId(sessionId);
-      loadSessions();
+      reloadSessions();
     } catch (err) {
       console.error("Failed to load session:", err);
       window.location.hash = "";
@@ -123,12 +222,15 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
     const handleHashChange = async () => {
       const hash = window.location.hash.replace("#", "");
       if (!hash) return;
+      // Don't reload session mid-stream — that would wipe the streaming state
+      if (isProcessingRef.current) return;
       await loadAndShowSession(hash);
     };
     window.addEventListener("hashchange", handleHashChange);
     const initialHash = window.location.hash.replace("#", "");
     if (initialHash) loadAndShowSession(initialHash);
     return () => window.removeEventListener("hashchange", handleHashChange);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const username = getUsername();
@@ -137,24 +239,38 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
     <div className="chat-layout">
       <ChatSidebar
         sessions={sessions}
+        sessionTotal={sessionTotal}
         currentSessionId={currentSessionId}
         onNewChat={handleNewChat}
-        onSessionClick={(id) => { window.location.hash = id; }}
+        onSessionClick={(id) => {
+          window.location.hash = id;
+        }}
         onLogout={onLogout}
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-        onRenameComplete={loadSessions}
+        onRenameComplete={reloadSessions}
+        onLoadMore={() => loadSessions(true)}
       />
-      <button className="sidebar-toggle-floating" onClick={() => setSidebarCollapsed(false)}>☰</button>
-      <div className={`main-area ${sidebarCollapsed ? "main-area" : ""}`} id="mainArea" style={sidebarCollapsed ? { paddingLeft: 50 } : {}}>
+      <div className="main-area" id="mainArea">
         <ChatHeader
           username={username}
           onSettingsClick={() => setShowSettings(true)}
           onLogout={onLogout}
           currentModel={currentModel}
           onModelSelect={handleModelSelect}
+          sidebarCollapsed={sidebarCollapsed}
+          onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
-        <ChatWindow chatState={chatState} userSettings={userSettings} />
+        <ChatWindow
+          chatState={chatState}
+          userSettings={userSettings}
+          onScrollAwayChange={setShowScrollDown}
+          showScrollDown={showScrollDown}
+          onScrollDownClick={() => {
+            const el = document.getElementById("chatMessages");
+            if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+          }}
+        />
         <InputArea
           onSend={handleSendWrapper}
           disabled={isProcessing}

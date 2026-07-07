@@ -1,7 +1,6 @@
-/* Input Area */
+/* Input Area — flush with chat, no top border */
 .input-area {
-  border-top: 1px solid var(--border);
-  padding: 12px 20px 16px;
+  padding: 5px 20px 10px;
   background: var(--surface);
   flex-shrink: 0;
 }
@@ -11,36 +10,46 @@
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 6px;
 }
 
 .input-row {
   display: flex;
-  gap: 8px;
   align-items: flex-end;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface2);
+  transition: border-color 0.2s;
 }
 
+.input-row:focus-within {
+  border-color: var(--accent);
+}
+
+/* Upload (+) button — inside the input row, smaller, rounded, darker */
 .upload-btn {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px 0 0 12px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
   border: 1px solid var(--border);
-  border-right: none;
-  background: var(--surface2);
+  background: var(--surface3);
   color: var(--text-dim);
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 300;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  padding: 0;
+  margin: 8px 0 8px 8px;
   transition: all 0.15s;
 }
 
 .upload-btn:hover {
-  color: var(--text);
-  background: var(--surface3);
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-glow);
 }
 
 .prompt-input {
@@ -57,23 +66,10 @@
   min-height: 44px;
   max-height: 200px;
   line-height: 1.5;
-  transition: border-color 0.2s;
 }
 
 .prompt-input:focus { background: var(--surface3); }
 .prompt-input::placeholder { color: var(--text-dim); }
-
-.input-row {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--surface2);
-  transition: border-color 0.2s;
-}
-
-.input-row:focus-within {
-  border-color: var(--accent);
-}
 
 .send-btn {
   width: 44px;
@@ -97,14 +93,7 @@
   cursor: not-allowed;
 }
 
-.input-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 28px;
-  padding: 0 4px;
-}
-
+/* File chips */
 .preview-row {
   display: flex;
   gap: 6px;

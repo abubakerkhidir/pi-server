@@ -85,15 +85,21 @@
   color: var(--text);
 }
 
-.arr-btn.arr-hidden {
-  visibility: hidden;
-  pointer-events: none;
-}
+/* arr-hidden removed — now uses a single toggle arrow */
 
 .cb-label {
   font-weight: 600;
   user-select: text;
   cursor: default;
+  flex: 1;
+}
+
+.tool-duration {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: auto;
+  white-space: nowrap;
 }
 
 .cb-tool-name {

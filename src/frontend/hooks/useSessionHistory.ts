@@ -1,136 +1,119 @@
 import { getChatHistory } from "@/frontend/api";
-import type { ChatRecord, ChatState, UserMsg, AgentReply, AgentReplyEntity } from "@/frontend/types";
-import { escapeHtmlSimple } from "@/frontend/lib/escapeHtml";
-import { marked } from "marked";
+import type { ChatRecord, ChatState } from "@/frontend/types";
 
-marked.setOptions({ breaks: true, gfm: true });
+/**
+ * Backend response for session history — new entity-based format.
+ */
+interface BackendEntity {
+  type: "think" | "msg" | "tool";
+  content?: string;
+  name?: string;
+  args?: Record<string, unknown>;
+  result?: unknown;
+  isError?: boolean;
+  isComplete?: boolean;
+  duration?: number;
+  totalLength?: number;
+}
 
-// Backend response shape
+interface BackendRecord {
+  id: string;
+  userMsg: { content: string };
+  agentReply: {
+    id: string;
+    entities: BackendEntity[];
+  };
+  created_at?: string;
+}
+
 interface BackendHistory {
   sessionId: string;
   name: string;
-  messages: { id: string; role: string; content: string; created_at: string }[];
-  thinking: { seq: number; content: string }[];
-  tools: { seq: number; id: string; name: string; args: string; result: string; is_error?: number }[];
-}
-
-function getSubtitle(args: Record<string, unknown> | undefined, name: string): string {
-  if (!args) return "";
-  if (name === "write" || name === "ctx_write" || name === "read" || name === "ctx_read") {
-    return String(args.path || args.filePath || args.file || "");
-  }
-  if (name === "bash" || name === "shell" || name === "ctx_shell") {
-    return String(args.command || args.cmd || "");
-  }
-  if (name === "grep" || name === "ctx_search" || name === "ctx_semantic_search") {
-    return String(args.pattern || args.query || "");
-  }
-  if (name === "ls" || name === "ctx_tree" || name === "ctx_glob" || name === "find" || name === "glob") {
-    return String(args.path || args.pattern || args.glob || "");
-  }
-  if (name === "edit" || name === "ctx_edit") {
-    return String(args.path || args.file || "");
-  }
-  return "";
+  records: BackendRecord[];
 }
 
 /**
- * Convert backend session data into ChatState format using entity types.
+ * Convert a backend entity to the frontend AgentReplyEntity type.
+ *
+ * The frontend expects:
+ *  MsgData   { type: "msg",   id: string,  content: string, sealed?: boolean }
+ *  ThinkData { type: "think", id: string,  content: string, sealed?: boolean }
+ *  ToolData  { type: "tool",  id: string,  name: string,  args, partialResult,
+ *              result, isError, isComplete, sealed?: boolean }
+ */
+function mapEntity(
+  e: BackendRecord["agentReply"]["entities"][0],
+  index: number,
+): ChatRecord["agentReply"]["entities"][0] {
+  const base = { sealed: true };
+  if (e.type === "think") {
+    return {
+      ...base,
+      type: "think" as const,
+      id: `think-${index}`,
+      content: e.content || "",
+      duration: e.duration,
+      totalLength: e.totalLength,
+    };
+  }
+  if (e.type === "msg") {
+    return { ...base, type: "msg" as const, id: `msg-${index}`, content: e.content || "" };
+  }
+  if (e.type === "tool") {
+    return {
+      ...base,
+      type: "tool" as const,
+      id: `tool-${index}`,
+      name: e.name || "",
+      args: e.args,
+      partialResult: undefined,
+      result: e.result,
+      isError: !!e.isError,
+      isComplete: !!e.isComplete,
+      duration: e.duration,
+    };
+  }
+  // Fallback — treat as msg
+  return { ...base, type: "msg" as const, id: `msg-${index}`, content: "" };
+}
+
+/**
+ * Load session history from the backend.
+ *
+ * The backend now returns records in the same entity-based format used
+ * by the frontend. This function maps them into ChatState.
  */
 export async function loadSessionHistory(sessionId: string): Promise<ChatState> {
   try {
-    const history = await getChatHistory(sessionId);
-    const h = history as BackendHistory;
+    const raw = await getChatHistory(sessionId);
+    const history = raw as BackendHistory;
 
-    // Group tools by their id (tool_call_id)
-    const toolGroups: Record<string, BackendHistory["tools"][0][]> = {};
-    for (const t of h.tools || []) {
-      if (!toolGroups[t.id]) toolGroups[t.id] = [];
-      toolGroups[t.id].push(t);
+    if (!history.records || !Array.isArray(history.records)) {
+      console.warn("[loadSessionHistory] No records in response", history);
+      return { records: [] };
     }
 
-    // Group thinking by session
-    const thinkingContent = (h.thinking || []).map((t) => t.content).join("\n");
+    const records: ChatRecord[] = history.records.map((rec, ri) => {
+      let entityIndex = 0;
+      const entities = (rec.agentReply?.entities || []).map((e) => {
+        const mapped = mapEntity(e, entityIndex);
+        entityIndex++;
+        return mapped;
+      });
 
-    // Build ChatRecord[] from messages
-    const records: ChatRecord[] = [];
-    let currentRecord: ChatRecord | null = null;
-    let entityIndex = 0;
-
-    for (const msg of h.messages) {
-      if (msg.role === "user") {
-        // Flush previous agent reply
-        if (currentRecord && currentRecord.agentReply.entities.length > 0) {
-          records.push(currentRecord);
-        }
-        currentRecord = {
-          id: msg.id,
-          userMsg: { content: msg.content },
-          agentReply: { id: msg.id, entities: [] },
-        };
-      } else if (msg.role === "assistant") {
-        if (!currentRecord) {
-          // Orphaned assistant message without user
-          currentRecord = {
-            id: msg.id,
-            userMsg: { content: "" },
-            agentReply: { id: msg.id, entities: [] },
-          };
-        }
-
-        // Add thinking block if present
-        if (thinkingContent) {
-          currentRecord.agentReply.entities.push({
-            type: "think",
-            id: `think-${entityIndex++}`,
-            content: thinkingContent,
-          });
-        }
-
-        // Add tool blocks
-        for (const [, entries] of Object.entries(toolGroups)) {
-          const first = entries[0];
-          const last = entries[entries.length - 1];
-          if (!first) continue;
-
-          let args: Record<string, unknown> = {};
-          try { args = JSON.parse(first.args || "{}"); } catch { /* ignore */ }
-
-          let result: unknown = null;
-          try { result = JSON.parse(last.result || "null"); } catch { /* ignore */ }
-
-          currentRecord.agentReply.entities.push({
-            type: "tool",
-            id: first.id,
-            name: first.name,
-            args,
-            partialResult: undefined,
-            result,
-            isError: !!first.is_error,
-            isComplete: true,
-          });
-        }
-
-        // Add text message if present
-        if (msg.content && msg.content !== "(no text response)") {
-          currentRecord.agentReply.entities.push({
-            type: "msg",
-            id: `msg-${entityIndex++}`,
-            content: msg.content,
-            sealed: true,
-          });
-        }
-      }
-    }
-
-    // Flush last record
-    if (currentRecord) {
-      records.push(currentRecord);
-    }
+      return {
+        id: rec.id || `rec-${ri}`,
+        userMsg: { content: rec.userMsg?.content || "" },
+        agentReply: {
+          id: rec.agentReply?.id || "",
+          entities,
+        },
+      };
+    });
 
     return { records };
   } catch (err) {
-    console.error("Failed to load session:", err);
+    console.error("[loadSessionHistory] Failed:", err);
     return { records: [] };
   }
 }

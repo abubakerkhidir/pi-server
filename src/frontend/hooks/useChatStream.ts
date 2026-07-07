@@ -7,8 +7,6 @@ let msgCounter = 0;
 const nextThinkId = () => `think-${++thinkCounter}`;
 const nextMsgId = () => `msg-${++msgCounter}`;
 
-/* ── Public API ──────────────────────────────────────── */
-
 interface UseChatStreamOptions {
   currentSessionId: string | null;
   userSettings: { tool_lines: number; thinking_lines: number };
@@ -16,51 +14,31 @@ interface UseChatStreamOptions {
 
 export type OnEntityUpdate = (entities: AgentReplyEntity[]) => void;
 export type OnStreamEnd = () => void;
+export type OnSessionName = (session: { id: string; name: string; updated_at: string; created_at?: string }) => void;
+export type OnSessionCreated = (sessionId: string) => void;
 
 export interface UseChatStreamResult {
   sessionId: string | null;
-  /**
-   * Start streaming for a new user message.
-   *
-   * The parent MUST:
-   *   1. Create a ChatRecord with empty agentReply.entities BEFORE calling
-   *   2. Pass `onEntityUpdate` — called after every SSE event (streaming UI updates)
-   *   3. Pass `onStreamEnd` — called when the stream ends (done/error/abort)
-   *
-   * handleSend returns immediately (fire-and-forget). The parent sets
-   * `isProcessing = true` before calling and `isProcessing = false` in
-   * `onStreamEnd`.
-   */
   handleSend: (
     prompt: string,
     files: File[],
     onEntityUpdate: OnEntityUpdate,
     onStreamEnd: OnStreamEnd,
+    onSessionName?: OnSessionName,
+    onSessionCreated?: OnSessionCreated,
   ) => void;
   resetState: () => void;
 }
 
-/**
- * Simplified streaming hook.
- *
- * All entity aggregation lives inside this hook.  After every SSE event the
- * hook calls `onEntityUpdate(currentEntities)` so the parent can update its
- * ChatRecord immediately — enabling real-time streaming in the UI.
- *
- * When the stream ends (done/error/abort) the hook calls `onStreamEnd`.
- *
- * Error handling:
- *   - Network / server errors → onError seals all entities
- *   - Abort (new message while streaming) → silently ignored, entities kept
- */
 export function useChatStream({
   currentSessionId,
 }: UseChatStreamOptions): UseChatStreamResult {
   const sessionIdRef = useRef<string | null>(null);
   const isProcessingRef = useRef(false);
   const entitiesRef = useRef<AgentReplyEntity[]>([]);
+  // Track entity start times for live duration calculation
+  const entityStartTimes = useRef<Map<string, number>>(new Map());
 
-  /* ── helpers ─────────────────────────────────────────── */
   const getLastEntity = <T extends AgentReplyEntity>(
     typ: string,
     list: AgentReplyEntity[],
@@ -69,16 +47,28 @@ export function useChatStream({
 
   const sealLastEntity = (typ: string, list: AgentReplyEntity[]) => {
     const ent = getLastEntity<AgentReplyEntity>(typ, list);
-    if (ent) ent.sealed = true;
+    if (ent) {
+      ent.sealed = true;
+      // Calculate duration from start time
+      const startedAt = entityStartTimes.current.get(ent.id);
+      if (startedAt) {
+        (ent as any).duration = Math.round((Date.now() - startedAt) / 1000);
+        entityStartTimes.current.delete(ent.id);
+      }
+      if (ent.type === "think") {
+        (ent as ThinkData).totalLength = (ent as ThinkData).content.length;
+      }
+    }
   };
 
-  /* ── handleSend ──────────────────────────────────────── */
   const handleSend = useCallback(
     (
       prompt: string,
       files: File[],
       onEntityUpdate: OnEntityUpdate,
       onStreamEnd: OnStreamEnd,
+      onSessionName?: OnSessionName,
+      onSessionCreated?: OnSessionCreated,
     ) => {
       if (!prompt || isProcessingRef.current) return;
       isProcessingRef.current = true;
@@ -105,6 +95,7 @@ export function useChatStream({
             switch (event) {
               case "session":
                 sessionIdRef.current = data.sessionId as string;
+                onSessionCreated?.(data.sessionId as string);
                 break;
 
               case "thinking": {
@@ -114,7 +105,9 @@ export function useChatStream({
                 if (lastThink && !lastThink.sealed) {
                   lastThink.content += content;
                 } else {
-                  entitiesRef.current.push({ type: "think", id: nextThinkId(), content });
+                  const id = nextThinkId();
+                  entityStartTimes.current.set(id, Date.now());
+                  entitiesRef.current.push({ type: "think", id, content });
                 }
                 break;
               }
@@ -134,9 +127,11 @@ export function useChatStream({
               case "tool_start": {
                 sealLastEntity("think", entitiesRef.current);
                 sealLastEntity("msg", entitiesRef.current);
+                const toolId = data.id as string;
+                entityStartTimes.current.set(toolId, Date.now());
                 entitiesRef.current.push({
                   type: "tool",
-                  id: data.id as string,
+                  id: toolId,
                   name: data.name as string,
                   args: data.args as Record<string, unknown> | undefined,
                   partialResult: undefined,
@@ -171,7 +166,17 @@ export function useChatStream({
                   (entitiesRef.current[idx] as ToolData).result = data.result;
                   (entitiesRef.current[idx] as ToolData).isError = !!data.isError;
                   (entitiesRef.current[idx] as ToolData).isComplete = true;
+                  const startedAt = entityStartTimes.current.get(toolId);
+                  if (startedAt) {
+                    (entitiesRef.current[idx] as any).duration = Math.round((Date.now() - startedAt) / 1000);
+                    entityStartTimes.current.delete(toolId);
+                  }
                 }
+                break;
+              }
+
+              case "session_name": {
+                onSessionName?.(data as { id: string; name: string; updated_at: string; created_at?: string });
                 break;
               }
 
@@ -183,11 +188,9 @@ export function useChatStream({
               }
             }
 
-            // Notify parent after every event — enables streaming UI updates
             onEntityUpdate(entitiesRef.current);
           },
           (err: Error) => {
-            // AbortError is expected when user sends a new message — ignore
             if (err.name !== "AbortError") {
               for (const ent of entitiesRef.current) ent.sealed = true;
             }

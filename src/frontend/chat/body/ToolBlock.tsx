@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo } from "react";
 import type { ToolBlockProps } from "@/frontend/types";
 import { escapeHtmlSimple } from "@/frontend/lib/escapeHtml";
 import { formatToolResult } from "@/frontend/lib/formatters";
@@ -24,11 +24,9 @@ function getSubtitle(args: Record<string, unknown> | undefined, name: string): s
 }
 
 export default function ToolBlock({ entity, userSettings }: ToolBlockProps) {
-  // Always start collapsed — user must click to expand
   const [expanded, setExpanded] = useState(false);
   const subtitle = getSubtitle(entity.args, entity.name);
   const maxLines = userSettings.tool_lines || 5;
-  const arrHidden = "arr-hidden";
 
   const formatted = useMemo(
     () => (entity.isComplete ? formatToolResult(entity.name, entity.result, entity.args) : null),
@@ -39,7 +37,6 @@ export default function ToolBlock({ entity, userSettings }: ToolBlockProps) {
     if (entity.isComplete && formatted) {
       return formatted.bodyHtml;
     }
-    // Streaming / incomplete: show args
     const fullArgsStr = entity.args ? escapeHtmlSimple(JSON.stringify(entity.args, null, 2)) : "";
     return entity.name === "edit" && !formatted
       ? ""
@@ -50,7 +47,6 @@ export default function ToolBlock({ entity, userSettings }: ToolBlockProps) {
     if (entity.isComplete && formatted && formatted.footerHtml) {
       return formatted.footerHtml;
     }
-    // Fallback footer for incomplete or unformatted tools
     const isWrite = entity.name === "write" || entity.name === "ctx_write";
     if (isWrite && entity.args?.content) {
       const c = typeof entity.args.content === "string" ? entity.args.content : JSON.stringify(entity.args.content);
@@ -61,28 +57,20 @@ export default function ToolBlock({ entity, userSettings }: ToolBlockProps) {
   }, [entity.name, entity.args, entity.isComplete, subtitle, formatted]);
 
   const maxH = expanded ? "" : maxLines * 21 + "px";
-  const disVal = expanded? 'block':'none'
+  const disVal = expanded ? 'block' : 'none';
 
   return (
     <div className="tool-block" data-tool-id={entity.id}>
       <div className="cb-header">
+        {/* Single toggle arrow */}
         <span
-          className={`arr-btn ${expanded ? arrHidden : ""}`}
-          title="Expand"
-          onClick={() => setExpanded(true)}
+          className="arr-btn"
+          title={expanded ? "Collapse" : "Expand"}
+          onClick={() => setExpanded(!expanded)}
         >
-          ▶
+          {expanded ? "▲" : "▶"}
         </span>
-        <span
-          className={`arr-btn ${!expanded ? arrHidden : ""}`}
-          title="Collapse"
-          onClick={() => setExpanded(false)}
-        >
-          ▲
-        </span>
-        <span
-          className={`tool-status ${entity.isComplete ? (entity.isError ? "error" : "done") : ""}`}
-        >
+        <span className={`tool-status ${entity.isComplete ? (entity.isError ? "error" : "done") : ""}`}>
           {entity.isComplete ? (entity.isError ? "✗" : "✓") : ""}
         </span>
         {!entity.isComplete && !entity.result && <span className="spinner" />}
@@ -90,8 +78,12 @@ export default function ToolBlock({ entity, userSettings }: ToolBlockProps) {
           <span className="cb-tool-name">{entity.name}</span>
           {subtitle && <span className="cb-tool-subtitle">{subtitle}</span>}
         </span>
+        {/* Duration on the far right */}
+        {entity.duration != null && (
+          <span className="tool-duration">{entity.duration}s</span>
+        )}
       </div>
-      <div className="cb-body" hidden={expanded} style={{ maxHeight: maxH, display:disVal }}>
+      <div className="cb-body" hidden={expanded} style={{ maxHeight: maxH, display: disVal }}>
         <div dangerouslySetInnerHTML={{ __html: bodyContent }} />
         {footerContent && <div dangerouslySetInnerHTML={{ __html: footerContent }} />}
       </div>

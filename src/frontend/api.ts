@@ -91,8 +91,11 @@ export async function getTools(): Promise<Record<string, unknown>> {
   return res.json();
 }
 
-export async function getSessions(): Promise<unknown[]> {
-  const res = await apiFetch("/api/sessions");
+export async function getSessions(limit?: number, offset?: number): Promise<{ sessions: unknown[]; total: number }> {
+  const params = new URLSearchParams();
+  if (limit !== undefined) params.set("limit", String(limit));
+  if (offset !== undefined) params.set("offset", String(offset));
+  const res = await apiFetch(`/api/sessions?${params}`);
   return res.json();
 }
 

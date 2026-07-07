@@ -1,6 +1,7 @@
 /* Header */
 .header {
-  padding: 12px 24px;
+  padding: 8px 24px;
+  min-height: 52px;
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
@@ -13,6 +14,29 @@
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.header-sidebar-toggle {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text-dim);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+  margin-right: -4px;
+}
+
+.header-sidebar-toggle:hover {
+  border-color: var(--accent);
+  color: var(--text);
+  background: var(--surface3);
 }
 
 .logo {

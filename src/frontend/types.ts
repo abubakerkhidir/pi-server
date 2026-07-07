@@ -79,14 +79,17 @@ export interface ToolData {
   result: unknown | undefined;
   isError: boolean;
   isComplete: boolean;
-  sealed?:boolean
+  sealed?: boolean;
+  duration?: number; // seconds
 }
 
 export interface ThinkData {
   type: "think";
   id: string; // locally generated
   content: string;
-  sealed?:boolean
+  sealed?: boolean;
+  duration?: number; // seconds
+  totalLength?: number; // characters
 }
 
 export type AgentReplyEntity = MsgData | ToolData | ThinkData;
@@ -163,6 +166,7 @@ export interface SettingsModalProps {
 
 export interface SidebarProps {
   sessions: Session[];
+  sessionTotal: number;
   currentSessionId: string | null;
   onNewChat: () => void;
   onSessionClick: (sessionId: string) => void;
@@ -170,6 +174,7 @@ export interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
   onRenameComplete?: () => void;
+  onLoadMore: () => void;
 }
 
 export interface InputAreaProps {

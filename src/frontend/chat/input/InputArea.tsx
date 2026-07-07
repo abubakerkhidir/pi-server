@@ -1,7 +1,5 @@
 import { useEffect, useRef } from "react";
 import type { InputAreaProps } from "@/frontend/types";
-import FileChips from "./FileChips";
-
 export default function InputArea({
   onSend,
   disabled,
@@ -22,7 +20,8 @@ export default function InputArea({
   }, [value]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    // Submit on plain Enter only — Shift/Ctrl/Meta+Enter insert a newline
+    if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
       e.preventDefault();
       if (value.trim() && !disabled) {
         onSend(value.trim(), uploadedFiles);
@@ -69,6 +68,7 @@ export default function InputArea({
             value={value}
             onChange={(e) => onValueChange(e.target.value)}
             onKeyDown={handleKeyDown}
+            autoFocus
           />
           <button
             className="send-btn"
@@ -81,9 +81,6 @@ export default function InputArea({
               <path d="M22 2L15 22L11 13L2 9L22 2Z" />
             </svg>
           </button>
-        </div>
-        <div className="input-footer">
-          <FileChips files={uploadedFiles} onRemove={onRemoveFile} />
         </div>
       </div>
     </div>

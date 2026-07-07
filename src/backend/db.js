@@ -46,43 +46,21 @@ function createTables() {
 
     CREATE INDEX IF NOT EXISTS idx_session_metadata_user ON session_metadata(user_id);
 
-    CREATE TABLE IF NOT EXISTS chat_messages (
+    CREATE TABLE IF NOT EXISTS chat_files (
       id TEXT PRIMARY KEY,
+      record_id TEXT NOT NULL,
       session_id TEXT NOT NULL,
-      role TEXT NOT NULL,
-      content TEXT NOT NULL,
+      type TEXT NOT NULL CHECK(type IN ('upload','download')),
+      file_name TEXT NOT NULL,
+      file_path TEXT NOT NULL,
+      file_size INTEGER NOT NULL,
+      mime_type TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (record_id) REFERENCES chat_records(id) ON DELETE CASCADE,
       FOREIGN KEY (session_id) REFERENCES session_metadata(id) ON DELETE CASCADE
     );
 
-    CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id);
-
-    CREATE TABLE IF NOT EXISTS thinking_entries (
-      id TEXT PRIMARY KEY,
-      session_id TEXT NOT NULL,
-      seq INTEGER NOT NULL DEFAULT 0,
-      content TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      FOREIGN KEY (session_id) REFERENCES session_metadata(id) ON DELETE CASCADE
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_thinking_session ON thinking_entries(session_id);
-
-    CREATE TABLE IF NOT EXISTS tool_entries (
-      id TEXT PRIMARY KEY,
-      session_id TEXT NOT NULL,
-      seq INTEGER NOT NULL DEFAULT 0,
-      tool_call_id TEXT NOT NULL,
-      name TEXT NOT NULL,
-      args TEXT,
-      result TEXT,
-      partial_result TEXT,
-      is_error INTEGER DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      FOREIGN KEY (session_id) REFERENCES session_metadata(id) ON DELETE CASCADE
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_tool_session ON tool_entries(session_id);
+    CREATE INDEX IF NOT EXISTS idx_chat_files_record ON chat_files(record_id);
   `);
 
   try {
@@ -90,6 +68,42 @@ function createTables() {
   } catch {
     // Column already exists
   }
+
+  // ── Add duration/content_length columns to chat_entities ──
+  try { db.exec("ALTER TABLE chat_entities ADD COLUMN duration_ms INTEGER"); } catch {}
+  try { db.exec("ALTER TABLE chat_entities ADD COLUMN content_length INTEGER"); } catch {}
+
+  // ── Entity-based persistence tables ──
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS chat_records (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      user_msg_content TEXT NOT NULL,
+      agent_reply_id TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (session_id) REFERENCES session_metadata(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS chat_entities (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      record_id TEXT NOT NULL,
+      session_id TEXT NOT NULL,
+      seq INTEGER NOT NULL,
+      type TEXT NOT NULL CHECK(type IN ('think','msg','tool')),
+      content TEXT,
+      tool_name TEXT,
+      tool_args TEXT,
+      tool_result TEXT,
+      tool_is_error INTEGER DEFAULT 0,
+      is_complete INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (record_id) REFERENCES chat_records(id) ON DELETE CASCADE,
+      FOREIGN KEY (session_id) REFERENCES session_metadata(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_chat_records_session ON chat_records(session_id);
+    CREATE INDEX IF NOT EXISTS idx_chat_entities_record ON chat_entities(record_id);
+  `);
 }
 
 export function getDb() {

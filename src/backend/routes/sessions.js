@@ -6,10 +6,18 @@ const router = Router();
 
 router.get("/sessions", authMiddleware, (req, res) => {
   const db = getDb();
+  const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+  const offset = parseInt(req.query.offset) || 0;
+
   const sessions = db.prepare(
-    "SELECT id, name, created_at, updated_at FROM session_metadata WHERE user_id = ? ORDER BY updated_at DESC"
-  ).all(req.user.userId);
-  res.json(sessions);
+    "SELECT id, name, created_at, updated_at FROM session_metadata WHERE user_id = ? ORDER BY updated_at DESC LIMIT ? OFFSET ?"
+  ).all(req.user.userId, limit, offset);
+
+  const total = db.prepare(
+    "SELECT COUNT(*) AS c FROM session_metadata WHERE user_id = ?"
+  ).get(req.user.userId);
+
+  res.json({ sessions, total: total.c });
 });
 
 router.delete("/sessions/:id", authMiddleware, (req, res) => {

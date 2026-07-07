@@ -32,6 +32,75 @@
 .message.user .message-header { color: var(--accent); }
 .message.assistant .message-header { color: #a78bfa; }
 
+/* Agent reply control toolbar */
+.assistant-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 5px;
+}
+
+/* Global visibility controls (top of chat) */
+.global-agent-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  padding: 0 20px;
+  margin-bottom: -8px;
+  font-size: 11px;
+}
+
+.agent-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.agent-control-link {
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.12s;
+}
+
+.agent-control-link:hover {
+  color: var(--text);
+}
+
+/* Scroll-to-bottom button inside the chat container */
+.scroll-down-btn-wrapper {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 0;
+}
+
+.scroll-down-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text-dim);
+  font-size: 18px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s;
+}
+
+.scroll-down-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-glow);
+}
+
 .message-content {
   padding: 14px 18px;
   border-radius: 12px;

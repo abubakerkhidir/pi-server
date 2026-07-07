@@ -29,7 +29,7 @@ app.use("/api", sessionsRoutes);
 
 // Client-side routing: serve index.html for non-API, non-upload paths
 app.get("*", (req, res) => {
-  if (!req.path.startsWith("/api") && !req.path.startsWith("/uploads")) {
+  if (!req.path.startsWith("/api")) {
     res.sendFile(path.join(process.cwd(), "dist", "index.html"));
   } else {
     res.status(404).json({ error: "Not found" });
