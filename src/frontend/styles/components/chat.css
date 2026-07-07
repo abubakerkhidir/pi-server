@@ -5,7 +5,15 @@
   padding: 20px 0;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+}
+
+/* 20px between records, 10px between user & assistant inside a record */
+.chat > div + div {
+  margin-top: 20px;
+}
+
+.message + .message {
+  margin-top: 10px;
 }
 
 .chat::-webkit-scrollbar { width: 4px; }
@@ -198,4 +206,85 @@
   color: var(--text-dim);
   font-size: 14px;
   line-height: 1.6;
+}
+
+/* ── Copy buttons & entity footers ── */
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  transition: color 0.12s, background 0.12s;
+  line-height: 1;
+}
+
+.copy-btn:hover {
+  color: var(--text);
+  background: var(--surface3);
+}
+
+/* Copy button inside tool/think header bar, far right before duration */
+.copy-btn.header-copy {
+  margin-left: auto;
+  margin-right: 4px;
+  opacity: 0.4;
+  transition: opacity 0.12s;
+}
+
+.copy-btn.header-copy:hover {
+  opacity: 1;
+  color: var(--text);
+  background: transparent;
+}
+
+/* Labeled copy buttons (agent-reply footer) */
+.copy-btn.labeled {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.12s, background 0.12s;
+}
+
+.copy-btn.labeled:hover {
+  color: var(--text);
+  background: var(--surface3);
+}
+
+.entity-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 2px 8px 4px;
+  min-height: 20px;
+}
+
+.message-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 4px 2px 0;
+  gap: 8px;
+  min-height: 20px;
+}
+
+.agent-reply-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 4px 12px 8px;
+  background: var(--surface3);
+  border-radius: 0 0 12px 12px;
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import type { AgentReplyEntity, UserSettings } from "@/frontend/types";
+import { copyToClipboard, CopySvg, TextSvg } from "@/frontend/lib/clipboard";
 import ToolBlock from "./ToolBlock";
 import ThinkingBlock from "./ThinkingBlock";
 import TextBlock from "./TextBlock";
@@ -66,6 +67,31 @@ export default function AgentReply({
     }
   }
 
+  /** Build plain text of the full reply (all entities) */
+  const copyAllText = useCallback(() => {
+    const parts = entities
+      .map((e) => {
+        if (e.type === "msg" || e.type === "think") return e.content;
+        if (e.type === "tool") {
+          let s = e.name;
+          if (e.args) s += " " + JSON.stringify(e.args);
+          if (e.result !== undefined) s += "\n" + JSON.stringify(e.result, null, 2);
+          return s;
+        }
+        return "";
+      })
+      .filter(Boolean);
+    copyToClipboard(parts.join("\n\n"));
+  }, [entities]);
+
+  /** Build plain text of only msg entities */
+  const copyTextOnly = useCallback(() => {
+    const parts = entities
+      .filter((e) => e.type === "msg")
+      .map((e) => (e as any).content || "");
+    copyToClipboard(parts.join("\n\n"));
+  }, [entities]);
+
   return (
     <div className="message assistant">
       <div className="message-header assistant-header-row">
@@ -89,6 +115,16 @@ export default function AgentReply({
       {!collapsed && (
         <div className="message-content">
           <div className="message-flow">{entityJsx}</div>
+          <div className="agent-reply-footer">
+            <button className="copy-btn labeled" title="Copy entire reply" onClick={copyAllText}>
+              <CopySvg size={13} />
+              <span>copy all reply</span>
+            </button>
+            <button className="copy-btn labeled" title="Copy text only" onClick={copyTextOnly}>
+              <TextSvg size={13} />
+              <span>copy text</span>
+            </button>
+          </div>
         </div>
       )}
     </div>

@@ -2,6 +2,7 @@ import { useMemo, useRef, useEffect, useState, useCallback } from "react";
 import { marked } from "marked";
 import type { ChatState, UserSettings, UserMsg } from "@/frontend/types";
 import AgentReply from "../body/AgentReply";
+import { copyToClipboard, CopySvg } from "@/frontend/lib/clipboard";
 
 marked.setOptions({ breaks: true, gfm: true });
 
@@ -125,7 +126,21 @@ export default function ChatWindow({
         <div key={rec.userId}>
           <div className="message user">
             <div className="message-header">You</div>
-            <div className="message-content" dangerouslySetInnerHTML={{ __html: rec.userHtml }} />
+            <div className="message-content">
+              <div dangerouslySetInnerHTML={{ __html: rec.userHtml }} />
+              <div className="message-footer">
+                <button
+                  className="copy-btn"
+                  title="Copy prompt"
+                  onClick={() => {
+                    const text = rec.userHtml.replace(/<[^>]*>/g, "");
+                    copyToClipboard(text);
+                  }}
+                >
+                  <CopySvg />
+                </button>
+              </div>
+            </div>
           </div>
           <AgentReply
             recordId={rec.userId}
