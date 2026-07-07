@@ -104,6 +104,17 @@ function createTables() {
     CREATE INDEX IF NOT EXISTS idx_chat_records_session ON chat_records(session_id);
     CREATE INDEX IF NOT EXISTS idx_chat_entities_record ON chat_entities(record_id);
   `);
+
+  // ── Token stats columns ──
+  try { db.exec("ALTER TABLE chat_records ADD COLUMN prompt_tokens INTEGER DEFAULT 0"); } catch (e) {}
+  try { db.exec("ALTER TABLE chat_records ADD COLUMN think_tokens INTEGER DEFAULT 0"); } catch (e) {}
+  try { db.exec("ALTER TABLE chat_records ADD COLUMN output_tokens INTEGER DEFAULT 0"); } catch (e) {}
+  try { db.exec("ALTER TABLE chat_records ADD COLUMN prompt_token_s INTEGER DEFAULT 0"); } catch (e) {}
+  try { db.exec("ALTER TABLE chat_records ADD COLUMN output_token_s INTEGER DEFAULT 0"); } catch (e) {}
+  try { db.exec("ALTER TABLE chat_records ADD COLUMN duration_ms INTEGER"); } catch (e) {}
+
+  // ── Session-level context size ──
+  try { db.exec("ALTER TABLE session_metadata ADD COLUMN context_size INTEGER"); } catch (e) {}
 }
 
 export function getDb() {

@@ -1,6 +1,6 @@
 import { useRef, useCallback } from "react";
 import { createChatStream } from "@/frontend/api";
-import type { AgentReplyEntity, MsgData, ToolData, ThinkData } from "@/frontend/types";
+import type { AgentReplyEntity, MsgData, ToolData, ThinkData, TokenStats } from "@/frontend/types";
 
 let thinkCounter = 0;
 let msgCounter = 0;
@@ -16,6 +16,7 @@ export type OnEntityUpdate = (entities: AgentReplyEntity[]) => void;
 export type OnStreamEnd = () => void;
 export type OnSessionName = (session: { id: string; name: string; updated_at: string; created_at?: string }) => void;
 export type OnSessionCreated = (sessionId: string) => void;
+export type OnTokenStats = (stats: TokenStats) => void;
 
 export interface UseChatStreamResult {
   sessionId: string | null;
@@ -26,6 +27,7 @@ export interface UseChatStreamResult {
     onStreamEnd: OnStreamEnd,
     onSessionName?: OnSessionName,
     onSessionCreated?: OnSessionCreated,
+    onTokenStats?: OnTokenStats,
   ) => void;
   resetState: () => void;
 }
@@ -69,6 +71,7 @@ export function useChatStream({
       onStreamEnd: OnStreamEnd,
       onSessionName?: OnSessionName,
       onSessionCreated?: OnSessionCreated,
+      onTokenStats?: OnTokenStats,
     ) => {
       if (!prompt || isProcessingRef.current) return;
       isProcessingRef.current = true;
@@ -177,6 +180,12 @@ export function useChatStream({
 
               case "session_name": {
                 onSessionName?.(data as { id: string; name: string; updated_at: string; created_at?: string });
+                break;
+              }
+
+              case "record_stats": {
+                // Per-record token stats sent by backend
+                onTokenStats?.(data as unknown as TokenStats);
                 break;
               }
 

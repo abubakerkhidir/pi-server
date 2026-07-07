@@ -165,3 +165,29 @@
 }
 
 .file-tag .icon { font-size: 14px; }
+
+/* ── Session-level token stats bar (below input area) ── */
+.session-stats-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 20px;
+  padding: 0 0 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: monospace;
+  max-width: 80%;
+  margin: 0 auto;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.session-stat {
+  flex-shrink: 0;
+}
+
+.session-stat:not(:last-child)::after {
+  content: "·";
+  margin-left: 12px;
+  opacity: 0.5;
+}

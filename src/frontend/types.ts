@@ -99,9 +99,26 @@ export interface UserMsg {
   files?: string[];
 }
 
+export interface TokenStats {
+  prompt_tokens: number;
+  think_tokens: number;
+  output_tokens: number;
+  prompt_token_s: number;
+  output_token_s: number;
+}
+
+export interface SessionTokenStats {
+  total_prompt: number;
+  total_think: number;
+  total_output: number;
+  context_used_pct: number;
+  context_size: number;
+}
+
 export interface AgentReply {
   id: string;
   entities: AgentReplyEntity[];
+  tokenStats?: TokenStats;
 }
 
 export interface ChatRecord {
@@ -112,6 +129,7 @@ export interface ChatRecord {
 
 export interface ChatState {
   records: ChatRecord[];
+  sessionStats?: SessionTokenStats;
 }
 
 export type UserSettings = {

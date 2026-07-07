@@ -92,6 +92,7 @@ export default function ChatWindow({
         userHtml,
         userId: record.id,
         entities: record.agentReply.entities,
+        tokenStats: record.agentReply.tokenStats,
         hasTools: record.agentReply.entities.some((e) => e.type === "tool"),
         hasThink: record.agentReply.entities.some((e) => e.type === "think"),
       };
@@ -148,6 +149,7 @@ export default function ChatWindow({
             userSettings={userSettings}
             globalToolsHidden={globalToolsHidden}
             globalThinkHidden={globalThinkHidden}
+            tokenStats={rec.tokenStats}
           />
         </div>
       ))}

@@ -1,5 +1,10 @@
 import { useEffect, useRef } from "react";
-import type { InputAreaProps } from "@/frontend/types";
+import type { InputAreaProps, SessionTokenStats } from "@/frontend/types";
+
+interface InputAreaExtendedProps extends InputAreaProps {
+  sessionStats?: SessionTokenStats;
+}
+
 export default function InputArea({
   onSend,
   disabled,
@@ -7,7 +12,8 @@ export default function InputArea({
   onValueChange,
   uploadedFiles,
   onRemoveFile,
-}: InputAreaProps) {
+  sessionStats,
+}: InputAreaExtendedProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-resize textarea
@@ -37,6 +43,16 @@ export default function InputArea({
 
   return (
     <div className="input-area">
+      {/* ── Session-level token stats bar ── */}
+      {sessionStats && (
+        <div className="session-stats-bar" title={`Context: ${sessionStats.context_used_pct}% of ${sessionStats.context_size.toLocaleString()} tokens`}>
+          <span className="session-stat">total-prompt: {sessionStats.total_prompt}</span>
+          <span className="session-stat">total-think: {sessionStats.total_think}</span>
+          <span className="session-stat">total-output: {sessionStats.total_output}</span>
+          <span className="session-stat">{sessionStats.context_used_pct}%</span>
+          <span className="session-stat">{sessionStats.context_size.toLocaleString()}</span>
+        </div>
+      )}
       <div className="input-wrapper">
         <div className="input-row">
           <input

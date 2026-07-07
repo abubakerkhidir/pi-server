@@ -49,4 +49,35 @@ router.put("/sessions/:id/name", authMiddleware, (req, res) => {
   res.json({ ok: true });
 });
 
+//  GET /api/sessions/search — full-text search across all chat history
+router.get("/sessions/search", authMiddleware, (req, res) => {
+  const db = getDb();
+  const q = (req.query.q || "").trim();
+
+  if (!q) {
+    return res.json({ sessions: [], total: 0 });
+  }
+
+  // Search in user messages and entity content
+  const like = `%${q}%`;
+
+  const sessions = db.prepare(`
+    SELECT DISTINCT s.id, s.name, s.created_at, s.updated_at
+    FROM session_metadata s
+    LEFT JOIN chat_records r ON r.session_id = s.id
+    LEFT JOIN chat_entities e ON e.record_id = r.id
+    WHERE s.user_id = ?
+      AND (
+        r.user_msg_content LIKE ?
+        OR e.content LIKE ?
+      )
+    ORDER BY s.updated_at DESC
+    LIMIT 50
+  `).all(req.user.userId, like, like);
+
+  const total = sessions.length;
+
+  res.json({ sessions, total });
+});
+
 export default router;

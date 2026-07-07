@@ -1,5 +1,5 @@
 import { getChatHistory } from "@/frontend/api";
-import type { ChatRecord, ChatState } from "@/frontend/types";
+import type { ChatRecord, ChatState, TokenStats, SessionTokenStats } from "@/frontend/types";
 
 /**
  * Backend response for session history — new entity-based format.
@@ -22,6 +22,7 @@ interface BackendRecord {
   agentReply: {
     id: string;
     entities: BackendEntity[];
+    tokenStats?: TokenStats;
   };
   created_at?: string;
 }
@@ -30,6 +31,7 @@ interface BackendHistory {
   sessionId: string;
   name: string;
   records: BackendRecord[];
+  sessionStats?: SessionTokenStats;
 }
 
 /**
@@ -81,7 +83,7 @@ function mapEntity(
  * Load session history from the backend.
  *
  * The backend now returns records in the same entity-based format used
- * by the frontend. This function maps them into ChatState.
+ * by the frontend, including tokenStats per record and sessionStats.
  */
 export async function loadSessionHistory(sessionId: string): Promise<ChatState> {
   try {
@@ -107,11 +109,15 @@ export async function loadSessionHistory(sessionId: string): Promise<ChatState> 
         agentReply: {
           id: rec.agentReply?.id || "",
           entities,
+          tokenStats: rec.agentReply?.tokenStats,
         },
       };
     });
 
-    return { records };
+    return {
+      records,
+      sessionStats: history.sessionStats,
+    };
   } catch (err) {
     console.error("[loadSessionHistory] Failed:", err);
     return { records: [] };

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import type { AgentReplyEntity, UserSettings } from "@/frontend/types";
+import type { AgentReplyEntity, UserSettings, TokenStats } from "@/frontend/types";
 import { copyToClipboard, CopySvg, TextSvg } from "@/frontend/lib/clipboard";
 import ToolBlock from "./ToolBlock";
 import ThinkingBlock from "./ThinkingBlock";
@@ -11,15 +11,12 @@ interface AgentReplyProps {
   userSettings: UserSettings;
   globalToolsHidden: boolean;
   globalThinkHidden: boolean;
+  tokenStats?: TokenStats;
 }
 
 /**
- * Renders a single agent reply block with per-reply visibility controls.
- *
- * - Has its own local state for toolsHidden, thinkHidden, collapsed.
- * - A useEffect watches `globalToolsHidden` / `globalThinkHidden` and
- *   overrides local state when they change (parent → child, one-way).
- * - Local toggle clicks only update local state — they do NOT propagate up.
+ * Renders a single agent reply block with per-reply visibility controls
+ * and token usage statistics in the footer.
  */
 export default function AgentReply({
   recordId,
@@ -27,6 +24,7 @@ export default function AgentReply({
   userSettings,
   globalToolsHidden,
   globalThinkHidden,
+  tokenStats,
 }: AgentReplyProps) {
   const [toolsHidden, setToolsHidden] = useState(false);
   const [thinkHidden, setThinkHidden] = useState(false);
@@ -116,14 +114,26 @@ export default function AgentReply({
         <div className="message-content">
           <div className="message-flow">{entityJsx}</div>
           <div className="agent-reply-footer">
-            <button className="copy-btn labeled" title="Copy entire reply" onClick={copyAllText}>
-              <CopySvg size={13} />
-              <span>copy all reply</span>
-            </button>
-            <button className="copy-btn labeled" title="Copy text only" onClick={copyTextOnly}>
-              <TextSvg size={13} />
-              <span>copy text</span>
-            </button>
+            {/* ── Token stats (far left) ── */}
+            {tokenStats && (
+              <span className="token-stats" title={`Prompt: ${tokenStats.prompt_tokens} · Think: ${tokenStats.think_tokens} · Output: ${tokenStats.output_tokens} · Prompt/s: ${tokenStats.prompt_token_s} · Output/s: ${tokenStats.output_token_s}`}>
+                <span className="token-stat">p:{tokenStats.prompt_tokens}</span>
+                <span className="token-stat">t:{tokenStats.think_tokens}</span>
+                <span className="token-stat">o:{tokenStats.output_tokens}</span>
+                <span className="token-stat">{tokenStats.prompt_token_s} p/s</span>
+                <span className="token-stat">{tokenStats.output_token_s} o/s</span>
+              </span>
+            )}
+            <span className="agent-reply-footer-right">
+              <button className="copy-btn labeled" title="Copy entire reply" onClick={copyAllText}>
+                <CopySvg size={13} />
+                <span>copy all reply</span>
+              </button>
+              <button className="copy-btn labeled" title="Copy text only" onClick={copyTextOnly}>
+                <TextSvg size={13} />
+                <span>copy text</span>
+              </button>
+            </span>
           </div>
         </div>
       )}

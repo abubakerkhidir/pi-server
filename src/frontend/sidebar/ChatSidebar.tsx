@@ -1,5 +1,6 @@
-import { useRef } from "react";
+import { useState, useCallback, useRef } from "react";
 import type { Session } from "@/frontend/types";
+import SearchBox from "./SearchBox";
 import SessionList from "./SessionList";
 
 interface SidebarProps {
@@ -16,8 +17,9 @@ interface SidebarProps {
 }
 
 /**
- * Sidebar container — renders header + toggle + delegates list rendering
+ * Sidebar container — renders header + toggle + search box + delegates list rendering
  * and interaction state to <SessionList />.
+ * When search is active, search results replace the normal session list.
  */
 export default function ChatSidebar({
   sessions,
@@ -32,6 +34,28 @@ export default function ChatSidebar({
 }: SidebarProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // ── Search state ──
+  const [searchResults, setSearchResults] = useState<Session[] | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const isSearchActive = searchResults !== null;
+
+  const handleSearchResults = useCallback(
+    (results: Session[] | null, query: string) => {
+      setSearchResults(results);
+      setSearchQuery(query);
+    },
+    [],
+  );
+
+  const cancelSearch = useCallback(() => {
+    setSearchResults(null);
+    setSearchQuery("");
+  }, []);
+
+  const displaySessions = isSearchActive ? (searchResults ?? []) : sessions;
+  const displayTotal = isSearchActive ? (searchResults?.length ?? 0) : sessionTotal;
+
   return (
     <div className={`sidebar ${collapsed ? "collapsed" : ""}`} ref={containerRef}>
       <div className="sidebar-header">
@@ -42,14 +66,34 @@ export default function ChatSidebar({
           ◀
         </button>
       </div>
+
+      {/* ── Search box ── */}
+      <SearchBox onSearchResults={handleSearchResults} />
+
+      {/* ── Search results header / cancel ── */}
+      {isSearchActive && (
+        <div className="sidebar-search-header">
+          <span className="sidebar-search-count">
+            {searchResults?.length ?? 0} result{searchResults?.length !== 1 ? "s" : ""}
+          </span>
+          <button
+            className="sidebar-search-cancel"
+            onClick={cancelSearch}
+            title="Clear search results"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       <SessionList
-        sessions={sessions}
+        sessions={displaySessions}
         currentSessionId={currentSessionId}
         onSessionClick={onSessionClick}
         onRenameComplete={onRenameComplete}
         onLoadMore={onLoadMore}
-        hasMore={sessions.length < sessionTotal}
-        total={sessionTotal}
+        hasMore={!isSearchActive && sessions.length < sessionTotal}
+        total={displayTotal}
       />
     </div>
   );

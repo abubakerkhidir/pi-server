@@ -279,12 +279,39 @@
   min-height: 20px;
 }
 
+/* ── Token stats in agent reply footer ── */
+.token-stats {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+  margin-right: 8px;
+}
+
+.token-stat {
+  white-space: nowrap;
+}
+
+.agent-reply-footer-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 .agent-reply-footer {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 10px;
-  padding: 4px 12px 8px;
+  padding: 4px 18px 8px;
   background: var(--surface3);
   border-radius: 0 0 12px 12px;
+  margin: 0 -18px -14px;
 }

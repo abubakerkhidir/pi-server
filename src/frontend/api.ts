@@ -103,6 +103,13 @@ export async function deleteSession(id: string): Promise<void> {
   await apiFetch(`/api/sessions/${id}`, { method: "DELETE" });
 }
 
+export async function searchSessions(q: string): Promise<{ sessions: unknown[]; total: number }> {
+  const params = new URLSearchParams();
+  params.set("q", q);
+  const res = await apiFetch(`/api/sessions/search?${params}`);
+  return res.json();
+}
+
 export async function renameSession(id: string, name: string): Promise<void> {
   await apiFetch(`/api/sessions/${id}/name`, {
     method: "PUT",

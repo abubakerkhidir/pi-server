@@ -15,6 +15,7 @@ import {
   cleanupFrameDirs,
 } from "../pi-video.js";
 import { generateSessionName } from "../generateSessionName.js";
+import { computeRecordTokenStats, computeSessionTokenStats, estimateTokens } from "../token-stats.js";
 
 const router = Router();
 
@@ -128,6 +129,9 @@ router.post("/chat/stream", authMiddleware, upload.array("files", 20), async (re
     // ══════════════════════════════════════════════════════
     //  Entity buffering — mirrors frontend useChatStream
     // ══════════════════════════════════════════════════════
+    //  Track response start time for token stats
+    const responseStartTime = Date.now();
+
     let entityBuf = [];          // in-memory buffer of entities (think/msg/tool)
     let entitySeq = 0;
 
@@ -148,7 +152,7 @@ router.post("/chat/stream", authMiddleware, upload.array("files", 20), async (re
 
       // Calculate content length for think entities
       let contentLength = null;
-      if (entity.type === 'think') {
+      if (entity.type === 'think' || entity.type === 'msg') {
         contentLength = (entity.content || '').length;
       }
 
@@ -271,9 +275,35 @@ router.post("/chat/stream", authMiddleware, upload.array("files", 20), async (re
             for (const ent of entityBuf) {
               if (!ent.saved) saveEntity(ent);
             }
-            // Update record with agent_reply_id
-            db.prepare("UPDATE chat_records SET agent_reply_id = ? WHERE id = ?")
-              .run(uuidv4(), recordId);
+
+            // Compute and store token stats
+            const totalDurationMs = Date.now() - responseStartTime;
+            const tokenStats = computeRecordTokenStats(
+              prompt,
+              entityBuf.map((e) => ({
+                type: e.type,
+                content: e.content || '',
+                durationMs: e.startedAt ? Date.now() - e.startedAt : undefined,
+              })),
+              totalDurationMs,
+            );
+
+            // Update record with agent_reply_id and token stats
+            db.prepare(
+              "UPDATE chat_records SET agent_reply_id = ?, prompt_tokens = ?, think_tokens = ?, output_tokens = ?, prompt_token_s = ?, output_token_s = ?, duration_ms = ? WHERE id = ?"
+            ).run(
+              uuidv4(),
+              tokenStats.prompt_tokens,
+              tokenStats.think_tokens,
+              tokenStats.output_tokens,
+              tokenStats.prompt_token_s,
+              tokenStats.output_token_s,
+              totalDurationMs,
+              recordId,
+            );
+
+            // Send token stats event
+            res.write(`event: record_stats\ndata: ${JSON.stringify(tokenStats)}\n\n`);
             break;
           }
         }
@@ -301,6 +331,12 @@ router.post("/chat/stream", authMiddleware, upload.array("files", 20), async (re
       }
     }
 
+    // ── Store model context size in session metadata ──
+    if (modelInfo && modelInfo.input) {
+      db.prepare("UPDATE session_metadata SET context_size = ? WHERE id = ?")
+        .run(modelInfo.input, dbSessionId);
+    }
+
     // ── Signal completion ──
     if (!res.writableEnded) {
       res.write(`event: done\ndata: ${JSON.stringify({})}\n\n`);
@@ -326,17 +362,26 @@ router.get("/chat/history/:sessionId", authMiddleware, (req, res) => {
   const { sessionId } = req.params;
 
   const meta = db.prepare(
-    "SELECT id, name FROM session_metadata WHERE id = ? AND user_id = ?"
+    "SELECT id, name, context_size FROM session_metadata WHERE id = ? AND user_id = ?"
   ).get(sessionId, req.user.userId);
   if (!meta) return res.status(404).json({ error: "Session not found" });
 
   // ── Load records with entities ──
   const records = db.prepare(
-    "SELECT id, user_msg_content, agent_reply_id, created_at FROM chat_records WHERE session_id = ? ORDER BY created_at ASC"
+    "SELECT id, user_msg_content, agent_reply_id, created_at, prompt_tokens, think_tokens, output_tokens, prompt_token_s, output_token_s, duration_ms FROM chat_records WHERE session_id = ? ORDER BY created_at ASC"
   ).all(sessionId);
 
   const result = [];
   for (const rec of records) {
+    // Token stats for this record
+    const tokenStats = {
+      prompt_tokens: rec.prompt_tokens || 0,
+      think_tokens: rec.think_tokens || 0,
+      output_tokens: rec.output_tokens || 0,
+      prompt_token_s: rec.prompt_token_s || 0,
+      output_token_s: rec.output_token_s || 0,
+    };
+
     // Entities
     const entities = db.prepare(
       "SELECT type, content, tool_name, tool_args, tool_result, tool_is_error, is_complete, duration_ms, content_length FROM chat_entities WHERE record_id = ? ORDER BY seq ASC"
@@ -378,7 +423,7 @@ router.get("/chat/history/:sessionId", authMiddleware, (req, res) => {
     result.push({
       id: rec.id,
       userMsg: { content: rec.user_msg_content },
-      agentReply: { id: rec.agent_reply_id || '', entities: entityList },
+      agentReply: { id: rec.agent_reply_id || '', entities: entityList, tokenStats },
       created_at: rec.created_at,
       files: files.map((f) => ({
         id: f.id,
@@ -391,7 +436,11 @@ router.get("/chat/history/:sessionId", authMiddleware, (req, res) => {
     });
   }
 
-  res.json({ sessionId: meta.id, name: meta.name, records: result });
+  // Compute session-level token stats
+  const contextSize = meta.context_size || 128000;
+  const sessionStats = computeSessionTokenStats(records, contextSize);
+
+  res.json({ sessionId: meta.id, name: meta.name, records: result, sessionStats });
 });
 
 // ─────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { getSettings, getModels, getSessions, getUsername } from "@/frontend/api";
-import type { ChatLayoutProps, UserSettings, ChatState, ChatRecord, Session } from "@/frontend/types";
+import type { ChatLayoutProps, UserSettings, ChatState, ChatRecord, Session, TokenStats, SessionTokenStats } from "@/frontend/types";
 import ChatSidebar from "../../sidebar/ChatSidebar";
 import ChatHeader from "./ChatHeader";
 import ChatWindow from "./ChatWindow";
@@ -11,6 +11,50 @@ import { loadSessionHistory } from "@/frontend/hooks/useSessionHistory";
 import { v4 as uuidv4 } from "uuid";
 
 const PAGE_SIZE = 20;
+
+/** Heuristic: estimate tokens from text */
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
+/**
+ * Compute session-level token stats from all records.
+ */
+function computeSessionStats(records: ChatRecord[]): SessionTokenStats | undefined {
+  if (records.length === 0) return undefined;
+
+  let total_prompt = 0;
+  let total_think = 0;
+  let total_output = 0;
+
+  for (const rec of records) {
+    const ts = rec.agentReply.tokenStats;
+    if (ts) {
+      total_prompt += ts.prompt_tokens;
+      total_think += ts.think_tokens;
+      total_output += ts.output_tokens;
+    } else {
+      // Fallback estimate if no token stats yet (streaming in progress)
+      total_prompt += estimateTokens(rec.userMsg.content);
+      for (const ent of rec.agentReply.entities) {
+        if (ent.type === "think") total_think += estimateTokens(ent.content);
+        if (ent.type === "msg") total_output += estimateTokens(ent.content);
+      }
+    }
+  }
+
+  const totalUsed = total_prompt + total_think + total_output;
+  const contextSize = 128000; // default; can be refined from model info
+  const context_used_pct = Math.round((totalUsed / contextSize) * 100);
+
+  return {
+    total_prompt,
+    total_think,
+    total_output,
+    context_used_pct: Math.min(context_used_pct, 100),
+    context_size: contextSize,
+  };
+}
 
 export default function ChatLayout({ onLogout }: ChatLayoutProps) {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -45,6 +89,9 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
 
   // Chat state
   const [chatState, setChatState] = useState<ChatState>({ records: [] });
+
+  // Session-level token stats derived from records
+  const sessionStats = computeSessionStats(chatState.records);
 
   const currentSessionIdRef = useRef(currentSessionId);
   useEffect(() => {
@@ -129,6 +176,18 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
     [],
   );
 
+  const onTokenStats = useCallback(
+    (stats: TokenStats) => {
+      setChatState((prev) => {
+        const last = prev.records[prev.records.length - 1];
+        if (!last) return prev;
+        last.agentReply.tokenStats = stats;
+        return { records: [...prev.records] };
+      });
+    },
+    [],
+  );
+
   const handleSessionName = useCallback(
     (session: Session) => {
       const updatedAt = session.updated_at || new Date().toISOString();
@@ -177,9 +236,10 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
           // event mid-stream and cause a history reload race.
           setCurrentSessionId(sessionId);
         },
+        onTokenStats,
       );
     },
-    [isProcessing, handleSend, onEntityUpdate, handleStreamEnd, handleSessionName],
+    [isProcessing, handleSend, onEntityUpdate, handleStreamEnd, handleSessionName, onTokenStats],
   );
 
   const handleNewChat = () => {
@@ -278,6 +338,7 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
           onValueChange={setUserPrompt}
           uploadedFiles={[]}
           onRemoveFile={() => {}}
+          sessionStats={sessionStats}
         />
       </div>
       <SettingsModal
