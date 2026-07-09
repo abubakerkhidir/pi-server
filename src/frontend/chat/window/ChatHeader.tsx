@@ -1,13 +1,15 @@
 import ModelSelector from "../../config/models/ModelSelector";
+import type { ModelInfo } from "@/frontend/types";
 
 interface ChatHeaderProps {
   username: string | null;
   onSettingsClick: () => void;
   onLogout: () => void;
   currentModel: string;
-  onModelSelect: (model: { name: string }) => void;
+  onModelSelect: (model: ModelInfo) => void;
   sidebarCollapsed: boolean;
   onSidebarToggle: () => void;
+  modelInfo: ModelInfo | null;
 }
 
 export default function ChatHeader({
@@ -18,7 +20,12 @@ export default function ChatHeader({
   onModelSelect,
   sidebarCollapsed,
   onSidebarToggle,
+  modelInfo,
 }: ChatHeaderProps) {
+  const inputTypes = modelInfo?.input || [];
+  const hasVision = inputTypes.includes("image");
+  const hasReasoning = !!modelInfo?.reasoning;
+
   return (
     <div className="header">
       <div className="header-left">
@@ -28,11 +35,13 @@ export default function ChatHeader({
           </button>
         )}
         <span className="logo">pi-server</span>
-        <span className="model-badge">Coding Agent</span>
-        <span className="model-tags" id="modelTags" />
+        <ModelSelector currentModel={currentModel} onModelSelect={onModelSelect} />
+        <span className="model-tags">
+          {hasVision && <span className="model-tag vision">vision</span>}
+          {hasReasoning && <span className="model-tag reasoning">reasoning</span>}
+        </span>
       </div>
       <div className="header-right">
-        <ModelSelector currentModel={currentModel} onModelSelect={onModelSelect} />
         <span style={{ fontSize: 12, color: "var(--text-dim)" }}>{username || ""}</span>
         <button className="icon-btn" onClick={onSettingsClick} title="Settings">
           ⚙

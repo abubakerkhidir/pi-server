@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { getSettings, getModels, getSessions, getUsername } from "@/frontend/api";
-import type { ChatLayoutProps, UserSettings, ChatState, ChatRecord, Session, TokenStats, SessionTokenStats } from "@/frontend/types";
+import type { ChatLayoutProps, UserSettings, ChatState, ChatRecord, Session, TokenStats, SessionTokenStats, ModelInfo } from "@/frontend/types";
+
 import ChatSidebar from "../../sidebar/ChatSidebar";
 import ChatHeader from "./ChatHeader";
 import ChatWindow from "./ChatWindow";
@@ -77,7 +78,7 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
     tool_lines: 5,
   });
   const [showSettings, setShowSettings] = useState(false);
-  const [currentModel, setCurrentModel] = useState("Coding Agent");
+  const [currentModel, setCurrentModel] = useState<ModelInfo | null>(null);
 
   // Sidebar collapsed by default on narrow screens (< 800px)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(window.innerWidth < 800);
@@ -145,15 +146,19 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
   }, [loadSessions]);
 
   useEffect(() => {
-    getSettings()
-      .then((s) => setUserSettings({ ...userSettings, ...(s as UserSettings) }))
-      .catch(() => {});
-    getModels()
-      .then((r) => {
-        const first = ((r as { groups: { models: { name: string }[] }[] }).groups || []).flatMap(
+    Promise.all([getSettings(), getModels()])
+      .then(([s, m]) => {
+        const settings = s as UserSettings;
+        setUserSettings({ ...userSettings, ...settings });
+        const allModels = ((m as { groups: { models: ModelInfo[] }[] }).groups || []).flatMap(
           (g) => g.models,
-        )[0];
-        if (first) setCurrentModel(first.name);
+        );
+        if (allModels.length > 0) {
+          const found = settings.model_id
+            ? allModels.find((model) => model.id === settings.model_id)
+            : undefined;
+          setCurrentModel(found || allModels[0]);
+        }
       })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -272,7 +277,7 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
     window.location.hash = sessionId;
   };
 
-  const handleModelSelect = (model: { name: string }) => setCurrentModel(model.name);
+  const handleModelSelect = (model: ModelInfo) => setCurrentModel(model);
 
   const loadAndShowSession = async (sessionId: string) => {
     if (sessionId === currentSessionIdRef.current) return;
@@ -325,8 +330,9 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
           username={username}
           onSettingsClick={() => setShowSettings(true)}
           onLogout={onLogout}
-          currentModel={currentModel}
+          currentModel={currentModel?.name || "Select a model"}
           onModelSelect={handleModelSelect}
+          modelInfo={currentModel}
           sidebarCollapsed={sidebarCollapsed}
           onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
         />

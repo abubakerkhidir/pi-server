@@ -20,9 +20,18 @@ export interface ChatMessage {
 
 
 
+export interface ModelInfo {
+  id: string;
+  name: string;
+  input?: string[];
+  reasoning?: boolean;
+  contextWindow?: number;
+  maxTokens?: number;
+}
+
 export interface ModelGroup {
   provider: string;
-  models: { id: string; name: string }[];
+  models: ModelInfo[];
 }
 
 export interface ModelsResponse {

@@ -125,7 +125,7 @@ router.get("/models", authMiddleware, async (req, res) => {
   try {
     const sm = SessionManager.inMemory();
     const { session } = await createAgentSession({ sessionManager: sm, cwd: process.cwd() });
-    const models = session.modelRegistry.getAll();
+    const models = session.modelRegistry.getAvailable();
     session.dispose();
 
     const providers = new Map();

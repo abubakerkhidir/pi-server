@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { getModels } from "@/frontend/api";
 
+import type { ModelInfo } from "@/frontend/types";
+
 interface ModelSelectorProps {
   currentModel: string;
-  onModelSelect: (model: { id: string; name: string }) => void;
+  onModelSelect: (model: ModelInfo) => void;
 }
 
 export default function ModelSelector({
@@ -12,11 +14,11 @@ export default function ModelSelector({
 }: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
   const [providerList, setProviderList] = useState<
-    { provider: string; models: { id: string; name: string }[] }[]
+    { provider: string; models: ModelInfo[] }[]
   >([]);
   const [selectedProvider, setSelectedProvider] = useState<{
     provider: string;
-    models: { id: string; name: string }[];
+    models: ModelInfo[];
   } | null>(null);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -52,7 +54,7 @@ export default function ModelSelector({
     setOpen(true);
   };
 
-  const handleModelSelect = (model: { id: string; name: string }) => {
+  const handleModelSelect = (model: ModelInfo) => {
     onModelSelect(model);
     setOpen(false);
     setSelectedProvider(null);
@@ -71,7 +73,7 @@ export default function ModelSelector({
         <div
           className="model-dropdown"
           onClick={(e) => e.stopPropagation()}
-          style={{ position: "absolute", top: "100%", right: 0, marginTop: 4 }}
+          style={{ position: "absolute", top: "100%", left: 0, marginTop: 4 }}
         >
           {selectedProvider ? (
             <>
