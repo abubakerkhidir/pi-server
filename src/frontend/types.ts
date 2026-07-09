@@ -105,14 +105,17 @@ export interface TokenStats {
   output_tokens: number;
   prompt_token_s: number;
   output_token_s: number;
+  ttft_ms: number;
 }
 
 export interface SessionTokenStats {
   total_prompt: number;
   total_think: number;
   total_output: number;
+  total_text: number;
   context_used_pct: number;
   context_size: number;
+  ttft_avg_ms: number;
 }
 
 export interface AgentReply {

@@ -112,6 +112,7 @@ function createTables() {
   try { db.exec("ALTER TABLE chat_records ADD COLUMN prompt_token_s INTEGER DEFAULT 0"); } catch (e) {}
   try { db.exec("ALTER TABLE chat_records ADD COLUMN output_token_s INTEGER DEFAULT 0"); } catch (e) {}
   try { db.exec("ALTER TABLE chat_records ADD COLUMN duration_ms INTEGER"); } catch (e) {}
+  try { db.exec("ALTER TABLE chat_records ADD COLUMN ttft_ms INTEGER"); } catch (e) {}
 
   // ── Session-level context size ──
   try { db.exec("ALTER TABLE session_metadata ADD COLUMN context_size INTEGER"); } catch (e) {}

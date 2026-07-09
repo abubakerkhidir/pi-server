@@ -3,7 +3,7 @@ import type { ThinkingBlockProps } from "@/frontend/types";
 import { copyToClipboard, CopySvg } from "@/frontend/lib/clipboard";
 
 export default function ThinkingBlock({ entity, userSettings }: ThinkingBlockProps) {
-  const [expanded, setExpanded] = useState(!entity.sealed);
+  const [expanded, setExpanded] = useState(false);  //!entity.sealed
   const maxLines = userSettings.thinking_lines || 3;
   const maxH = expanded ? "" : maxLines * 21 + "px";
   const disVal = expanded ? "block" : "none";

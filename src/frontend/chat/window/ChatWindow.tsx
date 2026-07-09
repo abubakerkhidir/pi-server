@@ -35,7 +35,6 @@ export default function ChatWindow({
   onScrollDownClick,
 }: ChatWindowProps) {
   const chatRef = useRef<HTMLDivElement>(null);
-  const userScrolledAway = useRef(false);
   const prevRecordCount = useRef(chatState.records.length);
 
   // ── Global visibility controls (chat-level) ──
@@ -43,47 +42,12 @@ export default function ChatWindow({
   const [globalThinkHidden, setGlobalThinkHidden] = useState(false);
 
   // Detect if any record has tools / think (to show global controls)
-  const hasAnyTools = useMemo(
-    () => chatState.records.some((r) => r.agentReply.entities.some((e) => e.type === "tool")),
-    [chatState.records],
-  );
-  const hasAnyThink = useMemo(
-    () => chatState.records.some((r) => r.agentReply.entities.some((e) => e.type === "think")),
-    [chatState.records],
-  );
+  const hasAnyTools = useMemo(() => chatState.records.some((r) => r.agentReply.entities.some((e) => e.type === "tool")),[chatState.records]);
+  const hasAnyThink = useMemo(() => chatState.records.some((r) => r.agentReply.entities.some((e) => e.type === "think")),[chatState.records]);
 
-  // Detect when user manually scrolls up
-  const handleScroll = useCallback(() => {
-    const el = chatRef.current;
-    if (!el) return;
-    const threshold = 150;
-    const away = el.scrollHeight - el.scrollTop - el.clientHeight > threshold;
-    if (away !== userScrolledAway.current) {
-      userScrolledAway.current = away;
-      onScrollAwayChange?.(away);
-    }
-  }, [onScrollAwayChange]);
-
-  // Auto-scroll during streaming, but respect user scrolling up
-  useEffect(() => {
-    const el = chatRef.current;
-    if (!el) return;
-
-    const lastRecord = chatState.records[chatState.records.length - 1];
-    if (!lastRecord) return;
-
-    if (chatState.records.length > prevRecordCount.current) {
-      userScrolledAway.current = false;
-      onScrollAwayChange?.(false);
-    }
-    prevRecordCount.current = chatState.records.length;
-
-    const hasUnsealed = lastRecord.agentReply.entities.some((e) => !e.sealed);
-    if (!hasUnsealed) return;
-    if (userScrolledAway.current) return;
-
-    handleScrolToBtm(chatRef, false);
-  }, [chatState.records, onScrollAwayChange]);
+  useEffect(()=>setupScrolListner(chatRef,onScrollAwayChange),[])
+  // ── Auto-scroll during streaming ──
+  useEffect(() => autoScroll(chatState, prevRecordCount,showScrollDown, chatRef,onScrollAwayChange), [chatState.records]);
 
   const renderedRecords = useMemo(() => {
     return chatState.records.map((record) => {
@@ -100,23 +64,17 @@ export default function ChatWindow({
   }, [chatState.records]);
 
   return (
-    <div className="chat" id="chatMessages" onScroll={handleScroll}>
+    <div className="chat" id="chatMessages">
       {/* ── Global visibility controls ── */}
       {(hasAnyTools || hasAnyThink) && (
         <div className="global-agent-controls">
           {hasAnyTools && (
-            <span
-              className="agent-control-link"
-              onClick={() => setGlobalToolsHidden((p) => !p)}
-            >
+            <span className="agent-control-link" onClick={() => setGlobalToolsHidden((p) => !p)}>
               {globalToolsHidden ? "show all tools" : "hide all tools"}
             </span>
           )}
           {hasAnyThink && (
-            <span
-              className="agent-control-link"
-              onClick={() => setGlobalThinkHidden((p) => !p)}
-            >
+            <span className="agent-control-link" onClick={() => setGlobalThinkHidden((p) => !p)}>
               {globalThinkHidden ? "show all think" : "hide all think"}
             </span>
           )}
@@ -153,20 +111,56 @@ export default function ChatWindow({
           />
         </div>
       ))}
-      {showScrollDown && (
-        <div className="scroll-down-btn-wrapper">
-          <button
-            className="scroll-down-btn"
-            onClick={onScrollDownClick}
-            title="Scroll to bottom"
-          >
-            ↓
-          </button>
-        </div>
-      )}
       <div ref={chatRef} />
     </div>
   );
+}
+
+function setupScrolListner(chatRef:any, onScrollAwayChange:any){
+        const myDiv = chatRef.current?.parentElement;
+        if(!myDiv) return
+        const listner = (event:any) => {
+                //console.log('scrol-listner...')
+                if (event.deltaY < 0) {
+                        //console.log('User scrolled UP');
+                        onScrollAwayChange(true)
+                }
+        }
+        myDiv.addEventListener('wheel',listner)
+        return ()=>{
+                if(myDiv)
+                        myDiv.removeEventListener('wheel',listner)
+        }
+}
+
+function autoScroll(chatState:ChatState, prevRecordCount:any,manualScroll:any, chatRef:any,onScrollAwayChange:any){
+    const lastRecord = chatState.records[chatState.records.length-1]
+    if(!lastRecord){
+        console.log('skip as no record')
+        return
+    }
+    const recordsAdded = chatState.records.length > prevRecordCount.current;
+    prevRecordCount.current = chatState.records.length;
+    if (recordsAdded) {
+      onScrollAwayChange?.(false)
+      handleScrolToBtm(chatRef, false);
+      //console.log('scrolled due to new records')
+      return;
+    }
+
+    // During streaming: only auto-scroll if user hasn't scrolled up
+    const hasUnsealed = lastRecord.agentReply.entities.some((e) => !e.sealed);
+    console.log('unsealed: ',hasUnsealed)
+    if (!hasUnsealed){
+        //console.log('skip before unsealed')
+        return;
+    }
+    if (manualScroll){
+        //console.log('skipped due to manual scroll')
+        return;
+    }
+
+    handleScrolToBtm(chatRef, false);
 }
 
 export function handleScrolToBtm(

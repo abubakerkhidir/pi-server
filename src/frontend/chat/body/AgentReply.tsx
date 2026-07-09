@@ -114,16 +114,19 @@ export default function AgentReply({
         <div className="message-content">
           <div className="message-flow">{entityJsx}</div>
           <div className="agent-reply-footer">
-            {/* ── Token stats (far left) ── */}
-            {tokenStats && (
-              <span className="token-stats" title={`Prompt: ${tokenStats.prompt_tokens} · Think: ${tokenStats.think_tokens} · Output: ${tokenStats.output_tokens} · Prompt/s: ${tokenStats.prompt_token_s} · Output/s: ${tokenStats.output_token_s}`}>
-                <span className="token-stat">p:{tokenStats.prompt_tokens}</span>
-                <span className="token-stat">t:{tokenStats.think_tokens}</span>
-                <span className="token-stat">o:{tokenStats.output_tokens}</span>
-                <span className="token-stat">{tokenStats.prompt_token_s} p/s</span>
-                <span className="token-stat">{tokenStats.output_token_s} o/s</span>
-              </span>
-            )}
+            {/* ── Always render token-stats span to keep footer layout stable ── */}
+            <span className="token-stats">
+              {tokenStats ? (
+                <>
+                  <span className="token-stat" title="Prompt tokens">p:{tokenStats.prompt_tokens}</span>
+                  <span className="token-stat" title="Think tokens">t:{tokenStats.think_tokens}</span>
+                  <span className="token-stat" title="Output tokens">o:{tokenStats.output_tokens}</span>
+                  <span className="token-stat" title="Time to first token">ttft:{tokenStats.ttft_ms}ms</span>
+                  <span className="token-stat" title="Prompt tokens per second">{tokenStats.prompt_token_s} p/s</span>
+                  <span className="token-stat" title="Output tokens per second">{tokenStats.output_token_s} o/s</span>
+                </>
+              ) : null}
+            </span>
             <span className="agent-reply-footer-right">
               <button className="copy-btn labeled" title="Copy entire reply" onClick={copyAllText}>
                 <CopySvg size={13} />

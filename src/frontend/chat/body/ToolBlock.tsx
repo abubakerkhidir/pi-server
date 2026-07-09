@@ -4,22 +4,37 @@ import { copyToClipboard, CopySvg } from "@/frontend/lib/clipboard";
 import { escapeHtmlSimple } from "@/frontend/lib/escapeHtml";
 import { formatToolResult } from "@/frontend/lib/formatters";
 
+function truncate(s: string, maxLen: number = 50): string {
+  if (s.length <= maxLen) return s;
+  return s.slice(0, maxLen) + "…";
+}
+
 function getSubtitle(args: Record<string, unknown> | undefined, name: string): string {
   if (!args) return "";
   if (name === "write" || name === "ctx_write" || name === "read" || name === "ctx_read") {
-    return String(args.path || args.filePath || args.file || "");
+    return truncate(String(args.path || args.filePath || args.file || ""));
   }
   if (name === "bash" || name === "shell" || name === "ctx_shell") {
-    return String(args.command || args.cmd || "");
+    return truncate(String(args.command || args.cmd || ""));
   }
   if (name === "grep" || name === "ctx_search" || name === "ctx_semantic_search") {
-    return String(args.pattern || args.query || "");
+    return truncate(String(args.pattern || args.query || ""));
   }
   if (name === "ls" || name === "ctx_tree" || name === "ctx_glob" || name === "find" || name === "glob") {
-    return String(args.path || args.pattern || args.glob || "");
+    return truncate(String(args.path || args.pattern || args.glob || ""));
   }
   if (name === "edit" || name === "ctx_edit") {
-    return String(args.path || args.file || "");
+    return truncate(String(args.path || args.file || ""));
+  }
+  if (name === "websearch" || name === "web-search" || name === "web_search") {
+    const ql:any = args.queries
+    return truncate(String((args.query?args.query:ql && ql.length?ql[0]+(ql.length>1?' (+'+(ql.length-1)+' more)':''):'') || ""));
+  }
+  if (name === "webfetch" || name === "fetch_content" || name === "fetch-url" || name === "fetch") {
+    return truncate(String(args.url || ""));
+  }
+  if (name === "ask" || name === "question") {
+    return truncate(String(args.question || args.query || ""));
   }
   return "";
 }
@@ -35,6 +50,7 @@ export default function ToolBlock({ entity, userSettings }: ToolBlockProps) {
   );
 
   const bodyContent = useMemo(() => {
+    //console.log('body for:',entity,JSON.stringify(entity, null, 2))
     if (entity.isComplete && formatted) {
       return formatted.bodyHtml;
     }

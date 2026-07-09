@@ -25,34 +25,43 @@ function computeSessionStats(records: ChatRecord[]): SessionTokenStats | undefin
 
   let total_prompt = 0;
   let total_think = 0;
-  let total_output = 0;
+  let total_text = 0;
+  let ttftSum = 0;
+  let ttftCount = 0;
 
   for (const rec of records) {
     const ts = rec.agentReply.tokenStats;
     if (ts) {
       total_prompt += ts.prompt_tokens;
       total_think += ts.think_tokens;
-      total_output += ts.output_tokens;
+      total_text += ts.output_tokens;
+      if (ts.ttft_ms) {
+        ttftSum += ts.ttft_ms;
+        ttftCount++;
+      }
     } else {
       // Fallback estimate if no token stats yet (streaming in progress)
       total_prompt += estimateTokens(rec.userMsg.content);
       for (const ent of rec.agentReply.entities) {
         if (ent.type === "think") total_think += estimateTokens(ent.content);
-        if (ent.type === "msg") total_output += estimateTokens(ent.content);
+        if (ent.type === "msg") total_text += estimateTokens(ent.content);
       }
     }
   }
 
-  const totalUsed = total_prompt + total_think + total_output;
+  // total-output is the sum of think + text (msg)
+  const totalUsed = total_prompt + total_think + total_text;
   const contextSize = 128000; // default; can be refined from model info
   const context_used_pct = Math.round((totalUsed / contextSize) * 100);
 
   return {
     total_prompt,
     total_think,
-    total_output,
+    total_output: total_think + total_text,
+    total_text,
     context_used_pct: Math.min(context_used_pct, 100),
     context_size: contextSize,
+    ttft_avg_ms: ttftCount > 0 ? Math.round(ttftSum / ttftCount) : 0,
   };
 }
 
@@ -321,33 +330,10 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
           sidebarCollapsed={sidebarCollapsed}
           onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
-        <ChatWindow
-          chatState={chatState}
-          userSettings={userSettings}
-          onScrollAwayChange={setShowScrollDown}
-          showScrollDown={showScrollDown}
-          onScrollDownClick={() => {
-            const el = document.getElementById("chatMessages");
-            if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-          }}
-        />
-        <InputArea
-          onSend={handleSendWrapper}
-          disabled={isProcessing}
-          value={userPrompt}
-          onValueChange={setUserPrompt}
-          uploadedFiles={[]}
-          onRemoveFile={() => {}}
-          sessionStats={sessionStats}
-        />
+        <ChatWindow chatState={chatState} userSettings={userSettings} onScrollAwayChange={setShowScrollDown} showScrollDown={showScrollDown}/>
+        <InputArea onSend={handleSendWrapper} disabled={isProcessing} value={userPrompt} onValueChange={setUserPrompt} uploadedFiles={[]} onRemoveFile={() => {}} sessionStats={sessionStats} showScrollDown={showScrollDown} setShowScrollDown={setShowScrollDown}/>
       </div>
-      <SettingsModal
-        isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
-        onSave={(s) => setUserSettings({ ...userSettings, ...s })}
-        onResumeSession={handleResumeSession}
-        onSettingsChange={setUserSettings}
-      />
+      <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} onSave={(s) => setUserSettings({ ...userSettings, ...s })} onResumeSession={handleResumeSession} onSettingsChange={setUserSettings}/>
     </div>
   );
 }

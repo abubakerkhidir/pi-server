@@ -42,7 +42,13 @@ export function askFormatter(result: unknown, args: Record<string, unknown> | un
 
 // ====== Web Search Formatter ======
 export function websearchFormatter(result: unknown, args: Record<string, unknown> | undefined): FormatterResult {
-  const query = safeArgsStr(args, "query");
+  let query = safeArgsStr(args, "query");
+  if((!query || !query.length) && args?.queries){
+	const ql:any = args.queries
+	query = JSON.stringify(ql)
+
+  	//query = '<div>'+ql.join("<div/><div>")+'</div>'
+  }
   const text = extractTextFromResult(result);
 
   const lines = text.split("\n").length;

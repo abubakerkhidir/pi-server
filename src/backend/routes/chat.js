@@ -15,7 +15,7 @@ import {
   cleanupFrameDirs,
 } from "../pi-video.js";
 import { generateSessionName } from "../generateSessionName.js";
-import { computeRecordTokenStats, computeSessionTokenStats, estimateTokens } from "../token-stats.js";
+import { computeSessionTokenStats } from "../token-stats.js";
 
 const router = Router();
 
@@ -129,8 +129,10 @@ router.post("/chat/stream", authMiddleware, upload.array("files", 20), async (re
     // ══════════════════════════════════════════════════════
     //  Entity buffering — mirrors frontend useChatStream
     // ══════════════════════════════════════════════════════
-    //  Track response start time for token stats
+    //  Track timing for token stats
     const responseStartTime = Date.now();
+    let firstTokenTime = null;      // timestamp when first text/thinking/tool_start arrives
+    let usageData = null;           // real usage from pi SDK message_end event
 
     let entityBuf = [];          // in-memory buffer of entities (think/msg/tool)
     let entitySeq = 0;
@@ -193,6 +195,7 @@ router.post("/chat/stream", authMiddleware, upload.array("files", 20), async (re
         switch (event.type) {
           // ── Text delta ──
           case "text": {
+            if (firstTokenTime === null) firstTokenTime = Date.now();
             fullText += event.content;
             // Seal any open thinking block before appending text
             sealAndSave('think');
@@ -208,6 +211,7 @@ router.post("/chat/stream", authMiddleware, upload.array("files", 20), async (re
 
           // ── Thinking delta ──
           case "thinking": {
+            if (firstTokenTime === null) firstTokenTime = Date.now();
             const lastThink = lastEntity('think');
             if (lastThink && !lastThink.saved) {
               lastThink.content += event.content;
@@ -227,6 +231,7 @@ router.post("/chat/stream", authMiddleware, upload.array("files", 20), async (re
 
           // ── Tool started ──
           case "tool_start": {
+            if (firstTokenTime === null) firstTokenTime = Date.now();
             sealAndSave('think');
             sealAndSave('msg');
             entityBuf.push({
@@ -269,6 +274,16 @@ router.post("/chat/stream", authMiddleware, upload.array("files", 20), async (re
             break;
           }
 
+          // ── Real token usage from pi SDK ──
+          case "usage": {
+            usageData = {
+              prompt_tokens: event.input || 0,
+              output_tokens: event.output || 0,
+              think_tokens: event.reasoning || 0,
+            };
+            break;
+          }
+
           // ── Stream end ──
           case "done": {
             // Save any remaining unsaved entities
@@ -276,21 +291,48 @@ router.post("/chat/stream", authMiddleware, upload.array("files", 20), async (re
               if (!ent.saved) saveEntity(ent);
             }
 
-            // Compute and store token stats
+            // Compute token stats from real usage data or fallback
             const totalDurationMs = Date.now() - responseStartTime;
-            const tokenStats = computeRecordTokenStats(
-              prompt,
-              entityBuf.map((e) => ({
-                type: e.type,
-                content: e.content || '',
-                durationMs: e.startedAt ? Date.now() - e.startedAt : undefined,
-              })),
-              totalDurationMs,
-            );
+            const ttftMs = firstTokenTime ? firstTokenTime - responseStartTime : totalDurationMs;
+
+            let promptTokens = 0;
+            let thinkTokens = 0;
+            let outputTokens = 0;
+
+            if (usageData) {
+              // Use real token counts from pi SDK
+              promptTokens = usageData.prompt_tokens;
+              thinkTokens = usageData.think_tokens;
+              outputTokens = usageData.output_tokens;
+            } else {
+              // Fallback: estimate from content
+              promptTokens = Math.ceil(prompt.length / 4);
+              for (const ent of entityBuf) {
+                if (ent.type === 'think') thinkTokens += Math.ceil((ent.content || '').length / 4);
+                if (ent.type === 'msg') outputTokens += Math.ceil((ent.content || '').length / 4);
+              }
+            }
+
+            // Calculate speeds
+            const ttftSec = ttftMs / 1000;
+            const generationMs = totalDurationMs - ttftMs;
+            const generationSec = generationMs / 1000;
+
+            const promptTokenS = ttftSec > 0 ? Math.round(promptTokens / ttftSec) : 0;
+            const outputTokenS = generationSec > 0 ? Math.round(outputTokens / generationSec) : 0;
+
+            const tokenStats = {
+              prompt_tokens: promptTokens,
+              think_tokens: thinkTokens,
+              output_tokens: outputTokens,
+              prompt_token_s: promptTokenS,
+              output_token_s: outputTokenS,
+              ttft_ms: ttftMs,
+            };
 
             // Update record with agent_reply_id and token stats
             db.prepare(
-              "UPDATE chat_records SET agent_reply_id = ?, prompt_tokens = ?, think_tokens = ?, output_tokens = ?, prompt_token_s = ?, output_token_s = ?, duration_ms = ? WHERE id = ?"
+              "UPDATE chat_records SET agent_reply_id = ?, prompt_tokens = ?, think_tokens = ?, output_tokens = ?, prompt_token_s = ?, output_token_s = ?, duration_ms = ?, ttft_ms = ? WHERE id = ?"
             ).run(
               uuidv4(),
               tokenStats.prompt_tokens,
@@ -299,6 +341,7 @@ router.post("/chat/stream", authMiddleware, upload.array("files", 20), async (re
               tokenStats.prompt_token_s,
               tokenStats.output_token_s,
               totalDurationMs,
+              ttftMs,
               recordId,
             );
 
@@ -368,7 +411,7 @@ router.get("/chat/history/:sessionId", authMiddleware, (req, res) => {
 
   // ── Load records with entities ──
   const records = db.prepare(
-    "SELECT id, user_msg_content, agent_reply_id, created_at, prompt_tokens, think_tokens, output_tokens, prompt_token_s, output_token_s, duration_ms FROM chat_records WHERE session_id = ? ORDER BY created_at ASC"
+    "SELECT id, user_msg_content, agent_reply_id, created_at, prompt_tokens, think_tokens, output_tokens, prompt_token_s, output_token_s, duration_ms, ttft_ms FROM chat_records WHERE session_id = ? ORDER BY created_at ASC"
   ).all(sessionId);
 
   const result = [];
@@ -380,6 +423,7 @@ router.get("/chat/history/:sessionId", authMiddleware, (req, res) => {
       output_tokens: rec.output_tokens || 0,
       prompt_token_s: rec.prompt_token_s || 0,
       output_token_s: rec.output_token_s || 0,
+      ttft_ms: rec.ttft_ms || 0,
     };
 
     // Entities

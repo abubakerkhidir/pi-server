@@ -1,8 +1,18 @@
 import { useEffect, useRef } from "react";
 import type { InputAreaProps, SessionTokenStats } from "@/frontend/types";
 
+/** Format a number: if > 1000, show in K (e.g. 1500 → "1.5K"), otherwise raw */
+function fmt(n: number): string {
+  if (n >= 1000) {
+    const k = n / 1000;
+    return k % 1 === 0 ? k.toFixed(0) + "K" : k.toFixed(1) + "K";
+  }
+  return String(n);
+}
+
 interface InputAreaExtendedProps extends InputAreaProps {
   sessionStats?: SessionTokenStats;
+  showScrollDown?:boolean, setShowScrollDown?:(a:boolean)=>void
 }
 
 export default function InputArea({
@@ -12,7 +22,7 @@ export default function InputArea({
   onValueChange,
   uploadedFiles,
   onRemoveFile,
-  sessionStats,
+  sessionStats,showScrollDown,setShowScrollDown
 }: InputAreaExtendedProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -43,14 +53,30 @@ export default function InputArea({
 
   return (
     <div className="input-area">
+      {showScrollDown && (
+        <div className="scroll-down-btn-wrapper">
+          <button
+            className="scroll-down-btn"
+            onClick={() => {
+               const el = document.getElementById("chatMessages");
+               if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+	       setShowScrollDown?.(false)
+            }}
+            title="Scroll to bottom"
+          >
+            ↓
+          </button>
+        </div>
+      )}
       {/* ── Session-level token stats bar ── */}
       {sessionStats && (
-        <div className="session-stats-bar" title={`Context: ${sessionStats.context_used_pct}% of ${sessionStats.context_size.toLocaleString()} tokens`}>
-          <span className="session-stat">total-prompt: {sessionStats.total_prompt}</span>
-          <span className="session-stat">total-think: {sessionStats.total_think}</span>
-          <span className="session-stat">total-output: {sessionStats.total_output}</span>
-          <span className="session-stat">{sessionStats.context_used_pct}%</span>
-          <span className="session-stat">{sessionStats.context_size.toLocaleString()}</span>
+        <div className="session-stats-bar" title={`Context: ${sessionStats.context_used_pct}% of ${sessionStats.context_size.toLocaleString()} tokens · TTFT avg: ${sessionStats.ttft_avg_ms}ms`}>
+          <span className="session-stat">total-prompt: {fmt(sessionStats.total_prompt)}</span>
+          <span className="session-stat">total-think: {fmt(sessionStats.total_think)}</span>
+          <span className="session-stat">total-text: {fmt(sessionStats.total_text)}</span>
+          <span className="session-stat">total-output: {fmt(sessionStats.total_output)}</span>
+          <span className="session-stat">ctx: {sessionStats.context_used_pct}%/{fmt(sessionStats.context_size)}</span>
+          <span className="session-stat">ttft-avg: {sessionStats.ttft_avg_ms}ms</span>
         </div>
       )}
       <div className="input-wrapper">

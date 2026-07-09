@@ -77,6 +77,21 @@ export class PiSessionManager {
           }
           break;
         }
+        case "message_end": {
+          // Extract token usage from the assistant message
+          const msg = event.message;
+          if (msg && msg.usage) {
+            onEvent?.({
+              type: "usage",
+              input: msg.usage.input || 0,
+              output: msg.usage.output || 0,
+              reasoning: msg.usage.reasoning || 0,
+              cacheRead: msg.usage.cacheRead || 0,
+              cacheWrite: msg.usage.cacheWrite || 0,
+            });
+          }
+          break;
+        }
         case "tool_execution_start": {
           onEvent?.({
             type: "tool_start",
