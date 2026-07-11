@@ -8,7 +8,7 @@
  * Safe to run multiple times — idempotent DROP statements.
  */
 
-import { initDb, closeDb, getDb } from "../db.js";
+import { initDb, closeDb, getDb } from "../core/db.js";
 
 // Initialise the DB (this also creates new tables)
 initDb();

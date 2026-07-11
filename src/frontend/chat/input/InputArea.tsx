@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { InputAreaProps, SessionTokenStats } from "@/frontend/types";
+import FileChips from "./FileChips";
 
 /** Format a number: if > 1000, show in K (e.g. 1500 → "1.5K"), otherwise raw */
 function fmt(n: number): string {
@@ -21,6 +22,7 @@ export default function InputArea({
   value,
   onValueChange,
   uploadedFiles,
+  onAddFile,
   onRemoveFile,
   sessionStats,showScrollDown,setShowScrollDown
 }: InputAreaExtendedProps) {
@@ -39,16 +41,14 @@ export default function InputArea({
     // Submit on plain Enter only — Shift/Ctrl/Meta+Enter insert a newline
     if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
       e.preventDefault();
-      if (value.trim() && !disabled) {
-        onSend(value.trim(), uploadedFiles);
-      }
+      if ((!value.trim() && uploadedFiles.length === 0) || disabled) return;
+      onSend(value.trim(), uploadedFiles);
     }
   };
 
   const handleSend = () => {
-    if (value.trim() && !disabled) {
-      onSend(value.trim(), uploadedFiles);
-    }
+    if ((!value.trim() && uploadedFiles.length === 0) || disabled) return;
+    onSend(value.trim(), uploadedFiles);
   };
 
   return (
@@ -70,59 +70,72 @@ export default function InputArea({
       )}
       {/* ── Session-level token stats bar ── */}
       {sessionStats && (
-        <div className="session-stats-bar" title={`Context: ${sessionStats.context_used_pct}% of ${sessionStats.context_size.toLocaleString()} tokens · TTFT avg: ${sessionStats.ttft_avg_ms}ms`}>
+        <div className="session-stats-bar" title={`Context: ${sessionStats.context_percent ?? sessionStats.context_used_pct}% of ${sessionStats.context_size.toLocaleString()} tokens · TTFT avg: ${sessionStats.ttft_avg_ms}ms`}>
           <span className="session-stat">total-prompt: {fmt(sessionStats.total_prompt)}</span>
           <span className="session-stat">total-think: {fmt(sessionStats.total_think)}</span>
           <span className="session-stat">total-text: {fmt(sessionStats.total_text)}</span>
           <span className="session-stat">total-output: {fmt(sessionStats.total_output)}</span>
-          <span className="session-stat">ctx: {sessionStats.context_used_pct}%/{fmt(sessionStats.context_size)}</span>
+          <span className="session-stat">ctx: {sessionStats.context_percent != null ? Math.round(sessionStats.context_percent) : sessionStats.context_used_pct}%/{fmt(sessionStats.context_size)}</span>
           <span className="session-stat">ttft-avg: {sessionStats.ttft_avg_ms}ms</span>
         </div>
       )}
       <div className="input-wrapper">
         <div className="input-row">
-          <input
-            type="file"
-            multiple
-            accept="image/*,video/*,*/*"
-            style={{ display: "none" }}
-            id="file-upload"
-            onChange={(e) => {
-              const files = Array.from(e.target.files || []);
-              if (files.length > 0) {
-                onSend(value.trim(), [...uploadedFiles, ...files]);
-              }
-              e.target.value = "";
-            }}
-          />
-          <button
-            className="upload-btn"
-            title="Upload files"
-            onClick={() => document.getElementById("file-upload")?.click()}
-          >
-            +
-          </button>
-          <textarea
-            ref={textareaRef}
-            className="prompt-input"
-            placeholder="Tell pi what to do..."
-            rows={1}
-            value={value}
-            onChange={(e) => onValueChange(e.target.value)}
-            onKeyDown={handleKeyDown}
-            autoFocus
-          />
-          <button
-            className="send-btn"
-            disabled={disabled}
-            title="Send"
-            onClick={handleSend}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: 20, height: 20 }}>
-              <path d="M22 2L11 13" />
-              <path d="M22 2L15 22L11 13L2 9L22 2Z" />
-            </svg>
-          </button>
+          {/* File chips appear on top of the input line */}
+          {uploadedFiles.length > 0 && (
+            <div className="file-chips-inner">
+              <FileChips files={uploadedFiles} onRemove={onRemoveFile} />
+            </div>
+          )}
+          {/* +, textarea, send stay on the same row */}
+          <div className="input-line">
+            <input
+              type="file"
+              multiple
+              accept="image/*,video/*,*/*"
+              style={{ display: "none" }}
+              id="file-upload"
+              onChange={(e) => {
+                const files = Array.from(e.target.files || []);
+                if (files.length > 0) {
+                  if (onAddFile) {
+                    onAddFile(files);
+                  } else {
+                    onSend(value.trim(), [...uploadedFiles, ...files]);
+                  }
+                }
+                e.target.value = "";
+              }}
+            />
+            <button
+              className="upload-btn"
+              title="Upload files"
+              onClick={() => document.getElementById("file-upload")?.click()}
+            >
+              +
+            </button>
+            <textarea
+              ref={textareaRef}
+              className="prompt-input"
+              placeholder="Tell pi what to do..."
+              rows={1}
+              value={value}
+              onChange={(e) => onValueChange(e.target.value)}
+              onKeyDown={handleKeyDown}
+              autoFocus
+            />
+            <button
+              className="send-btn"
+              disabled={disabled}
+              title="Send"
+              onClick={handleSend}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: 20, height: 20 }}>
+                <path d="M22 2L11 13" />
+                <path d="M22 2L15 22L11 13L2 9L22 2Z" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>

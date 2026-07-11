@@ -123,6 +123,13 @@ export async function getModels(): Promise<Record<string, unknown>> {
   return res.json();
 }
 
+export async function summarizeSession(sessionId: string): Promise<{ summary: string }> {
+  const res = await apiFetch(`/api/chat/session/${encodeURIComponent(sessionId)}/summarize`, {
+    method: "POST",
+  });
+  return res.json();
+}
+
 export async function getChatHistory(sessionId: string): Promise<unknown> {
   const res = await apiFetch(`/api/chat/history/${sessionId}`);
   return res.json();

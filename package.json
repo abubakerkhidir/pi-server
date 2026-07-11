@@ -5,7 +5,7 @@
   "type": "module",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/backend/server.js",
+    "start": "node src/backend/index.js",
     "dev": "vite --port 3000",
     "build": "tsc && vite build",
     "preview": "vite preview"

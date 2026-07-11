@@ -7,16 +7,10 @@ const DB_PATH = path.join(DB_DIR, "pi-server.db");
 
 let db;
 
-export function initDb() {
-  fs.mkdirSync(DB_DIR, { recursive: true });
-  db = new Database(DB_PATH);
-  db.pragma("journal_mode = WAL");
-  db.pragma("foreign_keys = ON");
-  createTables();
-  return db;
-}
-
-function createTables() {
+/**
+ * Create base tables for users and settings.
+ */
+function createUserTables() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,11 +27,19 @@ function createTables() {
       PRIMARY KEY (user_id, key),
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
+  `);
+}
 
+/**
+ * Create session metadata table.
+ */
+function createSessionTables() {
+  db.exec(`
     CREATE TABLE IF NOT EXISTS session_metadata (
       id TEXT PRIMARY KEY,
       user_id INTEGER NOT NULL,
       pi_session_id TEXT,
+      pi_session_file TEXT,
       name TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -45,7 +47,14 @@ function createTables() {
     );
 
     CREATE INDEX IF NOT EXISTS idx_session_metadata_user ON session_metadata(user_id);
+  `);
+}
 
+/**
+ * Create chat files table.
+ */
+function createFileTables() {
+  db.exec(`
     CREATE TABLE IF NOT EXISTS chat_files (
       id TEXT PRIMARY KEY,
       record_id TEXT NOT NULL,
@@ -62,18 +71,12 @@ function createTables() {
 
     CREATE INDEX IF NOT EXISTS idx_chat_files_record ON chat_files(record_id);
   `);
+}
 
-  try {
-    db.exec("ALTER TABLE users ADD COLUMN home_dir TEXT");
-  } catch {
-    // Column already exists
-  }
-
-  // ── Add duration/content_length columns to chat_entities ──
-  try { db.exec("ALTER TABLE chat_entities ADD COLUMN duration_ms INTEGER"); } catch {}
-  try { db.exec("ALTER TABLE chat_entities ADD COLUMN content_length INTEGER"); } catch {}
-
-  // ── Entity-based persistence tables ──
+/**
+ * Create entity-based persistence tables for chat records and entities.
+ */
+function createEntityTables() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS chat_records (
       id TEXT PRIMARY KEY,
@@ -104,18 +107,61 @@ function createTables() {
     CREATE INDEX IF NOT EXISTS idx_chat_records_session ON chat_records(session_id);
     CREATE INDEX IF NOT EXISTS idx_chat_entities_record ON chat_entities(record_id);
   `);
+}
 
-  // ── Token stats columns ──
-  try { db.exec("ALTER TABLE chat_records ADD COLUMN prompt_tokens INTEGER DEFAULT 0"); } catch (e) {}
-  try { db.exec("ALTER TABLE chat_records ADD COLUMN think_tokens INTEGER DEFAULT 0"); } catch (e) {}
-  try { db.exec("ALTER TABLE chat_records ADD COLUMN output_tokens INTEGER DEFAULT 0"); } catch (e) {}
-  try { db.exec("ALTER TABLE chat_records ADD COLUMN prompt_token_s INTEGER DEFAULT 0"); } catch (e) {}
-  try { db.exec("ALTER TABLE chat_records ADD COLUMN output_token_s INTEGER DEFAULT 0"); } catch (e) {}
-  try { db.exec("ALTER TABLE chat_records ADD COLUMN duration_ms INTEGER"); } catch (e) {}
-  try { db.exec("ALTER TABLE chat_records ADD COLUMN ttft_ms INTEGER"); } catch (e) {}
+/**
+ * Add columns that may not exist in older schemas.
+ */
+function addMissingColumns() {
+  // Users table
+  try { db.exec("ALTER TABLE users ADD COLUMN home_dir TEXT"); } catch {}
 
-  // ── Session-level context size ──
-  try { db.exec("ALTER TABLE session_metadata ADD COLUMN context_size INTEGER"); } catch (e) {}
+  // Entity duration/content length
+  try { db.exec("ALTER TABLE chat_entities ADD COLUMN duration_ms INTEGER"); } catch {}
+  try { db.exec("ALTER TABLE chat_entities ADD COLUMN content_length INTEGER"); } catch {}
+
+  // Token stats columns
+  try { db.exec("ALTER TABLE chat_records ADD COLUMN prompt_tokens INTEGER DEFAULT 0"); } catch {}
+  try { db.exec("ALTER TABLE chat_records ADD COLUMN think_tokens INTEGER DEFAULT 0"); } catch {}
+  try { db.exec("ALTER TABLE chat_records ADD COLUMN output_tokens INTEGER DEFAULT 0"); } catch {}
+  try { db.exec("ALTER TABLE chat_records ADD COLUMN prompt_token_s INTEGER DEFAULT 0"); } catch {}
+  try { db.exec("ALTER TABLE chat_records ADD COLUMN output_token_s INTEGER DEFAULT 0"); } catch {}
+  try { db.exec("ALTER TABLE chat_records ADD COLUMN duration_ms INTEGER"); } catch {}
+  try { db.exec("ALTER TABLE chat_records ADD COLUMN ttft_ms INTEGER"); } catch {}
+
+  // Session-level context size
+  try { db.exec("ALTER TABLE session_metadata ADD COLUMN context_size INTEGER"); } catch {}
+  // Context usage from pi SDK
+  try { db.exec("ALTER TABLE session_metadata ADD COLUMN context_used INTEGER"); } catch {}
+  try { db.exec("ALTER TABLE session_metadata ADD COLUMN context_percent REAL"); } catch {}
+
+  // Session file path for loading sessions after restart
+  try { db.exec("ALTER TABLE session_metadata ADD COLUMN pi_session_file TEXT"); } catch {}
+
+  // Generated file tracking columns
+  try { db.exec("ALTER TABLE chat_files ADD COLUMN tool_name TEXT"); } catch {}
+  try { db.exec("ALTER TABLE chat_files ADD COLUMN chat_entity_id INTEGER"); } catch {}
+  try { db.exec("ALTER TABLE chat_files ADD COLUMN asset_id TEXT"); } catch {}
+}
+
+/**
+ * Create all database tables and add missing columns.
+ */
+function createTables() {
+  createUserTables();
+  createSessionTables();
+  createFileTables();
+  createEntityTables();
+  addMissingColumns();
+}
+
+export function initDb() {
+  fs.mkdirSync(DB_DIR, { recursive: true });
+  db = new Database(DB_PATH);
+  db.pragma("journal_mode = WAL");
+  db.pragma("foreign_keys = ON");
+  createTables();
+  return db;
 }
 
 export function getDb() {

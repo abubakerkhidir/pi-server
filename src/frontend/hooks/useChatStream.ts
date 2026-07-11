@@ -22,7 +22,7 @@ export interface UseChatStreamResult {
   sessionId: string | null;
   handleSend: (
     prompt: string,
-    files: File[],
+    files: File[] | undefined,
     onEntityUpdate: OnEntityUpdate,
     onStreamEnd: OnStreamEnd,
     onSessionName?: OnSessionName,
@@ -66,14 +66,14 @@ export function useChatStream({
   const handleSend = useCallback(
     (
       prompt: string,
-      files: File[],
+      files: File[] | undefined,
       onEntityUpdate: OnEntityUpdate,
       onStreamEnd: OnStreamEnd,
       onSessionName?: OnSessionName,
       onSessionCreated?: OnSessionCreated,
       onTokenStats?: OnTokenStats,
     ) => {
-      if (!prompt || isProcessingRef.current) return;
+      if (!prompt && (!files || files.length === 0) || isProcessingRef.current) return;
       isProcessingRef.current = true;
 
       // Fresh entity buffer for this stream

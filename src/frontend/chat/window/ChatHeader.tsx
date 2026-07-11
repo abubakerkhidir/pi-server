@@ -10,6 +10,8 @@ interface ChatHeaderProps {
   sidebarCollapsed: boolean;
   onSidebarToggle: () => void;
   modelInfo: ModelInfo | null;
+  onSummarizeAndNew: () => void;
+  summarizing: boolean;
 }
 
 export default function ChatHeader({
@@ -21,6 +23,8 @@ export default function ChatHeader({
   sidebarCollapsed,
   onSidebarToggle,
   modelInfo,
+  onSummarizeAndNew,
+  summarizing,
 }: ChatHeaderProps) {
   const inputTypes = modelInfo?.input || [];
   const hasVision = inputTypes.includes("image");
@@ -42,6 +46,14 @@ export default function ChatHeader({
         </span>
       </div>
       <div className="header-right">
+        <button
+          className="icon-btn"
+          onClick={onSummarizeAndNew}
+          disabled={summarizing}
+          title={summarizing ? "Summarizing current session…" : "Summarize session and start new task"}
+        >
+          {summarizing ? "⋯" : "📋"}
+        </button>
         <span style={{ fontSize: 12, color: "var(--text-dim)" }}>{username || ""}</span>
         <button className="icon-btn" onClick={onSettingsClick} title="Settings">
           ⚙

@@ -26,6 +26,66 @@ Now, generate a title for this conversation.
 Reply ONLY with the title. Nothing else. No markdown. No quotes. Just the title.`;
 
 /**
+ * Truncate and clean text for naming prompt.
+ */
+function prepareTextForNaming(text, maxLength) {
+  return text.replace(/\n/g, " ").substring(0, maxLength);
+}
+
+/**
+ * Build the full prompt for the naming session.
+ */
+function buildNamingPrompt(userPrompt, assistantResponse) {
+  const truncatedPrompt = prepareTextForNaming(userPrompt, 300);
+  const truncatedResponse = prepareTextForNaming(assistantResponse, 600);
+
+  return `${NAME_GEN_PROMPT}\n\nUser: "${truncatedPrompt}"\nAssistant: "${truncatedResponse}"\n\nRemember: reply ONLY with the title. Nothing else. No markdown. No quotes. Just the title.`;
+}
+
+/**
+ * Clean and validate the generated name.
+ */
+function cleanName(name) {
+  return name
+    .trim()
+    .replace(/^["']|["']$/g, "")
+    .replace(/[^\w\s\-—–]/g, "")
+    .trim()
+    .substring(0, 80);
+}
+
+/**
+ * Create the event subscriber for the naming session.
+ */
+function createNamingSubscriber(resolve) {
+  let name = "";
+  let done = false;
+
+  const unsub = (event) => {
+    switch (event.type) {
+      case "message_update": {
+        const ev = event.assistantMessageEvent;
+        if (ev?.type === "text_delta" && ev.delta) {
+          name += ev.delta;
+        }
+        break;
+      }
+      case "agent_end": {
+        done = true;
+        resolve();
+        break;
+      }
+    }
+  };
+
+  return {
+    unsub,
+    getName: () => name,
+    isDone: () => done,
+  };
+}
+
+/**
  * Generate a session name using the default LLM.
  *
  * Creates a temporary in-memory session with no tools and a dedicated
@@ -35,6 +95,7 @@ export async function generateSessionName(userPrompt, assistantResponse) {
   const tempManager = SessionManager.inMemory();
   let namingSession;
   let unsub = () => {};
+
   try {
     const result = await createAgentSession({
       sessionManager: tempManager,
@@ -43,46 +104,24 @@ export async function generateSessionName(userPrompt, assistantResponse) {
     });
     namingSession = result.session;
 
-    const truncatedPrompt = userPrompt.replace(/\n/g, " ").substring(0, 300);
-    const truncatedResponse = assistantResponse.replace(/\n/g, " ").substring(0, 600);
+    const fullPrompt = buildNamingPrompt(userPrompt, assistantResponse);
 
-    const fullPrompt = `${NAME_GEN_PROMPT}\n\nUser: "${truncatedPrompt}"\nAssistant: "${truncatedResponse}"\n\nRemember: reply ONLY with the title. Nothing else. No markdown. No quotes. Just the title.`;
-
-    let name = "";
-    let done = false;
     let resolvePrompt;
     const promptDone = new Promise((r) => { resolvePrompt = r; });
 
-    unsub = namingSession.subscribe((event) => {
-      switch (event.type) {
-        case "message_update": {
-          const ev = event.assistantMessageEvent;
-          if (ev?.type === "text_delta" && ev.delta) {
-            name += ev.delta;
-          }
-          break;
-        }
-        case "agent_end": {
-          done = true;
-          resolvePrompt();
-          break;
-        }
-      }
-    });
+    const subscriber = createNamingSubscriber(resolvePrompt);
+    unsub = (event) => {
+      subscriber.unsub(event);
+      if (subscriber.isDone()) resolvePrompt();
+    };
 
     await namingSession.prompt(fullPrompt, {});
 
-    if (!done) {
+    if (!subscriber.isDone()) {
       await promptDone;
     }
 
-    name = name
-      .trim()
-      .replace(/^["']|["']$/g, "")
-      .replace(/[^\w\s\-—–]/g, "")
-      .trim()
-      .substring(0, 80);
-
+    const name = cleanName(subscriber.getName());
     return name || "Chat";
   } catch (err) {
     console.error("[generateSessionName] Error:", err);

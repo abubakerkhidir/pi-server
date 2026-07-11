@@ -1,65 +1,55 @@
 import { Router } from "express";
 import { authMiddleware } from "../middleware/auth.js";
-import { getDb } from "../db.js";
+import { getDb } from "../core/db.js";
 
 const router = Router();
 
-router.get("/sessions", authMiddleware, (req, res) => {
+/**
+ * Get all sessions for a user with pagination.
+ */
+function getUserSessions(userId, limit, offset) {
   const db = getDb();
-  const limit = Math.min(parseInt(req.query.limit) || 20, 100);
-  const offset = parseInt(req.query.offset) || 0;
-
   const sessions = db.prepare(
     "SELECT id, name, created_at, updated_at FROM session_metadata WHERE user_id = ? ORDER BY updated_at DESC LIMIT ? OFFSET ?"
-  ).all(req.user.userId, limit, offset);
+  ).all(userId, limit, offset);
 
   const total = db.prepare(
     "SELECT COUNT(*) AS c FROM session_metadata WHERE user_id = ?"
-  ).get(req.user.userId);
+  ).get(userId);
 
-  res.json({ sessions, total: total.c });
-});
+  return { sessions, total: total.c };
+}
 
-router.delete("/sessions/:id", authMiddleware, (req, res) => {
+/**
+ * Delete a session by ID if it belongs to the user.
+ */
+function deleteUserSession(sessionId, userId) {
   const db = getDb();
   const result = db.prepare(
     "DELETE FROM session_metadata WHERE id = ? AND user_id = ?"
-  ).run(req.params.id, req.user.userId);
+  ).run(sessionId, userId);
 
-  if (result.changes === 0) {
-    return res.status(404).json({ error: "Session not found" });
-  }
-  res.json({ ok: true });
-});
+  return result.changes > 0;
+}
 
-router.put("/sessions/:id/name", authMiddleware, (req, res) => {
-  const { name } = req.body;
-  if (!name || typeof name !== "string" || name.trim().length === 0) {
-    return res.status(400).json({ error: "Name is required" });
-  }
-
+/**
+ * Update session name if it belongs to the user.
+ */
+function updateSessionName(sessionId, userId, name) {
   const db = getDb();
   const result = db.prepare(
     "UPDATE session_metadata SET name = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?"
-  ).run(name.trim(), req.params.id, req.user.userId);
+  ).run(name.trim(), sessionId, userId);
 
-  if (result.changes === 0) {
-    return res.status(404).json({ error: "Session not found" });
-  }
-  res.json({ ok: true });
-});
+  return result.changes > 0;
+}
 
-//  GET /api/sessions/search — full-text search across all chat history
-router.get("/sessions/search", authMiddleware, (req, res) => {
+/**
+ * Search sessions by content (user messages and entity content).
+ */
+function searchSessions(userId, query) {
   const db = getDb();
-  const q = (req.query.q || "").trim();
-
-  if (!q) {
-    return res.json({ sessions: [], total: 0 });
-  }
-
-  // Search in user messages and entity content
-  const like = `%${q}%`;
+  const like = `%${query}%`;
 
   const sessions = db.prepare(`
     SELECT DISTINCT s.id, s.name, s.created_at, s.updated_at
@@ -73,10 +63,50 @@ router.get("/sessions/search", authMiddleware, (req, res) => {
       )
     ORDER BY s.updated_at DESC
     LIMIT 50
-  `).all(req.user.userId, like, like);
+  `).all(userId, like, like);
 
-  const total = sessions.length;
+  return { sessions, total: sessions.length };
+}
 
+//  GET /api/sessions — list all sessions for user
+router.get("/sessions", authMiddleware, (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+  const offset = parseInt(req.query.offset) || 0;
+  const { sessions, total } = getUserSessions(req.user.userId, limit, offset);
+  res.json({ sessions, total });
+});
+
+//  DELETE /api/sessions/:id — delete a session
+router.delete("/sessions/:id", authMiddleware, (req, res) => {
+  const deleted = deleteUserSession(req.params.id, req.user.userId);
+  if (!deleted) {
+    return res.status(404).json({ error: "Session not found" });
+  }
+  res.json({ ok: true });
+});
+
+//  PUT /api/sessions/:id/name — update session name
+router.put("/sessions/:id/name", authMiddleware, (req, res) => {
+  const { name } = req.body;
+  if (!name || typeof name !== "string" || name.trim().length === 0) {
+    return res.status(400).json({ error: "Name is required" });
+  }
+
+  const updated = updateSessionName(req.params.id, req.user.userId, name);
+  if (!updated) {
+    return res.status(404).json({ error: "Session not found" });
+  }
+  res.json({ ok: true });
+});
+
+//  GET /api/sessions/search — full-text search across all chat history
+router.get("/sessions/search", authMiddleware, (req, res) => {
+  const q = (req.query.q || "").trim();
+  if (!q) {
+    return res.json({ sessions: [], total: 0 });
+  }
+
+  const { sessions, total } = searchSessions(req.user.userId, q);
   res.json({ sessions, total });
 });
 

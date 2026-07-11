@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { getSettings, getModels, getSessions, getUsername } from "@/frontend/api";
+import { getSettings, getModels, getSessions, getUsername, summarizeSession } from "@/frontend/api";
 import type { ChatLayoutProps, UserSettings, ChatState, ChatRecord, Session, TokenStats, SessionTokenStats, ModelInfo } from "@/frontend/types";
 
 import ChatSidebar from "../../sidebar/ChatSidebar";
@@ -79,6 +79,8 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
   });
   const [showSettings, setShowSettings] = useState(false);
   const [currentModel, setCurrentModel] = useState<ModelInfo | null>(null);
+  const pendingSummaryRef = useRef<string | null>(null);
+  const [summarizing, setSummarizing] = useState(false);
 
   // Sidebar collapsed by default on narrow screens (< 800px)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(window.innerWidth < 800);
@@ -95,6 +97,7 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
   }, []);
 
   const [userPrompt, setUserPrompt] = useState("");
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [showScrollDown, setShowScrollDown] = useState(false);
 
   // Chat state
@@ -226,21 +229,34 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
 
   const handleSendWrapper = useCallback(
     (prompt: string, files: File[]) => {
-      if (!prompt || isProcessing) return;
-      setUserPrompt("");
+      if (isProcessing) return;
+      // Allow file-only uploads (empty prompt with files)
+      if (!prompt && (!files || files.length === 0)) return;
+
+      if (prompt) setUserPrompt("");
+      // Clear uploaded files after sending
+      if (files && files.length > 0) setUploadedFiles([]);
+
+      // If there's a pending summary from a previous session, prepend it
+      const pendingSummary = pendingSummaryRef.current;
+      let finalPrompt = prompt || "[File attachment]";
+      if (pendingSummary) {
+        finalPrompt = `###Previous session summary:\n${pendingSummary}\n\n###New Task\n\n${finalPrompt}`;
+        pendingSummaryRef.current = null; // consume it once
+      }
 
       const userId = uuidv4();
       const userRecord: ChatRecord = {
         id: userId,
-        userMsg: { content: prompt },
+        userMsg: { content: finalPrompt },
         agentReply: { id: "", entities: [] },
       };
       setChatState((prev) => ({ records: [...prev.records, userRecord] }));
 
       setIsProcessing(true);
       handleSend(
-        prompt,
-        files,
+        finalPrompt,
+        files && files.length > 0 ? files : undefined,
         onEntityUpdate,
         handleStreamEnd,
         handleSessionName,
@@ -266,6 +282,30 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
       window.history.replaceState(null, "", window.location.pathname);
     }
   };
+
+  const handleSummarizeAndNew = useCallback(async () => {
+    const oldSessionId = currentSessionIdRef.current;
+    if (!oldSessionId) {
+      // No active session, just create a new one
+      handleNewChat();
+      return;
+    }
+
+    setSummarizing(true);
+    try {
+      const result = await summarizeSession(oldSessionId);
+      if (result.summary) {
+        pendingSummaryRef.current = result.summary;
+      }
+    } catch (err) {
+      console.error("Summarization failed:", err);
+      // Still start a new session even if summarization fails
+    } finally {
+      setSummarizing(false);
+    }
+
+    handleNewChat();
+  }, [handleNewChat]);
 
   const handleResumeSession = async (sessionId: string | null) => {
     if (sessionId === null) {
@@ -333,11 +373,24 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
           currentModel={currentModel?.name || "Select a model"}
           onModelSelect={handleModelSelect}
           modelInfo={currentModel}
+          onSummarizeAndNew={handleSummarizeAndNew}
+          summarizing={summarizing}
           sidebarCollapsed={sidebarCollapsed}
           onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
         <ChatWindow chatState={chatState} userSettings={userSettings} onScrollAwayChange={setShowScrollDown} showScrollDown={showScrollDown}/>
-        <InputArea onSend={handleSendWrapper} disabled={isProcessing} value={userPrompt} onValueChange={setUserPrompt} uploadedFiles={[]} onRemoveFile={() => {}} sessionStats={sessionStats} showScrollDown={showScrollDown} setShowScrollDown={setShowScrollDown}/>
+        <InputArea
+          onSend={handleSendWrapper}
+          disabled={isProcessing}
+          value={userPrompt}
+          onValueChange={setUserPrompt}
+          uploadedFiles={uploadedFiles}
+          onAddFile={(files) => setUploadedFiles((prev) => [...prev, ...files])}
+          onRemoveFile={(index) => setUploadedFiles((prev) => prev.filter((_, i) => i !== index))}
+          sessionStats={sessionStats}
+          showScrollDown={showScrollDown}
+          setShowScrollDown={setShowScrollDown}
+        />
       </div>
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} onSave={(s) => setUserSettings({ ...userSettings, ...s })} onResumeSession={handleResumeSession} onSettingsChange={setUserSettings}/>
     </div>

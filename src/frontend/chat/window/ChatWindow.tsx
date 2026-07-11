@@ -63,6 +63,9 @@ export default function ChatWindow({
     });
   }, [chatState.records]);
 
+  const parsedUser = (rec:any)=> marked.parse(rec.userHtml) || "";
+
+
   return (
     <div className="chat" id="chatMessages">
       {/* ── Global visibility controls ── */}
@@ -86,7 +89,7 @@ export default function ChatWindow({
           <div className="message user">
             <div className="message-header">You</div>
             <div className="message-content">
-              <div dangerouslySetInnerHTML={{ __html: rec.userHtml }} />
+              <div className="markdown" dangerouslySetInnerHTML={{ __html: parsedUser(rec) }} />
               <div className="message-footer">
                 <button
                   className="copy-btn"

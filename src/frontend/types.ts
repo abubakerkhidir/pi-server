@@ -124,6 +124,8 @@ export interface SessionTokenStats {
   total_text: number;
   context_used_pct: number;
   context_size: number;
+  context_used?: number;  // actual context tokens used (from pi SDK)
+  context_percent?: number;  // percentage of context used (from pi SDK)
   ttft_avg_ms: number;
 }
 
@@ -213,5 +215,6 @@ export interface InputAreaProps {
   value: string;
   onValueChange: (value: string) => void;
   uploadedFiles: File[];
+  onAddFile?: (files: File[]) => void;
   onRemoveFile: (index: number) => void;
 }

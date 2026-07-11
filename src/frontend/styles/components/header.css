@@ -114,6 +114,20 @@
   background: var(--surface3);
 }
 
+.icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-color: var(--border);
+  color: var(--text-muted);
+  background: var(--surface2);
+}
+
+.icon-btn:disabled:hover {
+  border-color: var(--border);
+  color: var(--text-muted);
+  background: var(--surface2);
+}
+
 .logout-btn {
   padding: 6px 12px;
   border-radius: 8px;
