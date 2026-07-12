@@ -281,8 +281,8 @@ export class PiSessionManager {
     // Create a new session
     const sessionCwd = getUserHomeDir(userId);
     const session = await createNewSession(userId, sessionCwd);
-    console.log('created new session: ',session.id)
-    const newPiSessionId = session.id || piSessionId || uuidv4();
+    console.log('created new session: ',session.sessionId)
+    const newPiSessionId = session.sessionId || piSessionId || uuidv4();
 
     // Store the session file path in the database for future loading
     if (session.sessionFile) {

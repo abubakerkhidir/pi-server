@@ -14,7 +14,7 @@ export function registerHandler(h){
 export async function handleFileSaveEvent(pi, event, ctx) {
     const sessionId = ctx?.sessionManager?.sessionId
     const entityBuffer = getEntityBuffer(sessionId);
-    if(!entityBuffer || event.toolCallId){
+    if(!entityBuffer || !event.toolCallId){
         console.log('>>>>>>>>>>>>>>>>>>> entityBuffer is null...',sessionId, entityBuffer,event.toolCallId)
         return
     }
