@@ -1,5 +1,5 @@
 import { downloadFile, saveBufferToFile, parseMcpResult, registerHandler } from "../fileSaverExt.js";
-import { getDb } from "../../../core/db.js";
+import { getDb } from "../../../db.js";
 
 const comfyTools = ["generate_image", "generate_song", "generate_video", "generate_audio"];
 

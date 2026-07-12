@@ -3,7 +3,7 @@ import path from "path";
 import https from "https";
 import http from "http";
 import { v4 as uuidv4 } from "uuid";
-import { getDb } from "../core/db.js";
+import { getDb } from "../db.js";
 import { getEntityBuffer } from "../../routes/chat/stream/state.js";
 
 const handlers = []
