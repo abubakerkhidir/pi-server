@@ -1,5 +1,6 @@
 import { downloadFile, saveBufferToFile, parseMcpResult, modifyContentBlocks } from "./file-handler.js";
-
+import { getDb } from "../../../core/db.js";
+  
 /**
  * Extract file info from Comfy MCP generate_image result.
  */
@@ -105,7 +106,6 @@ export function modifyComfyToolResult(result, fileId, filePath, serverBaseUrl, f
  * @returns {Object|null} The file record if found, null otherwise
  */
 export function findFileByAssetId(assetId, userId) {
-  const { getDb } = require("../../../core/db.js");
   const db = getDb();
   
   console.log(`[ComfyHandler:findFileByAssetId] Looking for assetId: ${assetId}, userId: ${userId}`);
