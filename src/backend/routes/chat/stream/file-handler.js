@@ -4,11 +4,8 @@ import https from "https";
 import http from "http";
 import { v4 as uuidv4 } from "uuid";
 import { getDb } from "../../../core/db.js";
-import { extractComfyFileInfo, processComfyAsset, modifyComfyToolResult, interceptViewImage } from "./comfy-handler.js";
+import { extractComfyFileInfo, processComfyAsset, modifyComfyToolResult } from "./comfy-handler.js";
 import { extractHtml2PdfFileInfo, processLocalFile, modifyHtml2PdfToolResult } from "./html2pdf-handler.js";
-
-// Re-export interceptViewImage for use in handler.js
-export { interceptViewImage };
 
 /**
  * Get the user's downloads directory.

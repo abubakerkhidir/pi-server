@@ -1,5 +1,5 @@
 import { calculateTokenStats, saveTokenStats, updateSessionContextUsage } from "./token-stats.js";
-import { autoSaveGeneratedFile, isFileGeneratingTool, interceptViewImage, normalizeToolName } from "./file-handler.js";
+import { autoSaveGeneratedFile, isFileGeneratingTool, normalizeToolName } from "./file-handler.js";
 
 /**
  * Create an SSE event writer helper.
@@ -105,20 +105,6 @@ async function handleToolEndEvent(event, entityBuffer, writeEvent, params) {
   
   let finalResult = event.result;
   let info = null;
-  
-  // Check if this is a view_image call that should be intercepted
-  const normalizedName = normalizeToolName(toolName);
-  if (normalizedName === 'view_image' || toolName?.includes('view_image')) {
-    console.log(`[Handler:handleToolEndEvent] Detected view_image call, checking for interception`);
-    const interceptionResult = interceptViewImage(normalizedName, args, userId);
-    if (interceptionResult) {
-      console.log(`[Handler:handleToolEndEvent] Intercepting view_image, returning rejection`);
-      saveToolToBuffer(tool, interceptionResult, false, entityBuffer);
-      // Write the tool_end event with the interception result
-      writeEvent("tool_end", {id: event.id, name: event.name, args: event.args, result: interceptionResult, isError: false});
-      return;
-    }
-  }
   
   // Check if this is a file-generating tool
   if (isFileGeneratingTool(toolName, event.result) && event.result) {

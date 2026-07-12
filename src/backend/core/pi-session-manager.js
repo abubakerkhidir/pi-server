@@ -120,7 +120,8 @@ async function createResourceLoader(sessionCwd) {
       pi.on("tool_call", async (event, ctx) => { handleOnToolCallEvent(pi, event,ctx)})
     ]
   });
-  
+  console.log('loader created, reloading... ')
+
   // IMPORTANT: Must call reload() to actually discover skills!
   await loader.reload();
   

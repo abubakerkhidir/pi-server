@@ -1,18 +1,34 @@
-
+import {getDb} from '../db.js'
 
 export function comfyViewImgExt(pi,event, ctx){
     // Target your specific tool (e.g., bash)
-    if (event.toolName === "mcp") {
-        console.log('***** on mcp tool call: ', JSON.stringify(event))
-        // const command = event.input?.command || "";
-        
-        // // Apply your custom argument blacklist
-        // const isBlacklisted = command.includes("rm -rf") || command.includes("dropdb");
-        
-        // if (isBlacklisted) {
-        //      ctx.ui.notify(`Blocked unsafe command: ${command}`, "error");
-        //     // Stop execution and throw a rejection string back to the LLM
-        //     throw new Error(`Execution Rejected: '${command}' matches system blacklist criteria.`);
-        // }
+    if (event.toolName === "mcp" && event.input?.tool?.includes('view_image') && event.input.args) {
+        console.log('***** on mcp tool call for comfyViewImgExt: ', JSON.stringify(event))
+        const args = JSON.parse(event.input.args)
+        const assetId = args?.asset_id;
+        if (!assetId) {
+            console.log(`[comfyViewImgExt] No asset_id in args, letting through`);
+            return null;
+        }
+        // Search for this asset in our database
+        const fileRecord = findFileByAssetId(assetId, userId);
+        if (fileRecord) {
+            const text = `The image has already been saved locally. To view it, use the ctx_read tool with this file path:\n\n${fileRecord.file_path}\n\nThe file is ${fileRecord.file_size} bytes (${fileRecord.mime_type}).`;
+            console.log(`[comfyViewImgExt] Found local file, creating rejection: `,text);
+            //      ctx.ui.notify(`Blocked unsafe command: ${command}`, "error");
+            throw new Error(text);
+        }
+        console.log(`[comfyViewImgExt] Asset not found locally, letting through`);
     }
+}
+
+export function findFileByAssetId(assetId, userId) {
+  const db = getDb();
+  console.log(`[ComfyHandler:findFileByAssetId] Looking for assetId: ${assetId}, userId: ${userId}`);
+  const record = db.prepare(`
+    SELECT id, file_name, file_path, file_size, mime_type 
+    FROM chat_files  WHERE asset_id = ? LIMIT 1
+  `).get(assetId) ; // AND session_id = ? , userId);
+  console.log(`[ComfyHandler:findFileByAssetId] Found record:`, record);
+  return record;
 }
