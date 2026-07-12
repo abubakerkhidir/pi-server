@@ -106,6 +106,12 @@ function handleOnToolCallEvent(pi, event,ctx){
   console.log('Got event for toolCall: ',JSON.stringify(event))
   comfyViewImgExt(pi,event,ctx)
 }
+
+function handleOnToolOuptutEvent(pi, event,ctx){
+  console.log('Got event for toolOutput: ',JSON.stringify(event))
+  //comfyViewImgExt(pi,event,ctx)
+}
+
 /**
  * Create a resource loader for discovering skills and other resources.
  */
@@ -117,7 +123,10 @@ async function createResourceLoader(sessionCwd) {
     cwd: sessionCwd,
     agentDir,
     extensionFactories: [
-      pi.on("tool_call", async (event, ctx) => { handleOnToolCallEvent(pi, event,ctx)})
+      (pi)=> {
+        pi.on("tool_call", async (event, ctx) => { handleOnToolCallEvent(pi, event,ctx)});
+        pi.on("tool_output", async (event, ctx) => {handleOnToolOuptutEvent(pi, event,ctx)});
+      }
     ]
   });
   console.log('loader created, reloading... ')
