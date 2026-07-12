@@ -13,11 +13,14 @@ export function getPiManager() {
 export function setEntityBuffer(sessionId,entityBuffer){
   if(sessionId)  
       entityBufferMap.set(sessionId,entityBuffer)
+  console.log('setting entity buffer: ',sessionId,entityBuffer)
 }
 export function getEntityBuffer(sessionId){
-    return sessionId?? entityBufferMap.get(sessionId)
+    return sessionId? entityBufferMap.get(sessionId) : undefined
 }
+
 export function removeEntityBuffer(sessionId){
     if(sessionId)
       entityBufferMap.delete(sessionId)
+    console.log('removing entity buffer: ',sessionId)
 }
