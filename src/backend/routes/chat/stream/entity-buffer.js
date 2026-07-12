@@ -44,7 +44,7 @@ function buildEntityParams(entity, recordId, dbSessionId, seq) {
  * @param {string} dbSessionId - The session ID
  * @returns {Object} Entity buffer functions
  */
-export function createEntityBuffer(recordId, dbSessionId) {
+export function createEntityBuffer(recordId, dbSessionId,userId) {
   const db = getDb();
   let entityBuf = [];
   let entitySeq = 0;
@@ -67,6 +67,7 @@ export function createEntityBuffer(recordId, dbSessionId) {
     const params = buildEntityParams(entity, recordId, dbSessionId, entitySeq++);
     const result = db.prepare(INSERT_STMT).run(...params);
     entity.saved = true;
+    entity.recordId = recordId
     entity.dbEntityId = Number(result.lastInsertRowid);
     return entity.dbEntityId;
   }
@@ -102,5 +103,7 @@ export function createEntityBuffer(recordId, dbSessionId) {
     flushAll,
     addEntity,
     findToolEntity,
+    recordId,
+    userId
   };
 }

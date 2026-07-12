@@ -3,7 +3,8 @@ import fs from "fs";
 import path from "path";
 import { getDb } from "./db.js";
 import { v4 as uuidv4 } from "uuid";
-import { comfyViewImgExt } from "./ext/comfyMcpExt.js";
+import { comfyViewImgExt } from "./ext/comfyViewImgExt.js";
+import { handleFileSaveEvent } from "./ext/fileSaverExt.js";
 
 //const DEFAULT_TOOLS = ["read", "ls", "bash", "find", "grep", "get_search_content"];
 const DEFAULT_TOOLS = [];
@@ -102,13 +103,14 @@ async function applyUserModel(session, userId) {
   }
 }
 
-function handleOnToolCallEvent(pi, event,ctx){
+async function handleOnToolCallEvent(pi, event,ctx){
   console.log('Got event for toolCall: ',JSON.stringify(event))
-  comfyViewImgExt(pi,event,ctx)
+  await comfyViewImgExt(pi,event,ctx)
 }
 
-function handleOnToolOuptutEvent(pi, event,ctx){
+async function handleOnToolOuptutEvent(pi, event,ctx){
   console.log('Got event for toolOutput: ',JSON.stringify(event))
+  return await handleFileSaveEvent(pi, event, ctx)
   //comfyViewImgExt(pi,event,ctx)
 }
 
@@ -124,8 +126,8 @@ async function createResourceLoader(sessionCwd) {
     agentDir,
     extensionFactories: [
       (pi)=> {
-        pi.on("tool_call", async (event, ctx) => { handleOnToolCallEvent(pi, event,ctx)});
-        pi.on("tool_output", async (event, ctx) => {handleOnToolOuptutEvent(pi, event,ctx)});
+        pi.on("tool_call", async (event, ctx) => { await handleOnToolCallEvent(pi, event,ctx)});
+        pi.on("tool_result", async (event, ctx) => {return await handleOnToolOuptutEvent(pi, event,ctx)});
       }
     ]
   });
@@ -280,7 +282,7 @@ export class PiSessionManager {
     const sessionCwd = getUserHomeDir(userId);
     const session = await createNewSession(userId, sessionCwd);
 
-    const newPiSessionId = piSessionId || uuidv4();
+    const newPiSessionId = session.id || piSessionId || uuidv4();
 
     // Store the session file path in the database for future loading
     if (session.sessionFile) {
@@ -402,6 +404,7 @@ export class PiSessionManager {
     this.activeSessions.clear();
     this.activeStreams.clear();
   }
+
 }
 
 const toolsCache = new Map();

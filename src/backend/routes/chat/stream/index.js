@@ -2,7 +2,7 @@ import { Router } from "express";
 import { authMiddleware } from "../../../middleware/auth.js";
 import upload from "../../../middleware/upload.js";
 import { cleanupFrameDirs } from "../../../core/pi-video.js";
-import { getPiManager } from "./state.js";
+import { getPiManager, removeEntityBuffer, setEntityBuffer } from "./state.js";
 import { processUploadedFiles } from "./file-processor.js";
 import { createEntityBuffer } from "./entity-buffer.js";
 import { createSSEWriter, createStreamEventHandler } from "./handler.js";
@@ -142,10 +142,12 @@ router.post("/chat/stream", authMiddleware, upload.array("files", 20), async (re
     // Handle abort on client disconnect
     req.on("close", () => {
       piManager.abort(piSessionId).catch(() => {});
+      removeEntityBuffer(dbSessionId)
     });
 
     // Create entity buffer and stream handler
-    const entityBuffer = createEntityBuffer(recordId, dbSessionId);
+    const entityBuffer = createEntityBuffer(recordId, dbSessionId,req.user.userId);
+    setEntityBuffer(dbSessionId,entityBuffer)
     const responseStartTime = Date.now();
 
     const { onEvent } = createStreamEventHandler({
@@ -174,10 +176,12 @@ router.post("/chat/stream", authMiddleware, upload.array("files", 20), async (re
 
     // Signal completion
     writeDoneEvent(writeEvent, res);
+    removeEntityBuffer(dbSessionId)
   } catch (err) {
     writeErrorResponse(res, err.message);
   } finally {
     scheduleCleanup(tempDirs);
+    removeEntityBuffer(dbSessionId)
   }
 });
 

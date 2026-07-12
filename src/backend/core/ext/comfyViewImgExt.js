@@ -1,6 +1,6 @@
 import {getDb} from '../db.js'
 
-export function comfyViewImgExt(pi,event, ctx){
+export async function comfyViewImgExt(pi,event, ctx){
     // Target your specific tool (e.g., bash)
     if (event.toolName === "mcp" && event.input?.tool?.includes('view_image') && event.input.args) {
         console.log('***** on mcp tool call for comfyViewImgExt: ', JSON.stringify(event))
