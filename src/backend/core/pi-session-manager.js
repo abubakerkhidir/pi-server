@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { getDb } from "./db.js";
 import { v4 as uuidv4 } from "uuid";
+import { comfyViewImgExt } from "./ext/comfyMcpExt.js";
 
 //const DEFAULT_TOOLS = ["read", "ls", "bash", "find", "grep", "get_search_content"];
 const DEFAULT_TOOLS = [];
@@ -101,6 +102,10 @@ async function applyUserModel(session, userId) {
   }
 }
 
+function handleOnToolCallEvent(pi, event,ctx){
+  console.log('Got event for toolCall: ',JSON.stringify(event))
+  comfyViewImgExt(pi,event,ctx)
+}
 /**
  * Create a resource loader for discovering skills and other resources.
  */
@@ -111,6 +116,9 @@ async function createResourceLoader(sessionCwd) {
   const loader = new DefaultResourceLoader({
     cwd: sessionCwd,
     agentDir,
+    extensionFactories: [
+      pi.on("tool_call", async (event, ctx) => { handleOnToolCallEvent(pi, event,ctx)})
+    ]
   });
   
   // IMPORTANT: Must call reload() to actually discover skills!
@@ -120,22 +128,8 @@ async function createResourceLoader(sessionCwd) {
   const { skills, diagnostics } = loader.getSkills();
   console.log(`[ResourceLoader] Discovered ${skills.length} skills:`);
   for (const skill of skills) {
-    console.log(`  - ${skill.name}: ${skill.description?.substring(0, 80)}...`);
-    console.log(`    filePath: ${skill.filePath}`);
+    console.log(`  - ${skill.name}: filePath: ${skill.filePath}...`);
   }
-  if (diagnostics.length > 0) {
-    console.log(`[ResourceLoader] Diagnostics:`, diagnostics);
-  }
-  
-  // Debug: Check what's in the skills directory
-  const skillsDirPath = path.join(agentDir, 'skills');
-  console.log(`[ResourceLoader] Skills directory: ${skillsDirPath}`);
-  console.log(`[ResourceLoader] Skills directory exists: ${fs.existsSync(skillsDirPath)}`);
-  if (fs.existsSync(skillsDirPath)) {
-    const entries = fs.readdirSync(skillsDirPath, { withFileTypes: true });
-    console.log(`[ResourceLoader] Skills directory contents:`, entries.map(e => `${e.name} (${e.isDirectory() ? 'dir' : 'file'})`));
-  }
-  
   return loader;
 }
 

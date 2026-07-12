@@ -54,7 +54,7 @@ function createSessionTables() {
  * Create chat files table.
  */
 function createFileTables() {
-  db.exec('DROP TABLE chat_files;')
+  //db.exec('DROP TABLE chat_files;')
   db.exec(`
     CREATE TABLE IF NOT EXISTS chat_files (
       id TEXT PRIMARY KEY,
