@@ -129,6 +129,7 @@ router.post("/chat/stream", authMiddleware, upload.array("files", 20), async (re
     // Get or create session
     const { session, piSessionId } = await piManager.getOrCreateSession(req.user.userId, sessionId);
     const dbSessionId = sessionId || piSessionId;
+    console.log('got pi session: ',piSessionId, sessionId, dbSessionId)
 
     // Initialize session and record
     initSessionMetadata(dbSessionId, req.user.userId, piSessionId, effectivePrompt);
