@@ -109,7 +109,7 @@ async function handleOnToolCallEvent(pi, event,ctx){
 }
 
 async function handleOnToolOuptutEvent(pi, event,ctx){
-  console.log('Got event for toolOutput: ',ctx?.sessionId, ctx??Object.keys(ctx), JSON.stringify(event))
+  console.log('Got event for toolOutput: ',ctx?.sessionId, ctx??Object.keys(ctx), Object.keys(event))
   return await handleFileSaveEvent(pi, event, ctx)
   //comfyViewImgExt(pi,event,ctx)
 }

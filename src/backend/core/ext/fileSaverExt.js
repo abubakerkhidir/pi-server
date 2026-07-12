@@ -14,11 +14,11 @@ export function registerHandler(h){
 export async function handleFileSaveEvent(pi, event, ctx) {
     const sessionId = ctx?.sessionManager?.sessionId
     const entityBuffer = getEntityBuffer(sessionId);
-    if(!entityBuffer){
-        console.log('>>>>>>>>>>>>>>>>>>> entityBuffer is null...')
+    if(!entityBuffer || event.toolCallId){
+        console.log('>>>>>>>>>>>>>>>>>>> entityBuffer is null...',entityBuffer,event.toolCallId)
         return
     }
-    const tool = entityBuffer?.findToolEntity(event.id);
+    const tool = entityBuffer?.findToolEntity(event.toolCallId);
     let toolName = event.toolName
     if (toolName === 'mcp' && tool?.toolArgs?.tool) {
         toolName = tool.toolArgs.tool;
@@ -31,6 +31,8 @@ export async function handleFileSaveEvent(pi, event, ctx) {
         const entityId = tool?.dbEntityId || null;
         console.log(`[handleFileSaveEvent] Entity ID: ${entityId}`);
         return await autoSaveGeneratedFile(entityBuffer,tool,fileInfo, toolName, event, entityBuffer.recordId, sessionId, entityBuffer.userId, entityId );
+    }else{
+        console.log('not file-saver tool... ',toolName,tool)
     }
     return null
 }
