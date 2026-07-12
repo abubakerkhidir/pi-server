@@ -96,12 +96,11 @@ async function handleToolEndEvent(event, entityBuffer, writeEvent, params) {
   const tool = entityBuffer.findToolEntity(event.id);
   let toolName = event.name
   let args = tool?.toolArgs
-	
-  if(toolName === 'mcp' && tool?.toolName){
-        toolName = tool.toolName;
-        console.log('parsed mcp args, tool:',toolName)
+  if(toolName === 'mcp' && tool?.toolArgs?.tool){
+    toolName = tool.toolArgs.tool;
+    console.log('parsed mcp args, tool:',toolName)
   }
-  console.log(`[Handler:handleToolEndEvent] ========== START ==========`, {toolName: event.name,toolId: event.id,hasResult: !!event.result,resultType: typeof event.result, isError: event.isError,}, args, JSON.stringify(event), tool?JSON.stringify(tool):undefined);
+  console.log(`[Handler:handleToolEndEvent] ========== START ==========`, {toolName: event.name,toolId: event.id,hasResult: !!event.result,isError: event.isError,}, args, tool?JSON.stringify(tool):undefined);
   
   let finalResult = event.result;
   let info = null;
