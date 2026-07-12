@@ -104,12 +104,12 @@ async function applyUserModel(session, userId) {
 }
 
 async function handleOnToolCallEvent(pi, event,ctx){
-  console.log('Got event for toolCall: ',ctx?.sessionId, ctx??Object.keys(ctx), JSON.stringify(event))
+  console.log('Got event for toolCall: ',ctx?.sessionManager?.sessionId)
   await comfyViewImgExt(pi,event,ctx)
 }
 
 async function handleOnToolOuptutEvent(pi, event,ctx){
-  console.log('Got event for toolOutput: ',ctx?.sessionId, ctx??Object.keys(ctx), Object.keys(event))
+  console.log('Got event for toolOutput: ',ctx?.sessionManager?.sessionId,event.toolName, Object.keys(event).join(','))
   return await handleFileSaveEvent(pi, event, ctx)
   //comfyViewImgExt(pi,event,ctx)
 }
@@ -281,7 +281,7 @@ export class PiSessionManager {
     // Create a new session
     const sessionCwd = getUserHomeDir(userId);
     const session = await createNewSession(userId, sessionCwd);
-    console.log('created new session: ',session.sessionId)
+    console.log('created new sesion: ',session.sessionId)
     const newPiSessionId = session.sessionId || piSessionId || uuidv4();
 
     // Store the session file path in the database for future loading

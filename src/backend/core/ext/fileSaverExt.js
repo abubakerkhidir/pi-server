@@ -26,8 +26,8 @@ export async function handleFileSaveEvent(pi, event, ctx) {
     }
     toolName = normalizeToolName(toolName)
     const fileInfo = extractFileInfo(toolName, result);
+    console.log('normalized-tool: ',toolName, handlers.length, tool, fileInfo)
     if(fileInfo && tool){
-        //entityBuffer.saveEntity(tool)
         const entityId = tool?.dbEntityId || null;
         console.log(`[handleFileSaveEvent] Entity ID: ${entityId}`);
         return await autoSaveGeneratedFile(entityBuffer,tool,fileInfo, toolName, event, entityBuffer.recordId, sessionId, entityBuffer.userId, entityId );
