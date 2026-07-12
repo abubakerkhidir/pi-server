@@ -112,35 +112,8 @@ export function findFileByAssetId(assetId, userId) {
   
   const record = db.prepare(`
     SELECT id, file_name, file_path, file_size, mime_type 
-    FROM chat_files 
-    WHERE tool_name LIKE '%generate_image%' 
-    AND file_name LIKE ?
-    AND record_id IN (
-      SELECT id FROM chat_records WHERE user_id = ?
-    )
-    LIMIT 1
-  `).get(`%${assetId}%`, userId);
-  
-  // Also try matching by asset_id in file_name pattern
-  if (!record) {
-    // The asset_id might be in the filename or we need to search differently
-    // Let's search for any recent generate_image files for this user
-    const recentRecord = db.prepare(`
-      SELECT id, file_name, file_path, file_size, mime_type, tool_name
-      FROM chat_files 
-      WHERE tool_name LIKE '%generate_image%'
-      AND record_id IN (
-        SELECT id FROM chat_records WHERE user_id = ?
-      )
-      ORDER BY created_at DESC
-      LIMIT 1
-    `).get(userId);
-    
-    if (recentRecord) {
-      console.log(`[ComfyHandler:findFileByAssetId] Found recent generate_image record:`, recentRecord);
-      return recentRecord;
-    }
-  }
+    FROM chat_files  WHERE asset_id = ? LIMIT 1
+  `).get(assetId) ; // AND session_id = ? , userId);
   
   console.log(`[ComfyHandler:findFileByAssetId] Found record:`, record);
   return record;

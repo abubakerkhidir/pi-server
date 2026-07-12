@@ -54,6 +54,7 @@ function createSessionTables() {
  * Create chat files table.
  */
 function createFileTables() {
+  db.exec('DROP TABLE chat_files;')
   db.exec(`
     CREATE TABLE IF NOT EXISTS chat_files (
       id TEXT PRIMARY KEY,
@@ -64,12 +65,17 @@ function createFileTables() {
       file_path TEXT NOT NULL,
       file_size INTEGER NOT NULL,
       mime_type TEXT,
+      asset_id TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (record_id) REFERENCES chat_records(id) ON DELETE CASCADE,
       FOREIGN KEY (session_id) REFERENCES session_metadata(id) ON DELETE CASCADE
     );
 
     CREATE INDEX IF NOT EXISTS idx_chat_files_record ON chat_files(record_id);
+    CREATE INDEX IF NOT EXISTS idx_chat_files_asset ON chat_files(asset_id);
+    CREATE INDEX IF NOT EXISTS idx_chat_files_session ON chat_files(session_id);
+
+
   `);
 }
 
