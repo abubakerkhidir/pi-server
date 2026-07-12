@@ -1,0 +1,70 @@
+331.16.921.587 W slot   operator(): id  0 | task 74409 | forcing full prompt re-processing due to lack of cache data (likely due to SWA or hybrid/recurrent memory, see https://github.com/ggml-org/llama.cpp/pull/13194#issuecomment-2868343055)
+
+
+can u create a snake-game inside current dir with react/typescript (use vite)
+
+can u summarize the project in current dir (purpose/architecture/design) and write the output to README.md file under current dir
+
+can u add the db schema to the README.md file under current dir
+
+
+can u summarize the project under /home/bakry/ui-lama (purpose/architecture/design) and write the output to README.md file under current dir
+
+
+can u summarize the project under /home/bakry/ui-lama (purpose/architecture/design) 
+
+
+- streaming handling for agent messages is not working properly (on each message a new line is added to the msg div), below is a sample of what is shown: 
+    Let
+    Let me
+    Let me explore
+    Let me explore the
+- the app is not taking full screen height on first load
+- change session name from side-bar is working (updating backend db), however the new name is not reflected on the sidebar (untill i refresh the screen)
+- the thinking div is not showing any text (it should stream agent thoughts)
+- there is an extra bordr input-text (top/bottom), the outer border (containing input+send+upload) is ok, but the input-txt has extra border showing
+- the model-selector showing on left instead of right, when I click on it the drop-down is showing on right? no need to show label (only drop-down with default model pre-selected) 
+
+
+- model-selector dropdown disappeared totaly
+- session resume on side-bar still not working, please add some console logs to see whats going on when clicking on a session
+- streaming is fixed on think-div but not on agent-message, still printing new line on each stream, see below:
+    -Now I have a thorough understanding of the project. Let me write the README.
+    Done
+    Now I have a thorough understanding of the project. Let me write the README.
+    Done!
+    Now I have a thorough understanding of the project. Let me write the README.
+    Done! I
+    Now I have a thorough understanding of the project. Let me write the README.
+    Done! I've
+    Now I have a thorough understanding of the project. Let me write the README.
+    Done! I've written
+- all thinking streams are added to the first thinking div although they came after tool-execution of agent msg, the tools are added correctly to the chat body (each tool call create a tool div), however thinking and agent msg are single div on top and buttom of the chat window, they should be added as they come (we should have a think div created whenever a think stream comes after tool execution or when the current block is not thinking, same for agent msg)
+- the expand/collabse functionality is not working for tool-div and think-div 
+
+
+
+
+
+
+
+- model-selector dropdown disappeared totaly (use the one on top instead) show only one with auth
+- expand/collabse behavior (collabse on seal) 2 modes only (remove up/down arrows)
+- add footer to tool div
+- window height
+- on send, clear input txt
+- the +/send buttons styling
+- side-bar should not scroll (scroll should by on chat-window only)
+- auto-scroll while generating agent res
+- usage after each msg
+- session context-window size, %, total sent, total received on the buttom right 
+
+- session search
+- token stats (reply footer)
+- context stats at the end 
+- models filter (search) default model not loading (badges)
+- web-search to show query/url (substr 60char)
+
+- start a new session after 20 record (summarize current)
+- show/hide tools/think on settigs
+- collabse/expand think/tools settings

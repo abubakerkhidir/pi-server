@@ -155,12 +155,6 @@ export function findFileByAssetId(assetId, userId) {
  * @returns {Object|null} Rejection result if should intercept, null otherwise
  */
 export function interceptViewImage(toolName, args, userId) {
-  console.log('check view image tool', toolName, args, args?.args)
-  if(toolName === 'mcp' && args?.args && typeof args.args === 'string' && args.args.startWith('{')){
-  	toolName = args.tool;
-	args = JSON.parse(args.args)
-	console.log('parsed mcp args, tool:',toolName)
-  }
   // Check if this is a view_image tool
   if (!toolName?.includes('view_image')) {
     return null;
@@ -181,15 +175,8 @@ export function interceptViewImage(toolName, args, userId) {
   
   if (fileRecord) {
     console.log(`[ComfyHandler:interceptViewImage] Found local file, creating rejection`);
-    return {
-      content: [
-        {
-          type: "text",
-          text: `The image has already been saved locally. To view it, use the ctx_read tool with this file path:\n\n${fileRecord.file_path}\n\nThe file is ${fileRecord.file_size} bytes (${fileRecord.mime_type}).`
-        }
-      ],
-      isError: false,
-    };
+    const text = `The image has already been saved locally. To view it, use the ctx_read tool with this file path:\n\n${fileRecord.file_path}\n\nThe file is ${fileRecord.file_size} bytes (${fileRecord.mime_type}).`;
+    return {content: [{type: "text",text}], isError: false};
   }
   
   console.log(`[ComfyHandler:interceptViewImage] Asset not found locally, letting through`);

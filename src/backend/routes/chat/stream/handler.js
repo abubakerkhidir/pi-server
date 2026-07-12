@@ -101,40 +101,21 @@ async function handleToolEndEvent(event, entityBuffer, writeEvent, params) {
         toolName = tool.toolName;
         console.log('parsed mcp args, tool:',toolName)
   }
-  console.log(`[Handler:handleToolEndEvent] ========== START ==========`, {
-    toolName: event.name,
-    toolId: event.id,
-    hasResult: !!event.result,
-    resultType: typeof event.result,
-    isError: event.isError,
-  }, args, JSON.stringify(event), tool?JSON.stringify(tool):undefined);
+  console.log(`[Handler:handleToolEndEvent] ========== START ==========`, {toolName: event.name,toolId: event.id,hasResult: !!event.result,resultType: typeof event.result, isError: event.isError,}, args, JSON.stringify(event), tool?JSON.stringify(tool):undefined);
   
   let finalResult = event.result;
-  let savedFileInfo = null;
+  let info = null;
   
   // Check if this is a view_image call that should be intercepted
   const normalizedName = normalizeToolName(toolName);
   if (normalizedName === 'view_image' || toolName?.includes('view_image')) {
     console.log(`[Handler:handleToolEndEvent] Detected view_image call, checking for interception`);
-    const interceptionResult = interceptViewImage(toolName, args, userId);
+    const interceptionResult = interceptViewImage(normalizedName, args, userId);
     if (interceptionResult) {
       console.log(`[Handler:handleToolEndEvent] Intercepting view_image, returning rejection`);
-      finalResult = interceptionResult;
-      // Save the entity
-      if (tool) {
-        tool.result = finalResult;
-        tool.isError = false;
-        tool.isComplete = true;
-        entityBuffer.saveEntity(tool);
-      }
+      saveToolToBuffer(tool, interceptionResult, false, entityBuffer);
       // Write the tool_end event with the interception result
-      writeEvent("tool_end", {
-        id: event.id,
-        name: event.name,
-        args: event.args,
-        result: finalResult,
-        isError: false,
-      });
+      writeEvent("tool_end", {id: event.id, name: event.name, args: event.args, result: interceptionResult, isError: false});
       return;
     }
   }
@@ -142,80 +123,42 @@ async function handleToolEndEvent(event, entityBuffer, writeEvent, params) {
   // Check if this is a file-generating tool
   if (isFileGeneratingTool(toolName, event.result) && event.result) {
     console.log(`[Handler:handleToolEndEvent] Detected file-generating tool: ${event.name}`);
-    
-    // Save the entity first to get the entity ID
-    if (tool) {
-      tool.result = event.result;
-      tool.isError = !!event.isError;
-      tool.isComplete = true;
-      entityBuffer.saveEntity(tool);
-    }
-    
+    saveToolToBuffer(tool, event.result, !!event.isError, entityBuffer);
     // Get the entity ID from the saved tool
     const entityId = tool?.dbEntityId || null;
     console.log(`[Handler:handleToolEndEvent] Entity ID: ${entityId}`);
     
     // Auto-save the file
     console.log(`[Handler:handleToolEndEvent] Calling autoSaveGeneratedFile...`);
-    savedFileInfo = await autoSaveGeneratedFile({
-      toolName: event.name,
-      result: event.result,
-      args: event.args,
-      recordId,
-      sessionId: dbSessionId,
-      userId,
-      entityId,
-      req,
-    });
+    info = await autoSaveGeneratedFile({toolName: event.name,result: event.result,args: event.args,recordId,sessionId: dbSessionId,userId,entityId,req});
     
-    console.log(`[Handler:handleToolEndEvent] autoSaveGeneratedFile returned:`, savedFileInfo ? {
-      fileId: savedFileInfo.fileId,
-      fileName: savedFileInfo.fileName,
-      hasModifiedResult: !!savedFileInfo.modifiedResult,
-    } : 'null');
+    console.log(`[Handler:handleToolEndEvent] autoSaveGenFile returned:`, info ? {fileId: info.fileId,fileName: info.fileName,hasModifiedResult: !!info.modifiedResult} : 'null');
     
     // Use modified result if file was saved
-    if (savedFileInfo) {
-      finalResult = savedFileInfo.modifiedResult;
-      console.log(`[Handler:handleToolEndEvent] Using modified result with piFileId: ${savedFileInfo.fileId}`);
-      writeEvent("file_saved", {
-        fileId: savedFileInfo.fileId,
-        fileName: savedFileInfo.fileName,
-        fileSize: savedFileInfo.fileSize,
-        mimeType: savedFileInfo.mimeType,
-        toolName: event.name,
-      });
+    if (info) {
+      finalResult = info.modifiedResult;
+      console.log(`[Handler:handleToolEndEvent] Using modified result with piFileId: ${info.fileId}`);
+      writeEvent("file_saved", {fileId: info.fileId,fileName: info.fileName,fileSize: info.fileSize,mimeType: info.mimeType,toolName: event.name});
     } else {
       console.log(`[Handler:handleToolEndEvent] autoSaveGeneratedFile returned null, using original result`);
     }
   } else {
     console.log(`[Handler:handleToolEndEvent] Not a file-generating tool or no result`);
-    // Regular tool - just save the entity
-    if (tool) {
-      tool.result = event.result;
-      tool.isError = !!event.isError;
-      tool.isComplete = true;
-      entityBuffer.saveEntity(tool);
-    }
+    saveToolToBuffer(tool, event.result, !!event.isError, entityBuffer);
   }
   
-  console.log(`[Handler:handleToolEndEvent] ========== END ==========`, {
-    toolName: event.name,
-    hasPiFileId: !!finalResult?.piFileId,
-    assetUrl: finalResult?.asset_url,
-    resultKeys: Object.keys(finalResult || {}),
-  });
-  
-  // Log what we're sending to the LLM
+  console.log(`[Handler:handleToolEndEvent] ========== END ==========`, {toolName: event.name,hasPiFileId: !!finalResult?.piFileId,assetUrl: finalResult?.asset_url,resultKeys: Object.keys(finalResult || {})});
   console.log(`[Handler:handleToolEndEvent] FINAL RESULT BEING SENT TO LLM:`, JSON.stringify(finalResult, null, 2)?.substring(0, 2000));
-  
-  writeEvent("tool_end", {
-    id: event.id,
-    name: event.name,
-    args: event.args,
-    result: finalResult,
-    isError: event.isError,
-  });
+  writeEvent("tool_end", {id: event.id,name: event.name,args: event.args,result: finalResult,isError: event.isError,});
+}
+
+function saveToolToBuffer(tool, reslt, err, entityBuffer) {
+  if (tool) {
+    tool.result = reslt;
+    tool.isError = err;
+    tool.isComplete = true;
+    entityBuffer.saveEntity(tool);
+  }
 }
 
 /**
