@@ -5,8 +5,8 @@ import { getDb } from "../../core/db.js";
 
 const router = Router();
 
-//  GET /api/chat/file/:id — download an uploaded file
-router.get("/chat/file/:id", authMiddleware, (req, res) => {
+//  GET /api/chat/file/:id — download an uploaded file. authMiddleware,
+router.get("/chat/file/:id",  (req, res) => {
   const db = getDb();
   const file = db.prepare(
     `SELECT f.*, r.session_id FROM chat_files f

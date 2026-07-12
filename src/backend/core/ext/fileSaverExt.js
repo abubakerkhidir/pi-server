@@ -188,7 +188,7 @@ function getServerBaseUrl() {
         return fullUrl;
     }
     const port = process.env.PORT || 3500;
-    return `http://localhost:${port}`;
+    return `http://10.0.2.68:${port}`;
 }
 
 // Save file record to database.
