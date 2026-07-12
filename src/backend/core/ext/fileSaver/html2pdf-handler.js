@@ -92,6 +92,5 @@ function modifyContentBlock(cnt, newUrl, filePath) {
   });
 }
 
-registerHandler(new Html2PdfFileSaver())
 
 

@@ -5,6 +5,8 @@ import http from "http";
 import { v4 as uuidv4 } from "uuid";
 import { getDb } from "../db.js";
 import { getEntityBuffer } from "../../routes/chat/stream/state.js";
+import { Html2PdfFileSaver } from "./fileSaver/html2pdf-handler.js";
+import { ComfyFileSaver } from "./fileSaver/comfy-handler.js";
 
 const handlers = []
 export function registerHandler(h){
@@ -25,10 +27,11 @@ export async function handleFileSaveEvent(pi, event, ctx) {
             toolName = tool.toolArgs.tool;
             console.log('parsed mcp args, tool:', toolName)
         }
+        initHandlers()
         console.log('normalizing-tool: ',toolName, handlers.length)
         toolName = normalizeToolName(toolName)
         console.log('done normalizing-tool: ',toolName)
-        const fileInfo = extractFileInfo(toolName, result);
+        const fileInfo = extractFileInfo(toolName, event);
         console.log('normalized-tool: ',toolName, handlers.length, tool, fileInfo)
         if(fileInfo && tool){
             const entityId = tool?.dbEntityId || null;
@@ -205,5 +208,12 @@ function saveToolToBuffer(tool, reslt, err, entityBuffer) {
         tool.isError = err;
         tool.isComplete = true;
         entityBuffer.saveEntity(tool);
+    }
+}
+
+function initHandlers(){
+    if(!handlers.length){
+        registerHandler(new Html2PdfFileSaver())
+        registerHandler(new ComfyFileSaver())
     }
 }

@@ -109,5 +109,3 @@ function modifyContentBlocks(content, newUrl) {
     return block;
   });
 }
-
-registerHandler(new ComfyFileSaver())
