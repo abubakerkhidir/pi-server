@@ -83,7 +83,7 @@ export function copyLocalFile(sourcePath, downloadsDir, fileName) {
 }
 
 // Save a file buffer to the user's downloads directory.
-export function saveBufferToFile(buffer, downloadsDir, fileName) {
+export async function saveBufferToFile(buffer, downloadsDir, fileName) {
     const filePath = path.join(downloadsDir, fileName);
     fs.writeFileSync(filePath, buffer);
     console.log(`[FileHandler:saveBufferToFile] Saved buffer to: ${filePath}`);
@@ -118,7 +118,7 @@ async function autoSaveGeneratedFile(entityBuffer,tool, fileInfo, toolName, resu
     try {
         const downloadsDir = getUserDownloadsDir(userId);
         const serverBaseUrl = getServerBaseUrl();
-        const {filePath,fileSize} = processToolResult(fileInfo,downloadsDir)
+        const {filePath,fileSize} = await processToolResult(fileInfo,downloadsDir)
         const fileId = uuidv4();
         const newUrl = `${serverBaseUrl}/api/chat/file/${fileId}`;
         const modified = modifyToolResult(newUrl, result, fileId, filePath, fileInfo)
@@ -152,9 +152,9 @@ function extractFileInfo(toolName, result) {
     return null
 }
 
-function processToolResult(fileInfo, downloadsDir) {
+async function processToolResult(fileInfo, downloadsDir) {
     for (const handler of handlers) {
-        const info = handler.processToolResult(fileInfo, downloadsDir);
+        const info = await handler.processToolResult(fileInfo, downloadsDir);
         if (info) {
             return info;
         }

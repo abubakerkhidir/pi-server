@@ -1,5 +1,5 @@
 import { downloadFile, saveBufferToFile, parseMcpResult, registerHandler } from "../fileSaverExt.js";
-import { getDb } from "../../../db.js";
+import { getDb } from "../../db.js";
 
 const comfyTools = ["generate_image", "generate_song", "generate_video", "generate_audio"];
 
@@ -33,7 +33,7 @@ export class ComfyFileSaver {
     if (fileInfo?.isComfyAsset) {
       console.log(`[processComfyAsset] Downloading from: ${fileInfo.fileUrl}`);
       const buffer = await downloadFile(fileInfo.fileUrl);
-      const filePath = saveBufferToFile(buffer, downloadsDir, fileInfo.fileName);
+      const filePath = await saveBufferToFile(buffer, downloadsDir, fileInfo.fileName);
       return { filePath, fileSize: buffer.length };
     }
     return undefined
