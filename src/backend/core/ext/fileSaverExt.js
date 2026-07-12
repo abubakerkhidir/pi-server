@@ -12,27 +12,33 @@ export function registerHandler(h){
 }
 
 export async function handleFileSaveEvent(pi, event, ctx) {
-    const sessionId = ctx?.sessionManager?.sessionId
-    const entityBuffer = getEntityBuffer(sessionId);
-    if(!entityBuffer || !event.toolCallId){
-        console.log('>>>>>>>>>>>>>>>>>>> entityBuffer is null...',sessionId, entityBuffer,event.toolCallId)
-        return
-    }
-    const tool = entityBuffer?.findToolEntity(event.toolCallId);
-    let toolName = event.toolName
-    if (toolName === 'mcp' && tool?.toolArgs?.tool) {
-        toolName = tool.toolArgs.tool;
-        console.log('parsed mcp args, tool:', toolName)
-    }
-    toolName = normalizeToolName(toolName)
-    const fileInfo = extractFileInfo(toolName, result);
-    console.log('normalized-tool: ',toolName, handlers.length, tool, fileInfo)
-    if(fileInfo && tool){
-        const entityId = tool?.dbEntityId || null;
-        console.log(`[handleFileSaveEvent] Entity ID: ${entityId}`);
-        return await autoSaveGeneratedFile(entityBuffer,tool,fileInfo, toolName, event, entityBuffer.recordId, sessionId, entityBuffer.userId, entityId );
-    }else{
-        console.log('not file-saver tool... ',toolName,tool)
+    try{
+        const sessionId = ctx?.sessionManager?.sessionId
+        const entityBuffer = getEntityBuffer(sessionId);
+        if(!entityBuffer || !event.toolCallId){
+            console.log('>>>>>>>>>>>>>>>>>>> entityBuffer is null...',sessionId, entityBuffer,event.toolCallId)
+            return
+        }
+        const tool = entityBuffer?.findToolEntity(event.toolCallId);
+        let toolName = event.toolName
+        if (toolName === 'mcp' && tool?.toolArgs?.tool) {
+            toolName = tool.toolArgs.tool;
+            console.log('parsed mcp args, tool:', toolName)
+        }
+        console.log('normalizing-tool: ',toolName, handlers.length)
+        toolName = normalizeToolName(toolName)
+        console.log('done normalizing-tool: ',toolName)
+        const fileInfo = extractFileInfo(toolName, result);
+        console.log('normalized-tool: ',toolName, handlers.length, tool, fileInfo)
+        if(fileInfo && tool){
+            const entityId = tool?.dbEntityId || null;
+            console.log(`[handleFileSaveEvent] Entity ID: ${entityId}`);
+            return await autoSaveGeneratedFile(entityBuffer,tool,fileInfo, toolName, event, entityBuffer.recordId, sessionId, entityBuffer.userId, entityId );
+        }else{
+            console.log('not file-saver tool... ',toolName,tool)
+        }
+    }catch(err){
+        console.log('error handle save-file: ',err)
     }
     return null
 }
