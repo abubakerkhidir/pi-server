@@ -104,12 +104,12 @@ async function applyUserModel(session, userId) {
 }
 
 async function handleOnToolCallEvent(pi, event,ctx){
-  console.log('Got event for toolCall: ',JSON.stringify(event))
+  console.log('Got event for toolCall: ',ctx?.sessionId, ctx??Object.keys(ctx), JSON.stringify(event))
   await comfyViewImgExt(pi,event,ctx)
 }
 
 async function handleOnToolOuptutEvent(pi, event,ctx){
-  console.log('Got event for toolOutput: ',JSON.stringify(event))
+  console.log('Got event for toolOutput: ',ctx?.sessionId, ctx??Object.keys(ctx), JSON.stringify(event))
   return await handleFileSaveEvent(pi, event, ctx)
   //comfyViewImgExt(pi,event,ctx)
 }

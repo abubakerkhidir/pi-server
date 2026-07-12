@@ -12,7 +12,8 @@ export function registerHandler(h){
 }
 
 export async function handleFileSaveEvent(pi, event, ctx) {
-    const entityBuffer = getEntityBuffer(ctx.sessionId);
+    const sessionId = ctx?.sessionManager?.sessionId
+    const entityBuffer = getEntityBuffer(sessionId);
     if(!entityBuffer){
         console.log('>>>>>>>>>>>>>>>>>>> entityBuffer is null...')
         return
@@ -28,9 +29,8 @@ export async function handleFileSaveEvent(pi, event, ctx) {
     if(fileInfo && tool){
         //entityBuffer.saveEntity(tool)
         const entityId = tool?.dbEntityId || null;
-        const dbSessionId = ctx.sessionId
         console.log(`[handleFileSaveEvent] Entity ID: ${entityId}`);
-        return await autoSaveGeneratedFile(entityBuffer,tool,fileInfo, toolName, event, entityBuffer.recordId, dbSessionId, entityBuffer.userId, entityId );
+        return await autoSaveGeneratedFile(entityBuffer,tool,fileInfo, toolName, event, entityBuffer.recordId, sessionId, entityBuffer.userId, entityId );
     }
     return null
 }
