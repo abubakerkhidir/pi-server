@@ -74,7 +74,8 @@ function createFileTables() {
     CREATE INDEX IF NOT EXISTS idx_chat_files_record ON chat_files(record_id);
     CREATE INDEX IF NOT EXISTS idx_chat_files_asset ON chat_files(asset_id);
     CREATE INDEX IF NOT EXISTS idx_chat_files_session ON chat_files(session_id);
-
+    CREATE INDEX IF NOT EXISTS idx_chat_files_id ON chat_files(id);
+    
 
   `);
 }
