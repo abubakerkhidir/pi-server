@@ -1,4 +1,4 @@
-import { getDb } from "./db";
+import { getDb } from "./db.js";
 
 export function getChatEntities(recId) {
   return getDb().prepare("SELECT * FROM chat_entities WHERE record_id = ? ORDER BY seq ASC").all(recId);
