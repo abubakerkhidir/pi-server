@@ -1,7 +1,7 @@
 import { SessionManager, createAgentSession } from "@earendil-works/pi-coding-agent";
-import { loadSettingsFromDb } from "../db/settings-dao";
-import { createResourceLoader } from "./pi-resource-loader";
-import { DEFAULT_TOOLS, bindSessionExtensions } from "./pi-session-utils";
+import { loadSettingsFromDb } from "../db/settings-dao.js";
+import { createResourceLoader } from "./pi-resource-loader.js";
+import { DEFAULT_TOOLS, bindSessionExtensions } from "./pi-session-utils.js";
 
 /**
  * Create a new pi session with user settings.

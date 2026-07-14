@@ -103,7 +103,7 @@ export async function handleChatStream(req, res){
     });
 
     // Post-prompt tasks
-    await generateSessionNameIfNeeded(dbSessionId, effectivePrompt, getFullText(), writeEvent);
+    await generateSessionNameIfNeeded(dbSessionId, effectivePrompt, getFullText(), writeEvent,req);
     storeModelContextSize(dbSessionId, modelInfo);
 
     // Signal completion

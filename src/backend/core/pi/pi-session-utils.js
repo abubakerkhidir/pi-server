@@ -1,4 +1,4 @@
-import { loadSettingsFromDb } from "../db/settings-dao";
+import { loadSettingsFromDb } from "../db/settings-dao.js";
 
 
 //const DEFAULT_TOOLS = ["read", "ls", "bash", "find", "grep", "get_search_content"];

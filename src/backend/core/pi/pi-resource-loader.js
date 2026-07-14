@@ -1,6 +1,6 @@
 import { getAgentDir, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
-import { comfyViewImgExt } from "../ext/comfyViewImgExt";
-import { handleFileSaveEvent } from "../ext/fileSaverExt";
+import { comfyViewImgExt } from "../ext/comfyViewImgExt.js";
+import { handleFileSaveEvent } from "../ext/fileSaverExt.js";
 
 
 async function handleOnToolCallEvent(pi, event, ctx) {
