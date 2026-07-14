@@ -34,13 +34,13 @@ export function initSessionMetadata(dbSessionId, userId, piSessionId, effectiveP
  * @param {string} fullText - The full assistant response
  * @param {Function} writeEvent - SSE event writer
  */
-export async function generateSessionNameIfNeeded(dbSessionId, effectivePrompt, fullText, writeEvent) {
+export async function generateSessionNameIfNeeded(dbSessionId, effectivePrompt, fullText, writeEvent,req) {
   const messageCount = getSessionMessageCount(dbSessionId);
 
   if (messageCount === 1) {
     try {
       const name = await generateSessionName(effectivePrompt, fullText);
-      updateSessionName(dbSessionId, name);
+      updateSessionName(dbSessionId,req.user.userId, name);
       const sessionMeta = getSessionMeta(dbSessionId);
       writeEvent("session_name", sessionMeta);
     } catch (err) {
