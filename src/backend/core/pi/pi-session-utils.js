@@ -1,5 +1,7 @@
 import { loadSettingsFromDb } from "../db/settings-dao.js";
-
+import fs from "fs";
+import path from "path";
+import {fileURLToPath} from "url"
 
 //const DEFAULT_TOOLS = ["read", "ls", "bash", "find", "grep", "get_search_content"];
 export const DEFAULT_TOOLS = [];
@@ -52,13 +54,10 @@ export async function applyUserModel(session, userId) {
 }
 
 // Workaround: Patch pi's hardcoded compaction defaults
-export function initCompactionAtts(){
+export async function initCompactionAtts(){
   try {
-    const fs = await import('node:fs');
-    const path = await import('node:path');
-    const { fileURLToPath } = await import('node:url');
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    const compactionPath = path.join(__dirname, '../../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-agent-core/dist/harness/compaction/compaction.js');
+    const compactionPath = path.join(__dirname, '../../../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-agent-core/dist/harness/compaction/compaction.js');
     
     if (fs.existsSync(compactionPath)) {
       const compaction = await import('file://' + compactionPath);
