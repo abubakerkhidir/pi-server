@@ -1,17 +1,5 @@
 import { calculateTokenStats, saveTokenStats, updateSessionContextUsage } from "./token-stats.js";
 
-/**
- * Create an SSE event writer helper.
- * @param {Object} res - Express response object
- * @returns {Function} writeEvent function
- */
-export function createSSEWriter(res) {
-  return function writeEvent(event, data) {
-    if (!res.writableEnded) {
-      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-    }
-  };
-}
 
 /**
  * Handle text event from pi session.
@@ -38,12 +26,7 @@ function handleThinkingEvent(event, entityBuffer, writeEvent, state) {
     lastThink.content += event.content;
   } else {
     entityBuffer.sealAndSave('msg');
-    entityBuffer.addEntity({
-      type: 'think',
-      content: event.content,
-      startedAt: Date.now(),
-      saved: false,
-    });
+    entityBuffer.addEntity({type: 'think',content: event.content,startedAt: Date.now(),saved: false});
   }
   writeEvent("thinking", { content: event.content });
 }
@@ -55,22 +38,8 @@ function handleToolStartEvent(event, entityBuffer, writeEvent, state) {
   if (state.firstTokenTime === null) state.firstTokenTime = Date.now();
   entityBuffer.sealAndSave('think');
   entityBuffer.sealAndSave('msg');
-  entityBuffer.addEntity({
-    type: 'tool',
-    toolId: event.id,
-    toolName: event.name,
-    toolArgs: event.args ?? {},
-    result: null,
-    isError: false,
-    isComplete: false,
-    startedAt: Date.now(),
-    saved: false,
-  });
-  writeEvent("tool_start", {
-    id: event.id,
-    name: event.name,
-    args: event.args,
-  });
+  entityBuffer.addEntity({type: 'tool',toolId: event.id,toolName: event.name,toolArgs: event.args ?? {},result: null,isError: false,isComplete: false,startedAt: Date.now(),saved: false});
+  writeEvent("tool_start", {id: event.id,name: event.name,args: event.args});
 }
 
 /**
@@ -79,11 +48,7 @@ function handleToolStartEvent(event, entityBuffer, writeEvent, state) {
 function handleToolUpdateEvent(event, entityBuffer, writeEvent) {
   const tool = entityBuffer.findToolEntity(event.id);
   if (tool) tool.partialResult = event.partialResult;
-  writeEvent("tool_update", {
-    id: event.id,
-    name: event.name,
-    partialResult: event.partialResult,
-  });
+  writeEvent("tool_update", {id: event.id,name: event.name, partialResult: event.partialResult});
 }
 
 /**
@@ -154,29 +119,12 @@ function handleDoneEvent(entityBuffer, recordId, dbSessionId, responseStartTime,
  * @returns {Function} onEvent handler
  */
 export function createStreamEventHandler(params) {
-  const {
-    writeEvent,
-    entityBuffer,
-    dbSessionId,
-    recordId,
-    responseStartTime,
-    userId,
-    req,
-  } = params;
+  const {writeEvent,entityBuffer,dbSessionId,recordId,responseStartTime,userId,req} = params;
 
-  const state = {
-    firstTokenTime: null,
-    usageData: null,
-    contextUsage: null,
-  };
+  const state = {firstTokenTime: null,usageData: null,contextUsage: null};
 
   // Handler params that need to be passed to async handlers
-  const handlerParams = {
-    recordId,
-    dbSessionId,
-    userId,
-    req,
-  };
+  const handlerParams = {recordId,dbSessionId,userId,req,};
 
   function onEvent(event) {
     switch (event.type) {

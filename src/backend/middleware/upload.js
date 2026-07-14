@@ -1,14 +1,13 @@
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { getDb } from "../core/db.js";
+import { getUserById } from "../core/db/user-dao.js";
 
 /**
  * Get the user's upload directory.
  */
 function getUserUploadDir(userId) {
-  const db = getDb();
-  const user = db.prepare("SELECT home_dir, username FROM users WHERE id = ?").get(userId);
+  const user = getUserById(userId);
   const userDir = user?.home_dir || path.join(process.cwd(), "users", user?.username || "default");
   const uploadDir = path.join(userDir, "uploads");
   fs.mkdirSync(uploadDir, { recursive: true });

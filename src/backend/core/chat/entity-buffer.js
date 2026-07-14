@@ -1,4 +1,4 @@
-import { getDb } from "../../../core/db.js";
+import { insertChatEntity } from "../db/chat-entities-dao.js";
 
 /**
  * Calculate duration in milliseconds from start time.
@@ -45,17 +45,8 @@ function buildEntityParams(entity, recordId, dbSessionId, seq) {
  * @returns {Object} Entity buffer functions
  */
 export function createEntityBuffer(recordId, dbSessionId,userId) {
-  const db = getDb();
   let entityBuf = [];
   let entitySeq = 0;
-
-  const INSERT_STMT = `
-    INSERT INTO chat_entities (record_id, session_id, seq, type, content,
-                               tool_name, tool_args, tool_result,
-                               tool_is_error, is_complete,
-                               duration_ms, content_length)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `;
 
   function lastEntity(type) {
     return [...entityBuf].reverse().find((e) => e.type === type && !e.saved);
@@ -63,12 +54,11 @@ export function createEntityBuffer(recordId, dbSessionId,userId) {
 
   function saveEntity(entity) {
     if (entity.saved) return;
-
     const params = buildEntityParams(entity, recordId, dbSessionId, entitySeq++);
-    const result = db.prepare(INSERT_STMT).run(...params);
+    const id = insertChatEntity(params);
     entity.saved = true;
     entity.recordId = recordId
-    entity.dbEntityId = Number(result.lastInsertRowid);
+    entity.dbEntityId = id;
     return entity.dbEntityId;
   }
 
@@ -107,3 +97,4 @@ export function createEntityBuffer(recordId, dbSessionId,userId) {
     userId
   };
 }
+

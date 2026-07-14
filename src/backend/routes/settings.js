@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { authMiddleware } from "../middleware/auth.js";
-import { loadUserSettings, saveUserSettings, getDefaultSettings, discoverAllTools } from "../core/pi-session.js";
-import { createAgentSession, SessionManager } from "@earendil-works/pi-coding-agent";
-import { getDb } from "../core/db.js";
+import { getGroupedTools } from "../core/pi/tool-cache.js";
+import { loadUserSettings, saveUserSettings } from "../core/db/settings-dao.js";
+import { getPiModelsGrouped } from "../core/pi/pi-model-mngmt.js";
+import { updateHomeDir } from "../core/db/user-dao.js";
 
 const router = Router();
 
@@ -28,18 +29,6 @@ function validateNumberField(field, value, opts) {
   return { valid: true, value: n };
 }
 
-/**
- * Apply tools_enabled update.
- */
-function applyToolsEnabledUpdate(current, updates) {
-  if (updates.tools_enabled !== undefined) {
-    if (!Array.isArray(updates.tools_enabled)) {
-      return { error: "tools_enabled must be an array" };
-    }
-    current.tools_enabled = updates.tools_enabled;
-  }
-  return null;
-}
 
 /**
  * Apply boolean field updates.
@@ -92,90 +81,32 @@ function applyStringUpdates(current, updates) {
 /**
  * Apply home_dir update.
  */
-function applyHomeDirUpdate(current, updates, db, userId) {
+function applyHomeDirUpdate(current, updates, userId) {
   if (updates.home_dir !== undefined) {
     if (typeof updates.home_dir !== "string" || !updates.home_dir.trim()) {
       return { error: "home_dir must be a non-empty string" };
     }
     current.home_dir = updates.home_dir.trim();
-    db.prepare("UPDATE users SET home_dir = ? WHERE id = ?").run(current.home_dir, userId);
+    updateHomeDir(current.home_dir, userId);
   }
   return null;
 }
 
 /**
- * Group tools by source.
+ * Apply tools_enabled update.
  */
-function groupToolsBySource(tools) {
-  const groups = new Map();
-
-  for (const tool of tools) {
-    const source = tool.sourceInfo?.source || "builtin";
-    const groupLabel = getGroupLabel(source);
-
-    if (!groups.has(groupLabel)) {
-      groups.set(groupLabel, { name: groupLabel, source, tools: [] });
+function applyToolsEnabledUpdate(current, updates) {
+  if (updates.tools_enabled !== undefined) {
+    if (!Array.isArray(updates.tools_enabled)) {
+      return { error: "tools_enabled must be an array" };
     }
-    groups.get(groupLabel).tools.push({
-      name: tool.name,
-      description: tool.description,
-    });
+    current.tools_enabled = updates.tools_enabled;
   }
-
-  return Array.from(groups.values());
-}
-
-/**
- * Get group label for a tool source.
- */
-function getGroupLabel(source) {
-  if (source === "builtin") return "Built-in";
-  if (source === "auto") return "Auto";
-  if (source.startsWith("npm:")) return source.slice(4);
-  return source;
-}
-
-/**
- * Get fallback tools when discovery fails.
- */
-function getFallbackTools() {
-  return [
-    { name: "read", description: "Read file contents" },
-    { name: "bash", description: "Execute bash commands" },
-    { name: "edit", description: "Edit files with find/replace" },
-    { name: "write", description: "Write files (creates/overwrites)" },
-    { name: "grep", description: "Search file contents" },
-    { name: "find", description: "Find files by glob pattern" },
-    { name: "ls", description: "List directory contents" },
-  ];
-}
-
-/**
- * Group models by provider.
- */
-function groupModelsByProvider(models) {
-  const providers = new Map();
-
-  for (const m of models) {
-    const key = m.provider || "unknown";
-    if (!providers.has(key)) providers.set(key, []);
-    providers.get(key).push({
-      id: m.id,
-      name: m.name,
-      input: m.input,
-      reasoning: !!m.reasoning,
-    });
-  }
-
-  return Array.from(providers.entries()).map(([provider, models]) => ({
-    provider,
-    models,
-  }));
+  return null;
 }
 
 router.get("/settings", authMiddleware, (req, res) => {
-  const db = getDb();
-  const settings = loadUserSettings(db, req.user.userId);
+  const settings = loadUserSettings(req.user.userId);
   res.json(settings);
 });
 
@@ -185,8 +116,7 @@ router.put("/settings", authMiddleware, (req, res) => {
     return res.status(400).json({ error: "Invalid settings payload" });
   }
 
-  const db = getDb();
-  const current = loadUserSettings(db, req.user.userId);
+  const current = loadUserSettings(req.user.userId);
 
   const toolsError = applyToolsEnabledUpdate(current, updates);
   if (toolsError) return res.status(400).json(toolsError);
@@ -199,41 +129,22 @@ router.put("/settings", authMiddleware, (req, res) => {
   const stringError = applyStringUpdates(current, updates);
   if (stringError) return res.status(400).json(stringError);
 
-  const homeDirError = applyHomeDirUpdate(current, updates, db, req.user.userId);
+  const homeDirError = applyHomeDirUpdate(current, updates, req.user.userId);
   if (homeDirError) return res.status(400).json(homeDirError);
 
-  saveUserSettings(db, req.user.userId, current);
+  saveUserSettings(req.user.userId, current);
   res.json(current);
 });
 
 router.get("/tools", authMiddleware, async (req, res) => {
-  try {
-    const allTools = await discoverAllTools(process.cwd());
-    const groups = groupToolsBySource(allTools);
-    res.json({ groups });
-  } catch (err) {
-    console.error("Tool discovery failed:", err.message);
-    const fallback = getFallbackTools();
-    res.json({
-      groups: [{ name: "Built-in", source: "builtin", tools: fallback }],
-      _fallback: true,
-    });
-  }
+  const groupedTools = await getGroupedTools();
+  res.json(groupedTools);
 });
 
 router.get("/models", authMiddleware, async (req, res) => {
-  try {
-    const sm = SessionManager.inMemory();
-    const { session } = await createAgentSession({ sessionManager: sm, cwd: process.cwd() });
-    const models = session.modelRegistry.getAvailable();
-    session.dispose();
-
-    const groups = groupModelsByProvider(models);
-    res.json({ groups });
-  } catch (err) {
-    console.error("Model discovery failed:", err.message);
-    res.json({ groups: [] });
-  }
+  let modelsGrouped = await getPiModelsGrouped();
+  res.json(modelsGrouped);
 });
+
 
 export default router;

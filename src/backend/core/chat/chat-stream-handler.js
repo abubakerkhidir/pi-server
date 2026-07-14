@@ -1,31 +1,24 @@
 import { Router } from "express";
-import { authMiddleware } from "../../../middleware/auth.js";
-import upload from "../../../middleware/upload.js";
-import { cleanupFrameDirs } from "../../../core/pi-video.js";
+import { authMiddleware } from "../../middleware/auth.js";
+import upload from "../../middleware/upload.js";
+import { cleanupFrameDirs } from "../video/pi-video.js";
 import { getPiManager, removeEntityBuffer, setEntityBuffer } from "./state.js";
 import { processUploadedFiles } from "./file-processor.js";
 import { createEntityBuffer } from "./entity-buffer.js";
-import { createSSEWriter, createStreamEventHandler } from "./handler.js";
-import {
-  initSessionMetadata,
-  createChatRecord,
-  saveFileMetadata,
-  generateSessionNameIfNeeded,
-  storeModelContextSize,
-} from "./session-setup.js";
+import { createStreamEventHandler } from "./event-handler.js";
+import { createSSEWriter, wrapOnEventForNaming, writeDoneEvent, writeErrorResponse, writeSessionEvent, writeVideoMetadata } from "./stream-utils.js";
+import {initSessionMetadata,generateSessionNameIfNeeded,storeModelContextSize} from "./session-setup.js";
+import { createChatRecord } from "../db/chat-record-dao.js";
+import { saveFileMetadata } from "../db/chat-files-dao.js";
 
 const router = Router();
 
 /**
- * Write SSE metadata event for video info.
+ * Cleanup temp directories after delay.
  */
-function writeVideoMetadata(writeEvent, videoInfo, imageCount) {
-  if (videoInfo) {
-    writeEvent("metadata", {
-      type: "metadata",
-      frames: imageCount,
-      video: videoInfo,
-    });
+function scheduleCleanup(tempDirs) {
+  if (tempDirs.length > 0) {
+    setTimeout(() => cleanupFrameDirs(tempDirs), 30000);
   }
 }
 
@@ -42,60 +35,7 @@ function extractModelInfo(session) {
   };
 }
 
-/**
- * Write session info event with model and record ID.
- */
-function writeSessionEvent(writeEvent, dbSessionId, modelInfo, recordId) {
-  writeEvent("session", {
-    sessionId: dbSessionId,
-    model: modelInfo,
-    recordId,
-  });
-}
-
-/**
- * Write error event and close response.
- */
-function writeErrorResponse(res, message) {
-  if (!res.writableEnded) {
-    res.write(`event: error\ndata: ${JSON.stringify({ error: message })}\n\n`);
-    res.end();
-  }
-}
-
-/**
- * Write done event and close response.
- */
-function writeDoneEvent(writeEvent, res) {
-  if (!res.writableEnded) {
-    writeEvent("done", {});
-    res.end();
-  }
-}
-
-/**
- * Cleanup temp directories after delay.
- */
-function scheduleCleanup(tempDirs) {
-  if (tempDirs.length > 0) {
-    setTimeout(() => cleanupFrameDirs(tempDirs), 30000);
-  }
-}
-
-/**
- * Wrap onEvent to track full text for session naming.
- */
-function wrapOnEventForNaming(onEvent) {
-  let fullText = "";
-  const wrappedOnEvent = (event) => {
-    if (event.type === "text") fullText += event.content;
-    onEvent(event);
-  };
-  return { wrappedOnEvent, getFullText: () => fullText };
-}
-
-//  POST /api/chat/stream — SSE chat stream
-router.post("/chat/stream", authMiddleware, upload.array("files", 20), async (req, res) => {
+export async function handleChatStream(req, res){
   const piManager = getPiManager();
   const { prompt, sessionId } = req.body;
 
@@ -129,7 +69,7 @@ router.post("/chat/stream", authMiddleware, upload.array("files", 20), async (re
     // Get or create session
     const { session, piSessionId } = await piManager.getOrCreateSession(req.user.userId, sessionId);
     const dbSessionId = sessionId || piSessionId;
-    console.log('got pi session: ',piSessionId, sessionId, dbSessionId)
+    console.log('got pi session: ', piSessionId, sessionId, dbSessionId);
 
     // Initialize session and record
     initSessionMetadata(dbSessionId, req.user.userId, piSessionId, effectivePrompt);
@@ -142,25 +82,16 @@ router.post("/chat/stream", authMiddleware, upload.array("files", 20), async (re
 
     // Handle abort on client disconnect
     req.on("close", () => {
-      piManager.abort(piSessionId).catch(() => {});
-      removeEntityBuffer(dbSessionId)
+      piManager.abort(piSessionId).catch(() => { });
+      removeEntityBuffer(dbSessionId);
     });
 
     // Create entity buffer and stream handler
-    const entityBuffer = createEntityBuffer(recordId, dbSessionId,req.user.userId);
-    setEntityBuffer(dbSessionId,entityBuffer)
+    const entityBuffer = createEntityBuffer(recordId, dbSessionId, req.user.userId);
+    setEntityBuffer(dbSessionId, entityBuffer);
     const responseStartTime = Date.now();
 
-    const { onEvent } = createStreamEventHandler({
-      writeEvent,
-      entityBuffer,
-      res,
-      dbSessionId,
-      recordId,
-      responseStartTime,
-      userId: req.user.userId,
-      req,
-    });
+    const { onEvent } = createStreamEventHandler({ writeEvent, entityBuffer, res, dbSessionId, recordId, responseStartTime, userId: req.user.userId, req });
 
     // Track full text for session naming
     const { wrappedOnEvent, getFullText } = wrapOnEventForNaming(onEvent);
@@ -177,13 +108,14 @@ router.post("/chat/stream", authMiddleware, upload.array("files", 20), async (re
 
     // Signal completion
     writeDoneEvent(writeEvent, res);
-    removeEntityBuffer(dbSessionId)
+    removeEntityBuffer(dbSessionId);
   } catch (err) {
     writeErrorResponse(res, err.message);
   } finally {
     scheduleCleanup(tempDirs);
-    removeEntityBuffer(dbSessionId)
+    removeEntityBuffer(dbSessionId);
   }
-});
+}
 
 export default router;
+

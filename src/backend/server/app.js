@@ -2,11 +2,16 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 import { initDb, closeDb } from "../core/db.js";
-import { PiSessionManager } from "../core/pi-session.js";
 import authRoutes from "../routes/auth.js";
-import chatRoutes, { setPiManager } from "../routes/chat/index.js";
 import settingsRoutes from "../routes/settings.js";
 import sessionsRoutes from "../routes/sessions.js";
+import sessionRoutes from "../routes/session.js";
+import fileRoutes from "../routes/file.js";
+import hisRoutes from "../routes/history.js";
+import chatRoutes from "../routes/chat-routes.js";
+import { setPiManager } from "../core/chat/state.js";
+import { PiSessionManager } from "../core/pi/pi-session-manager.js";
+import { initCompactionAtts } from "../core/pi/pi-session-utils.js";
 
 const PORT = process.env.PORT || 3500;
 
@@ -31,6 +36,9 @@ function createApp() {
 function mountRoutes(app) {
   app.use("/api/auth", authRoutes);
   app.use("/api", chatRoutes);
+  app.use("/api", sessionRoutes);
+  app.use("/api", fileRoutes);
+  app.use("/api", hisRoutes);
   app.use("/api", settingsRoutes);
   app.use("/api", sessionsRoutes);
 }
@@ -71,6 +79,9 @@ function setupGracefulShutdown(server, piManager) {
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
 }
+
+//init compact settings hack
+initCompactionAtts()
 
 // Initialize database
 initDb();

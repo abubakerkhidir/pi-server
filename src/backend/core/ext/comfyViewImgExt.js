@@ -1,4 +1,4 @@
-import {getDb} from '../db.js'
+import { findFileByAssetId } from '../db/chat-files-dao.js';
 
 export async function comfyViewImgExt(pi,event, ctx){
     // Target your specific tool (e.g., bash)
@@ -11,7 +11,7 @@ export async function comfyViewImgExt(pi,event, ctx){
             return null;
         }
         // Search for this asset in our database
-        const fileRecord = findFileByAssetId(assetId, userId);
+        const fileRecord = findFileByAssetId(assetId);
         if (fileRecord) {
             const text = `The image has already been saved locally. To view it, use the ctx_read tool with this file path:\n\n${fileRecord.file_path}\n\nThe file is ${fileRecord.file_size} bytes (${fileRecord.mime_type}).`;
             console.log(`[comfyViewImgExt] Found local file, creating rejection: `,text);
@@ -22,13 +22,3 @@ export async function comfyViewImgExt(pi,event, ctx){
     }
 }
 
-export function findFileByAssetId(assetId, userId) {
-  const db = getDb();
-  console.log(`[ComfyHandler:findFileByAssetId] Looking for assetId: ${assetId}, userId: ${userId}`);
-  const record = db.prepare(`
-    SELECT id, file_name, file_path, file_size, mime_type 
-    FROM chat_files  WHERE asset_id = ? LIMIT 1
-  `).get(assetId) ; // AND session_id = ? , userId);
-  console.log(`[ComfyHandler:findFileByAssetId] Found record:`, record);
-  return record;
-}

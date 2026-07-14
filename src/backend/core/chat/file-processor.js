@@ -4,7 +4,7 @@ import {
   extractFrames,
   frameImagesToBase64,
   fileToImageContent,
-} from "../../../core/pi-video.js";
+} from "../video/pi-video.js";
 
 /**
  * Process a video file and extract frames.

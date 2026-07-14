@@ -3,10 +3,11 @@ import path from "path";
 import https from "https";
 import http from "http";
 import { v4 as uuidv4 } from "uuid";
-import { getDb } from "../db.js";
-import { getEntityBuffer } from "../../routes/chat/stream/state.js";
+import { getEntityBuffer } from "../chat/state.js";
 import { Html2PdfFileSaver } from "./fileSaver/html2pdf-handler.js";
 import { ComfyFileSaver } from "./fileSaver/comfy-handler.js";
+import { getUserHomeDir } from "../db/user-dao.js";
+import { insertFile } from "../db/chat-files-dao.js";
 
 const handlers = []
 export function registerHandler(h){
@@ -173,9 +174,7 @@ function modifyToolResult(newUrl, result, fileId, filePath, fileInfo) {
 }
 
 function getUserDownloadsDir(userId) {
-    const db = getDb();
-    const user = db.prepare("SELECT home_dir, username FROM users WHERE id = ?").get(userId);
-    const userDir = user?.home_dir || path.join(process.cwd(), "users", user?.username || "default");
+    const userDir = getUserHomeDir(userId)
     const downloadsDir = path.join(userDir, "downloads");
     fs.mkdirSync(downloadsDir, { recursive: true });
     return downloadsDir;
@@ -192,13 +191,8 @@ function getServerBaseUrl() {
 }
 
 // Save file record to database.
-function saveFileRecord(fileId, recordId, sessionId, fileInfo, toolName, entityId, filePath, assetId = null) {
-    const db = getDb();
-    console.log(`[FileHandler:saveFileRecord] Saving to DB:`, { recordId, sessionId, fileId, fileName: fileInfo.fileName, filePath, fileSize: fileInfo.fileSize, assetId });
-    db.prepare(`
-        INSERT INTO chat_files (id, record_id, session_id, type, file_name, file_path, file_size, mime_type, tool_name, chat_entity_id, asset_id)
-        VALUES (?, ?, ?, 'download', ?, ?, ?, ?, ?, ?, ?)
-    `).run(fileId, recordId, sessionId, fileInfo.fileName, filePath, fileInfo.fileSize, fileInfo.mimeType, toolName, entityId, assetId ?? '');
+function saveFileRecord(fileId, recordId, sessionId, f, toolName, entityId, filePath, assetId = null) {
+    insertFile(fileId, recordId, sessionId, 'download', f.fileName, filePath, f.fileSize, f.mimeType, toolName, entityId, assetId ?? '');
     return fileId;
 }
 

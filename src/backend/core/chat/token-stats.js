@@ -1,5 +1,5 @@
-import { v4 as uuidv4 } from "uuid";
-import { getDb } from "../../../core/db.js";
+import { updateTokenStats } from "../db/chat-record-dao.js";
+import { updateCtxSizeAndPrecentage, updateCtxWindow } from "../db/session-dao.js";
 
 /**
  * Calculate TTFT (time to first token) in seconds.
@@ -63,23 +63,10 @@ export function calculateTokenStats(usageData, responseStartTime, firstTokenTime
 /**
  * Save token stats to database.
  * @param {string} recordId - The chat record ID
- * @param {Object} tokenStats - Token stats object
+ * @param {Object} t - Token stats object
  */
-export function saveTokenStats(recordId, tokenStats) {
-  const db = getDb();
-  db.prepare(
-    "UPDATE chat_records SET agent_reply_id = ?, prompt_tokens = ?, think_tokens = ?, output_tokens = ?, prompt_token_s = ?, output_token_s = ?, duration_ms = ?, ttft_ms = ? WHERE id = ?"
-  ).run(
-    uuidv4(),
-    tokenStats.prompt_tokens,
-    tokenStats.think_tokens,
-    tokenStats.output_tokens,
-    tokenStats.prompt_token_s,
-    tokenStats.output_token_s,
-    tokenStats.totalDurationMs,
-    tokenStats.ttft_ms,
-    recordId,
-  );
+export function saveTokenStats(recordId, t) {
+  updateTokenStats(t.prompt_tokens, t.think_tokens, t.output_tokens, t.prompt_token_s, t.output_token_s, t.totalDurationMs, t.ttft_ms, recordId);
 }
 
 /**
@@ -88,20 +75,12 @@ export function saveTokenStats(recordId, tokenStats) {
  * @param {Object} contextUsage - Context usage from pi SDK
  */
 export function updateSessionContextUsage(dbSessionId, contextUsage) {
-  const db = getDb();
-  
   if (contextUsage?.contextSize != null) {
-    try {
-      db.prepare(
-        "UPDATE session_metadata SET context_used = ?, context_percent = ? WHERE id = ?"
-      ).run(contextUsage.contextSize, contextUsage.contextPercent, dbSessionId);
-    } catch {}
+    updateCtxSizeAndPrecentage(contextUsage.contextSize, contextUsage.contextPercent, dbSessionId);
   }
   if (contextUsage?.contextWindow != null) {
-    try {
-      db.prepare(
-        "UPDATE session_metadata SET context_size = ? WHERE id = ?"
-      ).run(contextUsage.contextWindow, dbSessionId);
-    } catch {}
+    updateCtxWindow(contextUsage.contextWindow, dbSessionId);
   }
 }
+
+

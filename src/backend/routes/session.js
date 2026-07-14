@@ -1,29 +1,9 @@
 import { Router } from "express";
-import { authMiddleware } from "../../middleware/auth.js";
-import { getDb } from "../../core/db.js";
-import { getPiManager } from "./stream/state.js";
+import { authMiddleware } from "../middleware/auth.js";
+import { getPiManager } from "../core/chat/state.js";
+import { findUserSession, verifySessionOwnership } from "../core/db/session-dao.js";
 
 const router = Router();
-
-/**
- * Look up session by ID if it belongs to the user.
- */
-function findUserSession(dbSessionId, userId) {
-  const db = getDb();
-  return db.prepare(
-    "SELECT id, pi_session_id, name, created_at, updated_at FROM session_metadata WHERE id = ? AND user_id = ?"
-  ).get(dbSessionId, userId);
-}
-
-/**
- * Verify session belongs to user.
- */
-function verifySessionOwnership(sessionId, userId) {
-  const db = getDb();
-  return db.prepare(
-    "SELECT id FROM session_metadata WHERE id = ? AND user_id = ?"
-  ).get(sessionId, userId);
-}
 
 /**
  * Get or load a pi session.

@@ -1,4 +1,5 @@
 import path from "path";
+import { getDb } from "./db.js";
 
 const DEFAULT_TOOLS = ["read", "ls", "bash", "find", "grep", "get_search_content"];
 
@@ -37,11 +38,11 @@ function parseSettingValue(row) {
 
 /**
  * Load user settings from database.
- * @param {Object} db - Database connection
  * @param {number} userId - User ID
  * @returns {Object} User settings
  */
-export function loadUserSettings(db, userId) {
+export function loadUserSettings(userId) {
+  const db = getDb();
   const rows = db.prepare("SELECT key, value FROM user_settings WHERE user_id = ?").all(userId);
   const settings = getDefaultSettings();
 
@@ -60,16 +61,15 @@ export function loadUserSettings(db, userId) {
 
 /**
  * Save user settings to database.
- * @param {Object} db - Database connection
  * @param {number} userId - User ID
  * @param {Object} settings - Settings to save
  */
-export function saveUserSettings(db, userId, settings) {
-  const upsert = db.prepare(
+export function saveUserSettings(userId, settings) {
+  const upsert = getDb().prepare(
     "INSERT INTO user_settings (user_id, key, value) VALUES (?, ?, ?) ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value"
   );
 
-  const transaction = db.transaction(() => {
+  const transaction = getDb().transaction(() => {
     for (const [key, value] of Object.entries(settings)) {
       upsert.run(userId, key, JSON.stringify(value));
     }
@@ -77,3 +77,27 @@ export function saveUserSettings(db, userId, settings) {
 
   transaction();
 }
+/**
+ * Load user settings from database.
+ */
+export function loadSettingsFromDb(userId) {
+  const userRows = getDb().prepare("SELECT key, value FROM user_settings WHERE user_id = ?").all(userId);
+  const userMap = {};
+
+  for (const r of userRows) {
+    try {
+      userMap[r.key] = JSON.parse(r.value);
+    } catch {
+      userMap[r.key] = r.value;
+    }
+  }
+
+  return userMap;
+}
+export function insertSettings(defaults, userId) {
+  const upsert = getDb().prepare("INSERT OR IGNORE INTO user_settings (user_id, key, value) VALUES (?, ?, ?)");
+  for (const [key, value] of Object.entries(defaults)) {
+    upsert.run(userId, key, JSON.stringify(value));
+  }
+}
+
