@@ -167,7 +167,7 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const { handleSend, resetState } = useChatStream({
+  const { handleSend, stopStream, resetState } = useChatStream({
     currentSessionId: currentSessionId || null,
     userSettings,
   });
@@ -319,6 +319,11 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
 
   const handleModelSelect = (model: ModelInfo) => setCurrentModel(model);
 
+  const handleStop = useCallback(() => {
+    stopStream();
+    setIsProcessing(false);
+  }, [stopStream]);
+
   const loadAndShowSession = async (sessionId: string) => {
     if (sessionId === currentSessionIdRef.current) return;
     try {
@@ -381,6 +386,7 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
         <ChatWindow chatState={chatState} userSettings={userSettings} onScrollAwayChange={setShowScrollDown} showScrollDown={showScrollDown}/>
         <InputArea
           onSend={handleSendWrapper}
+          onStop={handleStop}
           disabled={isProcessing}
           value={userPrompt}
           onValueChange={setUserPrompt}

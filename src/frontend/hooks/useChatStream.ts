@@ -1,5 +1,5 @@
 import { useRef, useCallback } from "react";
-import { createChatStream } from "@/frontend/api";
+import { createChatStream, type AbortChatStream } from "@/frontend/api";
 import type { AgentReplyEntity, MsgData, ToolData, ThinkData, TokenStats } from "@/frontend/types";
 
 let thinkCounter = 0;
@@ -29,6 +29,7 @@ export interface UseChatStreamResult {
     onSessionCreated?: OnSessionCreated,
     onTokenStats?: OnTokenStats,
   ) => void;
+  stopStream: () => void;
   resetState: () => void;
 }
 
@@ -40,6 +41,7 @@ export function useChatStream({
   const entitiesRef = useRef<AgentReplyEntity[]>([]);
   // Track entity start times for live duration calculation
   const entityStartTimes = useRef<Map<string, number>>(new Map());
+  const abortRef = useRef<AbortChatStream | null>(null);
 
   const getLastEntity = <T extends AgentReplyEntity>(
     typ: string,
@@ -86,11 +88,12 @@ export function useChatStream({
         if (streamEnded) return;
         streamEnded = true;
         isProcessingRef.current = false;
+        abortRef.current = null;
         onStreamEnd();
       };
 
       try {
-        createChatStream(
+        const abort = createChatStream(
           currentSessionId,
           prompt,
           files?.length ? files : undefined,
@@ -206,6 +209,7 @@ export function useChatStream({
             markEnded();
           },
         );
+        abortRef.current = abort;
       } catch {
         markEnded();
       }
@@ -216,7 +220,12 @@ export function useChatStream({
   const resetState = useCallback(() => {
     sessionIdRef.current = null;
     isProcessingRef.current = false;
+    abortRef.current = null;
   }, []);
 
-  return { sessionId: sessionIdRef.current, handleSend, resetState };
+  const stopStream = useCallback(() => {
+    abortRef.current?.();
+  }, []);
+
+  return { sessionId: sessionIdRef.current, handleSend, stopStream, resetState };
 }

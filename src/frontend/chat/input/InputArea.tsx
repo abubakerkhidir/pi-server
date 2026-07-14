@@ -18,6 +18,7 @@ interface InputAreaExtendedProps extends InputAreaProps {
 
 export default function InputArea({
   onSend,
+  onStop,
   disabled,
   value,
   onValueChange,
@@ -124,17 +125,28 @@ export default function InputArea({
               onKeyDown={handleKeyDown}
               autoFocus
             />
-            <button
-              className="send-btn"
-              disabled={disabled}
-              title="Send"
-              onClick={handleSend}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: 20, height: 20 }}>
-                <path d="M22 2L11 13" />
-                <path d="M22 2L15 22L11 13L2 9L22 2Z" />
-              </svg>
-            </button>
+            {disabled ? (
+              <button
+                className="stop-btn"
+                title="Stop generating"
+                onClick={onStop}
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 20, height: 20 }}>
+                  <rect x="6" y="6" width="12" height="12" rx="2" />
+                </svg>
+              </button>
+            ) : (
+              <button
+                className="send-btn"
+                title="Send"
+                onClick={handleSend}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: 20, height: 20 }}>
+                  <path d="M22 2L11 13" />
+                  <path d="M22 2L15 22L11 13L2 9L22 2Z" />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
       </div>

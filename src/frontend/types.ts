@@ -211,6 +211,7 @@ export interface SidebarProps {
 
 export interface InputAreaProps {
   onSend: (prompt: string, files: File[]) => void;
+  onStop?: () => void;
   disabled: boolean;
   value: string;
   onValueChange: (value: string) => void;

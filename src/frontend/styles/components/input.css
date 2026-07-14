@@ -112,6 +112,29 @@
   cursor: not-allowed;
 }
 
+.stop-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 0;
+  border: none;
+  background: var(--danger, #e53e3e);
+  color: white;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.stop-btn:last-child {
+  border-radius: 0 12px 12px 0;
+}
+
+.stop-btn:hover { background: #c53030; }
+
 /* File chips inside input row */
 .file-chip {
   display: inline-flex;
