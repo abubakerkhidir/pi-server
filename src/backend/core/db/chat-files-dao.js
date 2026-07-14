@@ -1,5 +1,5 @@
-import { getDb } from '../db.js';
-import { getDb } from "./db";
+import { getDb } from "./db.js";
+import { v4 as uuidv4 } from "uuid";
 
 export function getChatFilesByRec(recId) {
   return getDb().prepare("SELECT * FROM chat_files WHERE record_id = ? ORDER BY created_at ASC").all(recId);

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcrypt";
+import fs from "fs";
 import path from "path";
 import { generateToken, authMiddleware } from "../middleware/auth.js";
 import { insertUser, getUserByUsername } from "../core/db/user-dao.js";

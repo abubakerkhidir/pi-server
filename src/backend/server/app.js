@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import path from "path";
-import { initDb, closeDb } from "../core/db.js";
+import { initDb, closeDb } from "../core/db/db.js";
 import authRoutes from "../routes/auth.js";
 import settingsRoutes from "../routes/settings.js";
 import sessionsRoutes from "../routes/sessions.js";
