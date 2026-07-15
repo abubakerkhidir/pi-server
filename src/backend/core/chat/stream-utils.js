@@ -47,6 +47,7 @@ export function writeErrorResponse(res, message) {
  * Write done event and close response.
  */
 export function writeDoneEvent(writeEvent, res) {
+  console.log('writting done-event: ',res.writableEnded)
   if (!res.writableEnded) {
     writeEvent("done", {});
     res.end();

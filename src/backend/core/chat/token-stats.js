@@ -38,9 +38,9 @@ function calculateOutputTokensPerSecond(outputTokens, generationSec) {
  * @param {number} firstTokenTime - First token timestamp
  * @returns {Object} Token stats
  */
-export function calculateTokenStats(usageData, responseStartTime, firstTokenTime) {
+export function calculateTokenStats(usageData, responseStartTime, state) {
   const totalDurationMs = Date.now() - responseStartTime;
-  const ttftMs = firstTokenTime ? firstTokenTime - responseStartTime : totalDurationMs;
+  const ttftMs = state.firstTokenTime ? state.firstTokenTime - responseStartTime : totalDurationMs;
 
   const promptTokens = usageData?.prompt_tokens ?? 0;
   const thinkTokens = usageData?.think_tokens ?? 0;
@@ -57,6 +57,8 @@ export function calculateTokenStats(usageData, responseStartTime, firstTokenTime
     output_token_s: calculateOutputTokensPerSecond(outputTokens, generationSec),
     ttft_ms: ttftMs,
     totalDurationMs,
+    contextSize: state.contextUsage.contextSize, 
+    contextPercent: state.contextUsage.contextPercent
   };
 }
 

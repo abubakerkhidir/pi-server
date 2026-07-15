@@ -36,7 +36,7 @@ export function initSessionMetadata(dbSessionId, userId, piSessionId, effectiveP
  */
 export async function generateSessionNameIfNeeded(dbSessionId, effectivePrompt, fullText, writeEvent,req) {
   const messageCount = getSessionMessageCount(dbSessionId);
-
+  console.log('trying to name session, recordCount: ',messageCount)
   if (messageCount === 1) {
     try {
       const name = await generateSessionName(effectivePrompt, fullText);

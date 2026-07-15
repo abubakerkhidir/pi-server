@@ -101,7 +101,7 @@ export async function handleChatStream(req, res){
       images: images.length > 0 ? images : undefined,
       onEvent: wrappedOnEvent,
     });
-
+    console.log('prompt completed in pi... ',dbSessionId)
     // Post-prompt tasks
     await generateSessionNameIfNeeded(dbSessionId, effectivePrompt, getFullText(), writeEvent,req);
     storeModelContextSize(dbSessionId, modelInfo);
@@ -110,6 +110,7 @@ export async function handleChatStream(req, res){
     writeDoneEvent(writeEvent, res);
     removeEntityBuffer(dbSessionId);
   } catch (err) {
+    console.log('Error in pi session: ',err)
     writeErrorResponse(res, err.message);
   } finally {
     scheduleCleanup(tempDirs);

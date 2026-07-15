@@ -107,7 +107,7 @@ function handleContextUsageEvent(event, state) {
  */
 function handleDoneEvent(entityBuffer, recordId, dbSessionId, responseStartTime, state) {
   entityBuffer.flushAll();
-  const tokenStats = calculateTokenStats(state.usageData, responseStartTime, state.firstTokenTime);
+  const tokenStats = calculateTokenStats(state.usageData, responseStartTime, state) //.firstTokenTime);
   saveTokenStats(recordId, tokenStats);
   updateSessionContextUsage(dbSessionId, state.contextUsage);
   return tokenStats;
@@ -145,7 +145,6 @@ export function createStreamEventHandler(params) {
         break;
 
       case "tool_end":
-        console.log(`[Handler:onEvent] Received tool_end event for: ${event.name} (id: ${event.id})`);
         handleToolEndEvent(event, entityBuffer, writeEvent, handlerParams).catch(err => console.error("[Handler] tool_end error:", err));
         break;
 
@@ -157,11 +156,14 @@ export function createStreamEventHandler(params) {
         handleContextUsageEvent(event, state);
         break;
 
+      case "error": 
       case "done": {
         const tokenStats = handleDoneEvent(entityBuffer, recordId, dbSessionId, responseStartTime, state);
         writeEvent("record_stats", tokenStats);
+        writeEvent(event.type, {});
         break;
       }
+
     }
   }
 
