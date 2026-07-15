@@ -47,7 +47,7 @@ export async function handleChatStream(req, res){
   const images = [];
   let videoInfo = null;
   const tempDirs = [];
-
+  let dbSessionId = undefined
   try {
     // Process uploaded files
     const fileResult = await processUploadedFiles(req.files);
@@ -68,7 +68,7 @@ export async function handleChatStream(req, res){
 
     // Get or create session
     const { session, piSessionId } = await piManager.getOrCreateSession(req.user.userId, sessionId);
-    const dbSessionId = sessionId || piSessionId;
+    dbSessionId = sessionId || piSessionId;
     console.log('got pi session: ', piSessionId, sessionId, dbSessionId);
 
     // Initialize session and record
