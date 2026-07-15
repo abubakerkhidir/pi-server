@@ -1,4 +1,3 @@
-import { trace } from "../../utils/logger";
 
 // Shared state for chat routes
 let piManager = null;
@@ -16,7 +15,7 @@ export function getPiManager() {
 export function setEntityBuffer(sessionId,entityBuffer){
   if(sessionId)  
       entityBufferMap.set(sessionId,entityBuffer)
-  trace('setting entity buffer: ',sessionId,entityBuffer)
+  if(fullDebug()) console.log('setting entity buffer: ',sessionId,entityBuffer)
 }
 export function getEntityBuffer(sessionId){
     return sessionId? entityBufferMap.get(sessionId) : undefined
@@ -25,7 +24,7 @@ export function getEntityBuffer(sessionId){
 export function removeEntityBuffer(sessionId){
     if(sessionId)
       entityBufferMap.delete(sessionId)
-    console.log('removing entity buffer: ',sessionId)
+    if(fullDebug()) console.log('removing entity buffer: ',sessionId)
 }
 
 export function fullDebug() {
