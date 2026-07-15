@@ -1,7 +1,7 @@
 // Shared state for chat routes
 let piManager = null;
 let entityBufferMap = new Map();
-let fullDebug = undefined
+let fullDebugFlag = undefined
 
 export function setPiManager(manager) {
   piManager = manager;
@@ -27,7 +27,7 @@ export function removeEntityBuffer(sessionId){
 }
 
 export function fullDebug() {
-  if(fullDebug === undefined)
-    fullDebug = (process.env.FULL_DEBUG || 'false') === true
-  return fullDebug;
+  if(fullDebugFlag === undefined)
+    fullDebugFlag = (process.env.FULL_DEBUG || 'false') === true
+  return fullDebugFlag;
 }
