@@ -40,7 +40,7 @@ export async function handleFileSaveEvent(pi, event, ctx) {
             console.log(`[handleFileSaveEvent] : ${toolName}, fileName: ${fileInfo.fileName}, url: ${fileInfo.fileUrl}`);
             return await autoSaveGeneratedFile(entityBuffer,tool,fileInfo, toolName, event, entityBuffer.recordId, sessionId, entityBuffer.userId, entityId );
         }else{
-            console.log('not file-saver tool... ',toolName,tool)
+            trace('not file-saver tool... ',toolName,tool)
         }
     }catch(err){
         console.log('error handle save-file: ',err)

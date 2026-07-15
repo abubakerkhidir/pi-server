@@ -22,7 +22,7 @@ export class ComfyFileSaver {
         fileName: parsed.filename || `image_${Date.now()}.png`, fileUrl: parsed.asset_url, fileSize: parsed.bytes_size || 0,
         mimeType: parsed.mime_type || "image/png", assetId: parsed.asset_id, isComfyAsset: true, width: parsed.width, height: parsed.height,
       };
-      console.log(`[extractComfyFileInfo] Extracted file info:`, fileInfo);
+      console.log(`[extractComfyFileInfo] Extracted file info:`, JSON.stringify(fileInfo));
       return fileInfo;
     }
     return null

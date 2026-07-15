@@ -89,8 +89,12 @@ export function useChatStream({
 
       let streamEnded = false;
       const markEnded = () => {
-        if (streamEnded) return;
+        if (streamEnded) {
+          console.log('ignoring markEnd event as stream was ended before...')
+          return;
+        }
         streamEnded = true;
+        console.log('marking stream ended...')
         isProcessingRef.current = false;
         abortRef.current = null;
         onStreamEnd();
@@ -207,6 +211,7 @@ export function useChatStream({
             onEntityUpdate(entitiesRef.current);
           },
           (err: Error) => {
+            console.log('Error in chat-stream processing: ',err)
             if (err.name !== "AbortError") {
               for (const ent of entitiesRef.current) ent.sealed = true;
             }
@@ -214,7 +219,8 @@ export function useChatStream({
           },
         );
         abortRef.current = abort;
-      } catch {
+      } catch (er) {
+        console.log('Error in create chat-stream: ',er)
         markEnded();
       }
     },
@@ -228,6 +234,7 @@ export function useChatStream({
   }, []);
 
   const stopStream = useCallback(() => {
+    isProcessingRef.current = false;
     abortRef.current?.();
   }, []);
 

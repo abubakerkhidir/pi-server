@@ -1,3 +1,5 @@
+import { trace } from "../../utils/logger";
+
 // Shared state for chat routes
 let piManager = null;
 let entityBufferMap = new Map();
@@ -14,7 +16,7 @@ export function getPiManager() {
 export function setEntityBuffer(sessionId,entityBuffer){
   if(sessionId)  
       entityBufferMap.set(sessionId,entityBuffer)
-  console.log('setting entity buffer: ',sessionId,entityBuffer)
+  trace('setting entity buffer: ',sessionId,entityBuffer)
 }
 export function getEntityBuffer(sessionId){
     return sessionId? entityBufferMap.get(sessionId) : undefined
