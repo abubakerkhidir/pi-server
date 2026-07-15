@@ -48,6 +48,7 @@ export default function InputArea({
   };
 
   const handleSend = () => {
+    console.log('send button clicked: ', disabled, value)
     if ((!value.trim() && uploadedFiles.length === 0) || disabled) return;
     onSend(value.trim(), uploadedFiles);
   };

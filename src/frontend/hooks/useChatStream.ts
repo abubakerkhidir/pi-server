@@ -75,7 +75,11 @@ export function useChatStream({
       onSessionCreated?: OnSessionCreated,
       onTokenStats?: OnTokenStats,
     ) => {
-      if (!prompt && (!files || files.length === 0) || isProcessingRef.current) return;
+
+      if (!prompt && (!files || files.length === 0) || isProcessingRef.current) {
+        console.log('ignore send button: ',prompt, files?.length, isProcessingRef.current)
+        return;
+      }
       isProcessingRef.current = true;
 
       // Fresh entity buffer for this stream

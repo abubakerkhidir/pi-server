@@ -8,6 +8,7 @@ import { Html2PdfFileSaver } from "./fileSaver/html2pdf-handler.js";
 import { ComfyFileSaver } from "./fileSaver/comfy-handler.js";
 import { getUserHomeDir } from "../db/user-dao.js";
 import { insertFile } from "../db/chat-files-dao.js";
+import { trace } from "../../utils/logger.js";
 
 const handlers = []
 export function registerHandler(h){
@@ -33,10 +34,10 @@ export async function handleFileSaveEvent(pi, event, ctx) {
         toolName = normalizeToolName(toolName)
         console.log('done normalizing-tool: ',toolName)
         const fileInfo = extractFileInfo(toolName, event);
-        console.log('normalized-tool: ',toolName, handlers.length, tool, fileInfo)
+        trace('normalized-tool: ',toolName, handlers.length, tool, fileInfo)
         if(fileInfo && tool){
             const entityId = tool?.dbEntityId || null;
-            console.log(`[handleFileSaveEvent] Entity ID: ${entityId}`);
+            console.log(`[handleFileSaveEvent] : ${toolName}, fileName: ${fileInfo.fileName}, url: ${fileInfo.fileUrl}`);
             return await autoSaveGeneratedFile(entityBuffer,tool,fileInfo, toolName, event, entityBuffer.recordId, sessionId, entityBuffer.userId, entityId );
         }else{
             console.log('not file-saver tool... ',toolName,tool)
@@ -118,10 +119,9 @@ export function parseMcpResult(result) {
 async function autoSaveGeneratedFile(entityBuffer,tool, fileInfo, toolName, result, recordId, sessionId, userId, entityId) {
     try {
         const downloadsDir = getUserDownloadsDir(userId);
-        const serverBaseUrl = getServerBaseUrl();
         const {filePath,fileSize} = await processToolResult(fileInfo,downloadsDir)
         const fileId = uuidv4();
-        const newUrl = `${serverBaseUrl}/api/chat/file/${fileId}`;
+        const newUrl = buildFileUrl(fileId);
         const modified = modifyToolResult(newUrl, result, fileId, filePath, fileInfo)
         saveToolToBuffer(tool,modified,false,entityBuffer)
         saveFileRecord(fileId, recordId, sessionId,{ ...fileInfo, fileSize },toolName,entityId,filePath,fileInfo.assetId);
@@ -130,6 +130,12 @@ async function autoSaveGeneratedFile(entityBuffer,tool, fileInfo, toolName, resu
         console.error(`[FileHandler:autoSaveGeneratedFile] Failed to save file:`, err.message);
         return null;
     }
+}
+
+export function buildFileUrl(fileId) {
+    const serverBaseUrl = getServerBaseUrl();
+    const newUrl = `${serverBaseUrl}/api/chat/file/${fileId}`;
+    return newUrl;
 }
 
 function normalizeToolName(toolName) {

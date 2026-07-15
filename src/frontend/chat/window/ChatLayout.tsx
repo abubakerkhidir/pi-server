@@ -229,6 +229,7 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
 
   const handleSendWrapper = useCallback(
     (prompt: string, files: File[]) => {
+      console.log('handleSend: ', isProcessing, prompt)
       if (isProcessing) return;
       // Allow file-only uploads (empty prompt with files)
       if (!prompt && (!files || files.length === 0)) return;
