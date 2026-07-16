@@ -1,4 +1,5 @@
 import { createAgentSession, SessionManager } from "@earendil-works/pi-coding-agent";
+import { trace } from "./logger";
 
 const NAME_GEN_PROMPT = `You are a helpful assistant that suggests concise, descriptive titles for chat conversations.
 
@@ -62,7 +63,8 @@ function createNamingSubscriber(resolve) {
   let done = false;
 
   const unsub = (event) => {
-    console.log('name-session event: ',event.type,event.assistantMessageEvent?.type, event.assistantMessageEvent?.delta)
+    if(event.assistantMessageEvent?.type !=='thinking_delta')
+      trace('name-session event: ',event.type,event.assistantMessageEvent?.type, event.assistantMessageEvent?.delta)
     if(event.type ==='message_update'){
       const ev = event.assistantMessageEvent;
       if (ev?.type === "text_delta" && ev.delta) {

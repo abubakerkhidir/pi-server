@@ -8,7 +8,7 @@ import { Html2PdfFileSaver } from "./fileSaver/html2pdf-handler.js";
 import { ComfyFileSaver } from "./fileSaver/comfy-handler.js";
 import { getUserHomeDir } from "../db/user-dao.js";
 import { insertFile } from "../db/chat-files-dao.js";
-import { trace } from "../../utils/logger.js";
+import { trace,debug } from "../../utils/logger.js";
 
 const handlers = []
 export function registerHandler(h){
@@ -20,24 +20,24 @@ export async function handleFileSaveEvent(pi, event, ctx) {
         const sessionId = ctx?.sessionManager?.sessionId
         const entityBuffer = getEntityBuffer(sessionId);
         if(!entityBuffer || !event.toolCallId){
-            console.log('>>>>>>>>>>>>>>>>>>> entityBuffer is null...',sessionId, entityBuffer,event.toolCallId)
+            trace('>>>>>>>>>>>>>>>>>>> entityBuffer is null...',sessionId, entityBuffer,event.toolCallId)
             return
         }
         const tool = entityBuffer?.findToolEntity(event.toolCallId);
         let toolName = event.toolName
         if (toolName === 'mcp' && tool?.toolArgs?.tool) {
             toolName = tool.toolArgs.tool;
-            console.log('parsed mcp args, tool:', toolName)
+            trace('parsed mcp args, tool:', toolName)
         }
         initHandlers()
-        console.log('normalizing-tool: ',toolName, handlers.length)
+        trace('normalizing-tool: ',toolName, handlers.length)
         toolName = normalizeToolName(toolName)
-        console.log('done normalizing-tool: ',toolName)
+        debug('done normalizing-tool: ',toolName)
         const fileInfo = extractFileInfo(toolName, event);
         trace('normalized-tool: ',toolName, handlers.length, tool, fileInfo)
         if(fileInfo && tool){
             const entityId = tool?.dbEntityId || null;
-            console.log(`[handleFileSaveEvent] : ${toolName}, fileName: ${fileInfo.fileName}, url: ${fileInfo.fileUrl}`);
+            trace(`[handleFileSaveEvent] : ${toolName}, fileName: ${fileInfo.fileName}, url: ${fileInfo.fileUrl}`);
             return await autoSaveGeneratedFile(entityBuffer,tool,fileInfo, toolName, event, entityBuffer.recordId, sessionId, entityBuffer.userId, entityId );
         }else{
             trace('not file-saver tool... ',toolName,tool)
@@ -49,13 +49,13 @@ export async function handleFileSaveEvent(pi, event, ctx) {
 }
 
 export function downloadFile(url) {
-    console.log(`[FileHandler:downloadFile] Starting download from: ${url}`);
+    trace(`[FileHandler:downloadFile] Starting download from: ${url}`);
     return new Promise((resolve, reject) => {
         const client = url.startsWith("https") ? https : http;
         client.get(url, (res) => {
-            console.log(`[FileHandler:downloadFile] Response status: ${res.statusCode}`);
+            trace(`[FileHandler:downloadFile] Response status: ${res.statusCode}`);
             if (res.statusCode === 301 || res.statusCode === 302) {
-                console.log(`[FileHandler:downloadFile] Following redirect to: ${res.headers.location}`);
+                trace(`[FileHandler:downloadFile] Following redirect to: ${res.headers.location}`);
                 return downloadFile(res.headers.location).then(resolve).catch(reject);
             }
             if (res.statusCode !== 200) {
@@ -66,7 +66,7 @@ export function downloadFile(url) {
             res.on("data", (chunk) => chunks.push(chunk));
             res.on("end", () => {
                 const buffer = Buffer.concat(chunks);
-                console.log(`[FileHandler:downloadFile] Download complete, size: ${buffer.length} bytes`);
+                trace(`[FileHandler:downloadFile] Download complete, size: ${buffer.length} bytes`);
                 resolve(buffer);
             });
             res.on("error", reject);
@@ -88,7 +88,7 @@ export function copyLocalFile(sourcePath, downloadsDir, fileName) {
 export async function saveBufferToFile(buffer, downloadsDir, fileName) {
     const filePath = path.join(downloadsDir, fileName);
     fs.writeFileSync(filePath, buffer);
-    console.log(`[FileHandler:saveBufferToFile] Saved buffer to: ${filePath}`);
+    debug(`[FileHandler:saveBufferToFile] Saved buffer to: ${filePath}`);
     return filePath;
 }
 
