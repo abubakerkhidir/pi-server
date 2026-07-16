@@ -39,10 +39,14 @@ export async function generateSessionNameIfNeeded(dbSessionId, effectivePrompt, 
   console.log('trying to name session, recordCount: ',messageCount)
   if (messageCount === 1) {
     try {
+      console.log('generate session name... ',effectivePrompt?.length, fullText.length)
       const name = await generateSessionName(effectivePrompt, fullText);
+      console.log('got session name: ',name)
       updateSessionName(dbSessionId,req.user.userId, name);
       const sessionMeta = getSessionMeta(dbSessionId);
+      console.log('got session meta: ',name)
       writeEvent("session_name", sessionMeta);
+      console.log("session-name event done: ",sessionMeta.name)
     } catch (err) {
       console.error("Session naming failed:", err);
     }

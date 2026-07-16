@@ -62,22 +62,17 @@ function createNamingSubscriber(resolve) {
   let done = false;
 
   const unsub = (event) => {
-    switch (event.type) {
-      case "message_update": {
-        const ev = event.assistantMessageEvent;
-        if (ev?.type === "text_delta" && ev.delta) {
-          name += ev.delta;
-        }
-        break;
+    console.log('name-session event: ',event)
+    if(event.type ==='message_update'){
+      const ev = event.assistantMessageEvent;
+      if (ev?.type === "text_delta" && ev.delta) {
+        name += ev.delta;
       }
-      case "agent_end": {
-        done = true;
-        resolve();
-        break;
-      }
+    }else if(event.type ==='agent_end'){
+      done = true;
+      resolve();
     }
   };
-
   return {
     unsub,
     getName: () => name,
@@ -105,6 +100,7 @@ export async function generateSessionName(userPrompt, assistantResponse) {
     namingSession = result.session;
 
     const fullPrompt = buildNamingPrompt(userPrompt, assistantResponse);
+    console.log('naming-session created: ',fullPrompt.length)
 
     let resolvePrompt;
     const promptDone = new Promise((r) => { resolvePrompt = r; });
@@ -114,14 +110,17 @@ export async function generateSessionName(userPrompt, assistantResponse) {
       subscriber.unsub(event);
       if (subscriber.isDone()) resolvePrompt();
     };
-
+    console.log('naming-session sending prompt: ',fullPrompt.length)
     await namingSession.prompt(fullPrompt, {});
+    console.log('got naming-session result: ',fullPrompt.length)
 
     if (!subscriber.isDone()) {
+      console.log('error generate name in pi: ')
       await promptDone;
     }
 
     const name = cleanName(subscriber.getName());
+
     return name || "Chat";
   } catch (err) {
     console.error("[generateSessionName] Error:", err);
