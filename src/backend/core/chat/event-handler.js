@@ -125,6 +125,9 @@ export function createStreamEventHandler(params) {
 
   // Handler params that need to be passed to async handlers
   const handlerParams = {recordId,dbSessionId,userId,req,};
+  let onAgentEndResolve = undefined
+  let lastEvent = undefined
+  const onAgentEnd = new Promise((r) => { onAgentEndResolve = r; });
 
   function onEvent(event) {
     switch (event.type) {
@@ -160,7 +163,8 @@ export function createStreamEventHandler(params) {
       case "done": {
         const tokenStats = handleDoneEvent(entityBuffer, recordId, dbSessionId, responseStartTime, state);
         writeEvent("record_stats", tokenStats);
-        writeEvent(event.type, {});
+        lastEvent = event
+        onAgentEndResolve();
         break;
       }
 
@@ -171,5 +175,5 @@ export function createStreamEventHandler(params) {
   function getUsageData() { return state.usageData; }
   function getContextUsage() { return state.contextUsage; }
 
-  return { onEvent, getFirstTokenTime, getUsageData, getContextUsage };
+  return { onEvent, getFirstTokenTime, getUsageData, getContextUsage, onAgentEnd, lastEvent };
 }

@@ -91,23 +91,27 @@ export async function handleChatStream(req, res){
     setEntityBuffer(dbSessionId, entityBuffer);
     const responseStartTime = Date.now();
 
-    const { onEvent } = createStreamEventHandler({ writeEvent, entityBuffer, res, dbSessionId, recordId, responseStartTime, userId: req.user.userId, req });
+    const { onEvent,onAgentEnd, lastEvent } = createStreamEventHandler({ writeEvent, entityBuffer, res, dbSessionId, recordId, responseStartTime, userId: req.user.userId, req });
 
     // Track full text for session naming
     const { wrappedOnEvent, getFullText } = wrapOnEventForNaming(onEvent);
 
     // Run the prompt
+    let startTime = new Date().getTime()
     await piManager.prompt(piSessionId, effectivePrompt, {
       images: images.length > 0 ? images : undefined,
       onEvent: wrappedOnEvent,
     });
-    console.log('prompt completed in pi... ',dbSessionId)
+    console.log('prompt completed in pi... ',dbSessionId, new Date().getTime() - startTime)
+    await onAgentEnd
+    console.log('agent reply completed in pi... ',dbSessionId, new Date().getTime() - startTime)
+    
     // Post-prompt tasks
     await generateSessionNameIfNeeded(dbSessionId, effectivePrompt, getFullText(), writeEvent,req);
     storeModelContextSize(dbSessionId, modelInfo);
 
     // Signal completion
-    writeDoneEvent(writeEvent, res);
+    writeDoneEvent(writeEvent, res, lastEvent);
     removeEntityBuffer(dbSessionId);
   } catch (err) {
     console.log('Error in pi session: ',err)

@@ -46,10 +46,12 @@ export function writeErrorResponse(res, message) {
 /**
  * Write done event and close response.
  */
-export function writeDoneEvent(writeEvent, res) {
+export function writeDoneEvent(writeEvent, res, lastEvent) {
   console.log('writting done-event: ',res.writableEnded)
   if (!res.writableEnded) {
-    writeEvent("done", {});
+    if(lastEvent.type !== 'done')
+      console.log('lastEvent is not done: ',lastEvent)
+    writeEvent(lastEvent.type??"done", {});
     res.end();
   }
 }
