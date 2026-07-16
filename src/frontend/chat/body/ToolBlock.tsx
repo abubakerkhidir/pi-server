@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import type { ToolBlockProps } from "@/frontend/types";
 import { copyToClipboard, CopySvg } from "@/frontend/lib/clipboard";
 import { escapeHtmlSimple } from "@/frontend/lib/escapeHtml";
@@ -39,7 +39,7 @@ function getSubtitle(args: Record<string, unknown> | undefined, name: string): s
   return "";
 }
 
-export default function ToolBlock({ entity, userSettings }: ToolBlockProps) {
+function ToolBlock({ entity, userSettings }: ToolBlockProps) {
   const [expanded, setExpanded] = useState(false);
   const subtitle = getSubtitle(entity.args, entity.name);
   const maxLines = userSettings.tool_lines || 5;
@@ -127,3 +127,5 @@ export default function ToolBlock({ entity, userSettings }: ToolBlockProps) {
     </div>
   );
 }
+
+export default React.memo(ToolBlock)

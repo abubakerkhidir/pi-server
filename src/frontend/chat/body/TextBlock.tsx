@@ -1,8 +1,9 @@
+import React, { } from "react";
 import type { MsgData } from "@/frontend/types";
 import { copyToClipboard, CopySvg } from "@/frontend/lib/clipboard";
 import { marked } from "marked";
 
-export default function TextBlock({ entity }: { entity: MsgData }) {
+function TextBlock({ entity }: { entity: MsgData }) {
   const parsed = marked.parse(entity.content) || "";
 
   return (
@@ -20,3 +21,5 @@ export default function TextBlock({ entity }: { entity: MsgData }) {
     </div>
   );
 }
+
+export default React.memo(TextBlock)

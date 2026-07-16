@@ -282,7 +282,7 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
     if (window.location.hash) {
       window.history.replaceState(null, "", window.location.pathname);
     }
-    setTimeout(()=>scrollToBtm(),500)
+    setTimeout(()=>{scrollToBtm();setTimeout(()=>{scrollToBtm()},500)},500)
   };
 
   const handleSummarizeAndNew = useCallback(async () => {

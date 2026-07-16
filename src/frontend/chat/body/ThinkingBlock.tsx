@@ -1,8 +1,8 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import type { ThinkingBlockProps } from "@/frontend/types";
 import { copyToClipboard, CopySvg } from "@/frontend/lib/clipboard";
 
-export default function ThinkingBlock({ entity, userSettings }: ThinkingBlockProps) {
+function ThinkingBlock({ entity, userSettings }: ThinkingBlockProps) {
   const [expanded, setExpanded] = useState(false);  //!entity.sealed
   const maxLines = userSettings.thinking_lines || 3;
   const maxH = expanded ? "" : maxLines * 21 + "px";
@@ -39,3 +39,5 @@ export default function ThinkingBlock({ entity, userSettings }: ThinkingBlockPro
     </div>
   );
 }
+
+export default React.memo(ThinkingBlock)
