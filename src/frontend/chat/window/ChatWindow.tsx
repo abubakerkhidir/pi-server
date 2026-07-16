@@ -48,7 +48,7 @@ export default function ChatWindow({
   useEffect(()=>setupScrolListner(chatRef,onScrollAwayChange),[])
   // ── Auto-scroll during streaming ──
   useEffect(() => autoScroll(chatState, prevRecordCount,showScrollDown, chatRef,onScrollAwayChange), [chatState.records]);
-
+  
   const renderedRecords = useMemo(() => {
     return chatState.records.map((record) => {
       const userHtml = renderUserMsg(record.userMsg);
@@ -114,26 +114,26 @@ export default function ChatWindow({
           />
         </div>
       ))}
-      <div ref={chatRef} />
+      <div id="chatBtmRef" ref={chatRef} />
     </div>
   );
 }
 
 function setupScrolListner(chatRef:any, onScrollAwayChange:any){
-        const myDiv = chatRef.current?.parentElement;
-        if(!myDiv) return
-        const listner = (event:any) => {
-                //console.log('scrol-listner...')
-                if (event.deltaY < 0) {
-                        //console.log('User scrolled UP');
-                        onScrollAwayChange(true)
-                }
-        }
-        myDiv.addEventListener('wheel',listner)
-        return ()=>{
-                if(myDiv)
-                        myDiv.removeEventListener('wheel',listner)
-        }
+  const myDiv = chatRef.current?.parentElement;
+  if(!myDiv) return
+  const listner = (event:any) => {
+    //console.log('scrol-listner...')
+    if (event.deltaY < 0) {
+      //console.log('User scrolled UP');
+      onScrollAwayChange(true)
+    }
+  }
+  myDiv.addEventListener('wheel',listner)
+  return ()=>{
+    if(myDiv)
+      myDiv.removeEventListener('wheel',listner)
+  }
 }
 
 function autoScroll(chatState:ChatState, prevRecordCount:any,manualScroll:any, chatRef:any,onScrollAwayChange:any){
@@ -166,15 +166,21 @@ function autoScroll(chatState:ChatState, prevRecordCount:any,manualScroll:any, c
     handleScrolToBtm(chatRef, false);
 }
 
-export function handleScrolToBtm(
-  endRef: React.RefObject<HTMLDivElement | null>,
-  small: boolean,
-) {
-  endRef.current?.scrollIntoView({ behavior: "smooth" });
+export function scrollToBtm(){
+  handleScrollToBtmDiv(document.getElementById("chatBtmRef"), false);
+}
+
+export function handleScrolToBtm(endRef: React.RefObject<HTMLDivElement | null>, small: boolean) {
+  handleScrollToBtmDiv(endRef.current, small);
+}
+
+export function handleScrollToBtmDiv(btmDiv: any | null, small: boolean) {
+  btmDiv?.scrollIntoView({ behavior: "smooth" });
   setTimeout(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    btmDiv?.scrollIntoView({ behavior: "smooth" });
     if (small) {
       window.scrollTo(0, document.body.scrollHeight);
     }
   }, 100);
 }
+

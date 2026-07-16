@@ -4,7 +4,7 @@ import type { ChatLayoutProps, UserSettings, ChatState, ChatRecord, Session, Tok
 
 import ChatSidebar from "../../sidebar/ChatSidebar";
 import ChatHeader from "./ChatHeader";
-import ChatWindow from "./ChatWindow";
+import ChatWindow, {  scrollToBtm } from "./ChatWindow";
 import InputArea from "../input/InputArea";
 import SettingsModal from "../../config/settings/SettingsModal";
 import { useChatStream } from "@/frontend/hooks/useChatStream";
@@ -282,6 +282,7 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
     if (window.location.hash) {
       window.history.replaceState(null, "", window.location.pathname);
     }
+    setTimeout(()=>scrollToBtm(),500)
   };
 
   const handleSummarizeAndNew = useCallback(async () => {
