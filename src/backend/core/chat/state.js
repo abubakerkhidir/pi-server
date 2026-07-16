@@ -1,6 +1,6 @@
 
 // Shared state for chat routes
-const logLevelMap = new Map(['ERROR',1],['WARN',2],['INFO',3],['DEBUG',4],['TRACE',5],['FINE',6])
+const logLevelMap = new Map([['ERROR',1],['WARN',2],['INFO',3],['DEBUG',4],['TRACE',5],['FINE',6]])
 
 let piManager = null;
 let entityBufferMap = new Map();
