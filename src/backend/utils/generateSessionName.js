@@ -1,5 +1,5 @@
 import { createAgentSession, SessionManager } from "@earendil-works/pi-coding-agent";
-import { trace } from "./logger";
+import { trace } from "./logger.js";
 
 const NAME_GEN_PROMPT = `You are a helpful assistant that suggests concise, descriptive titles for chat conversations.
 
