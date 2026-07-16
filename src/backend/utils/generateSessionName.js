@@ -106,16 +106,17 @@ export async function generateSessionName(userPrompt, assistantResponse) {
     const promptDone = new Promise((r) => { resolvePrompt = r; });
 
     const subscriber = createNamingSubscriber(resolvePrompt);
-    unsub = (event) => {
-      subscriber.unsub(event);
-      if (subscriber.isDone()) resolvePrompt();
-    };
+    namingSession.subscribe(subscriber.unsub)
+    // unsub = (event) => {
+    //   subscriber.unsub(event);
+    //   if (subscriber.isDone()) resolvePrompt();
+    // };
     console.log('naming-session sending prompt: ',fullPrompt.length)
     await namingSession.prompt(fullPrompt, {});
     console.log('got naming-session result: ',fullPrompt.length)
 
     if (!subscriber.isDone()) {
-      console.log('error generate name in pi: ')
+      console.log('waiting for subs-done: ')
       await promptDone;
     }
 
