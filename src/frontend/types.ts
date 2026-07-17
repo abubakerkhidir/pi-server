@@ -181,11 +181,15 @@ export interface ChatLayoutProps {
 export interface ToolBlockProps {
   entity: ToolData;
   userSettings: { tool_lines: number; thinking_lines: number };
+  content?:any
+  sealed?:boolean
 }
 
 export interface ThinkingBlockProps {
   entity: ThinkData;
   userSettings: { tool_lines: number; thinking_lines: number };
+  content?: string;
+  sealed?: boolean;
 }
 
 export interface SettingsModalProps {

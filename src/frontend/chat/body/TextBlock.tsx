@@ -3,7 +3,7 @@ import type { MsgData } from "@/frontend/types";
 import { copyToClipboard, CopySvg } from "@/frontend/lib/clipboard";
 import { marked } from "marked";
 
-function TextBlock({ entity }: { entity: MsgData }) {
+function TextBlock({ entity,content,sealed }: { entity: MsgData,content?: string, sealed?: boolean }) {
   const parsed = marked.parse(entity.content) || "";
 
   return (

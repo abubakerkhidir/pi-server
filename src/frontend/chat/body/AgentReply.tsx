@@ -49,17 +49,17 @@ export default function AgentReply({
   const entityJsx: React.ReactNode[] = [];
   for (const entity of entities) {
     if (entity.type === "msg") {
-      if (!collapsed) entityJsx.push(<TextBlock key={entity.id} entity={entity} />);
+      if (!collapsed) entityJsx.push(<TextBlock key={entity.id} entity={entity} content={entity.content} sealed={entity.sealed} />);
     } else if (entity.type === "think") {
       if (!thinkHidden && !collapsed) {
         entityJsx.push(
-          <ThinkingBlock key={entity.id} entity={entity} userSettings={userSettings} />,
+          <ThinkingBlock key={entity.id} entity={entity} userSettings={userSettings} content={entity.content} sealed={entity.sealed} />,
         );
       }
     } else if (entity.type === "tool") {
       if (!toolsHidden && !collapsed) {
         entityJsx.push(
-          <ToolBlock key={entity.id} entity={entity} userSettings={userSettings} />,
+          <ToolBlock key={entity.id} entity={entity} userSettings={userSettings} content={entity.args?.content} sealed={entity.sealed} />,
         );
       }
     }

@@ -71,7 +71,7 @@ export function groupToolsBySource(tools) {
   return Array.from(groups.values());
 }
 export async function getGroupedTools() {
-  const groupedTools = undefined;
+  let groupedTools = undefined;
   try {
     const allTools = await discoverAllTools(process.cwd());
     const groups = groupToolsBySource(allTools);
