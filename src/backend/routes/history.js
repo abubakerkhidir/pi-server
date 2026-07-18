@@ -18,7 +18,17 @@ function parseThinkEntity(entity) {
  * Parse a message entity from database row.
  */
 function parseMessageEntity(entity) {
-  return { type: 'msg', content: entity.content };
+  return { type: 'msg', content: normalizeMessageContent(entity.content || '') };
+}
+
+/**
+ * Repair raw HTML tags that were streamed with the closing bracket on its own line.
+ * This keeps assistant-rendered image tags valid without changing the stored text.
+ */
+function normalizeMessageContent(content) {
+  return content
+    .replace(/(<[A-Za-z][^<>]*?)\s*\/\s*\n\s*>/g, '$1 />')
+    .replace(/(<[A-Za-z][^<>]*?)\s*\n\s*>/g, '$1>');
 }
 
 /**
