@@ -12,6 +12,7 @@ function normalizeMessageContent(content: string): string {
 function TextBlock({ entity,content,sealed }: { entity: MsgData,content?: string, sealed?: boolean }) {
   const parsed = marked.parse(normalizeMessageContent(entity.content)) || "";
 
+  console.log('render text: ',sealed, content?.length)
   return (
     <div className="entity-block entity-msg">
       <div className="markdown" dangerouslySetInnerHTML={{ __html: parsed as string }} />

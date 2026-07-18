@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import type { ThinkingBlockProps } from "@/frontend/types";
 import { copyToClipboard, CopySvg } from "@/frontend/lib/clipboard";
 
-function ThinkingBlock({ entity, userSettings }: ThinkingBlockProps) {
+function ThinkingBlock({ entity, userSettings,content, sealed }: ThinkingBlockProps) {
   const [expanded, setExpanded] = useState(false);  //!entity.sealed
   const maxLines = userSettings.thinking_lines || 3;
   const maxH = expanded ? "" : maxLines * 21 + "px";
@@ -11,7 +11,7 @@ function ThinkingBlock({ entity, userSettings }: ThinkingBlockProps) {
   const title = entity.duration
     ? `thinking for ${entity.duration}s, ${(entity.totalLength || entity.content.length).toLocaleString()} characters`
     : `thinking, ${(entity.totalLength || entity.content.length).toLocaleString()} characters`;
-
+  console.log('render think: ',sealed,content?.length)
   return (
     <div className="thinking-block">
       <div className="cb-header">

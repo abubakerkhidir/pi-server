@@ -39,7 +39,7 @@ function getSubtitle(args: Record<string, unknown> | undefined, name: string): s
   return "";
 }
 
-function ToolBlock({ entity, userSettings }: ToolBlockProps) {
+function ToolBlock({ entity, userSettings,content,sealed }: ToolBlockProps) {
   const [expanded, setExpanded] = useState(false);
   const subtitle = getSubtitle(entity.args, entity.name);
   const maxLines = userSettings.tool_lines || 5;
@@ -86,7 +86,7 @@ function ToolBlock({ entity, userSettings }: ToolBlockProps) {
     if (entity.result !== undefined) s += "\n" + JSON.stringify(entity.result, null, 2);
     return s;
   }, [entity.name, entity.args, entity.result]);
-
+  console.log('render tool: ',entity.name, sealed, content)
   return (
     <div className="tool-block" data-tool-id={entity.id}>
       <div className="cb-header">
