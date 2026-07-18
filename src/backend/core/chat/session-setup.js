@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
 import { generateSessionName } from "../../utils/generateSessionName.js";
-import { createSessionRecord, getSessionMeta, updateCtxSize, updateSessionName, updateSessionTimestamp } from "../db/session-dao.js";
+import { createSessionRecord, getSessionMeta,  updateSessionName, updateSessionTimestamp } from "../db/session-dao.js";
 import { getSessionMessageCount } from "../db/chat-record-dao.js";
 
 /**
@@ -50,16 +50,5 @@ export async function generateSessionNameIfNeeded(dbSessionId, effectivePrompt, 
     } catch (err) {
       console.error("Session naming failed:", err);
     }
-  }
-}
-
-/**
- * Store model context size in session metadata.
- * @param {string} dbSessionId - The session ID
- * @param {Object} modelInfo - Model info object
- */
-export function storeModelContextSize(dbSessionId, modelInfo) {
-  if (modelInfo && modelInfo.input) {
-    updateCtxSize(modelInfo.input, dbSessionId);
   }
 }

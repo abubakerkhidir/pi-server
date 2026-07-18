@@ -7,7 +7,7 @@ import { processUploadedFiles } from "./file-processor.js";
 import { createEntityBuffer } from "./entity-buffer.js";
 import { createStreamEventHandler } from "./event-handler.js";
 import { createSSEWriter, wrapOnEventForNaming, writeDoneEvent, writeErrorResponse, writeSessionEvent, writeVideoMetadata } from "./stream-utils.js";
-import {initSessionMetadata,generateSessionNameIfNeeded,storeModelContextSize} from "./session-setup.js";
+import {initSessionMetadata,generateSessionNameIfNeeded} from "./session-setup.js";
 import { createChatRecord } from "../db/chat-record-dao.js";
 import { saveFileMetadata } from "../db/chat-files-dao.js";
 
@@ -108,7 +108,6 @@ export async function handleChatStream(req, res){
     
     // Post-prompt tasks
     await generateSessionNameIfNeeded(dbSessionId, effectivePrompt, getFullText(), writeEvent,req);
-    storeModelContextSize(dbSessionId, modelInfo);
 
     // Signal completion
     writeDoneEvent(writeEvent, res, lastEvent);

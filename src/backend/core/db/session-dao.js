@@ -99,11 +99,6 @@ export function updateSessionTimestamp(dbSessionId) {
   db.prepare("UPDATE session_metadata SET updated_at = datetime('now') WHERE id = ?").run(dbSessionId);
 }
 
-export function updateCtxSize(ctxSize, dbSessionId) {
-  const db = getDb();
-  db.prepare("UPDATE session_metadata SET context_size = ? WHERE id = ?").run(ctxSize, dbSessionId);
-}
-
 export function updateCtxWindow(contextWindow, dbSessionId) {
   try {
     const db = getDb();
