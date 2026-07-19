@@ -12,6 +12,10 @@ export function createSSEWriter(res) {
       // If Express compression/proxy buffering is enabled, flush each SSE frame.
       if (typeof res.flush === "function") {
         res.flush();
+      } else {
+        // In plain Express (no compression middleware), res.flush is usually undefined.
+        // Best-effort socket uncork nudges buffered chunks to the client.
+        res.socket?.uncork?.();
       }
     }
   };
@@ -25,6 +29,8 @@ export function writeSSEComment(res, comment = "ping") {
     res.write(`: ${comment}\n\n`);
     if (typeof res.flush === "function") {
       res.flush();
+    } else {
+      res.socket?.uncork?.();
     }
   }
 }

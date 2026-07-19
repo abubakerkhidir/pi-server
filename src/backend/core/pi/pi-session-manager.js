@@ -61,21 +61,38 @@ export class PiSessionManager {
     const streams = this.activeStreams.get(piSessionId);
     streams.add(abortController);
 
+    const debugTiming = (process.env.DEBUG_STREAM_TIMING||'1') === "1";
+    let eventCount = 0;
+    let lastEmitTs = Date.now();
+    const emitAsync = (payload) => {
+      setImmediate(() => {
+        if (debugTiming) {
+          const now = Date.now();
+          const gap = now - lastEmitTs;
+          lastEmitTs = now;
+          eventCount += 1;
+          const contentLen = typeof payload?.content === "string" ? payload.content.length : 0;
+          console.log(`[stream-timing] #${eventCount} type=${payload?.type} gapMs=${gap} len=${contentLen}`);
+        }
+        onEvent?.(payload);
+      });
+    };
+
     const unsub = session.subscribe((event) => {
       switch (event.type) {
         case "message_update": {
           const ev = event.assistantMessageEvent;
           if (ev.type === "text_delta") {
-            onEvent?.({ type: "text", content: ev.delta });
+            emitAsync({ type: "text", content: ev.delta });
           } else if (ev.type === "thinking_delta") {
-            onEvent?.({ type: "thinking", content: ev.delta });
+            emitAsync({ type: "thinking", content: ev.delta });
           }
           break;
         }
         case "message_end": {
           const msg = event.message;
           if (msg && msg.usage) {
-            onEvent?.({
+            emitAsync({
               type: "usage",
               input: msg.usage.input || 0,
               output: msg.usage.output || 0,
@@ -87,7 +104,7 @@ export class PiSessionManager {
           break;
         }
         case "tool_execution_start": {
-          onEvent?.({
+          emitAsync({
             type: "tool_start",
             id: event.toolCallId,
             name: event.toolName,
@@ -96,7 +113,7 @@ export class PiSessionManager {
           break;
         }
         case "tool_execution_update": {
-          onEvent?.({
+          emitAsync({
             type: "tool_update",
             id: event.toolCallId,
             name: event.toolName,
@@ -105,7 +122,7 @@ export class PiSessionManager {
           break;
         }
         case "tool_execution_end": {
-          onEvent?.({
+          emitAsync({
             type: "tool_end",
             id: event.toolCallId,
             name: event.toolName,
@@ -118,14 +135,14 @@ export class PiSessionManager {
         case "agent_end": {
           try {
             const ctxUsage = session.getContextUsage();
-            onEvent?.({
+            emitAsync({
               type: "context_usage",
               contextSize: ctxUsage?.tokens ?? null,
               contextWindow: ctxUsage?.contextWindow ?? null,
               contextPercent: ctxUsage?.percent ?? null,
             });
           } catch {}
-          onEvent?.({ type: "done" });
+          emitAsync({ type: "done" });
           break;
         }
       }
