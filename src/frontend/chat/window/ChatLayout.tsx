@@ -66,6 +66,21 @@ function computeSessionStats(records: ChatRecord[]): SessionTokenStats | undefin
   };
 }
 
+function cloneEntitiesSnapshot(entities: AgentReplyEntity[]): AgentReplyEntity[] {
+  return entities.map((entity) => {
+    if (entity.type === "msg") {
+      return { ...entity };
+    }
+    if (entity.type === "think") {
+      return { ...entity };
+    }
+    return {
+      ...entity,
+      args: entity.args ? { ...entity.args } : entity.args,
+    };
+  });
+}
+
 export default function ChatLayout({ onLogout }: ChatLayoutProps) {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -184,11 +199,21 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
   const onEntityUpdate = useCallback(
     (entities: AgentReplyEntity[]) => {
       console.log('got stream: ')
+      const entitiesSnapshot = cloneEntitiesSnapshot(entities);
       setChatState((prev) => {
         const last = prev.records[prev.records.length - 1];
         if (!last) return prev;
-        last.agentReply.entities = entities;
-        return { records: [...prev.records] };
+        const updatedLast: ChatRecord = {
+          ...last,
+          agentReply: {
+            ...last.agentReply,
+            entities: entitiesSnapshot,
+          },
+        };
+        return {
+          ...prev,
+          records: [...prev.records.slice(0, -1), updatedLast],
+        };
       });
     },
     [],
@@ -199,8 +224,17 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
       setChatState((prev) => {
         const last = prev.records[prev.records.length - 1];
         if (!last) return prev;
-        last.agentReply.tokenStats = stats;
-        return { records: [...prev.records] };
+        const updatedLast: ChatRecord = {
+          ...last,
+          agentReply: {
+            ...last.agentReply,
+            tokenStats: stats,
+          },
+        };
+        return {
+          ...prev,
+          records: [...prev.records.slice(0, -1), updatedLast],
+        };
       });
     },
     [],
