@@ -1,4 +1,4 @@
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, RefObject } from "react";
 import { createChatStream, type AbortChatStream } from "@/frontend/api";
 import type { AgentReplyEntity, MsgData, ToolData, ThinkData, TokenStats } from "@/frontend/types";
 
@@ -30,175 +30,171 @@ export interface OnSendInput{
   onSessionCreated?: OnSessionCreated, onTokenStats?: OnTokenStats
 }
 
-export function useChatStream({
-  currentSessionId,
-}: UseChatStreamOptions): UseChatStreamResult {
+export function useChatStream({currentSessionId,}: UseChatStreamOptions): UseChatStreamResult {
   const sessionIdRef = useRef<string | null>(null);
   const isProcessingRef = useRef(false);
   const entitiesRef = useRef<AgentReplyEntity[]>([]);
-  // Track entity start times for live duration calculation
-  const entityStartTimes = useRef<Map<string, number>>(new Map());
+  const entityStartTimes = useRef<Map<string, number>>(new Map());    // Track entity start times for live duration calculation
   const abortRef = useRef<AbortChatStream | null>(null);
+  const streamEnded = useRef(false);
 
-  const getLastEntity = <T extends AgentReplyEntity>(typ: string,list: AgentReplyEntity[]): T | undefined =>
-    [...list].reverse().find((e) => e.type === typ) as T | undefined;
-
-  const sealLastEntity = (typ: string, list: AgentReplyEntity[]) => {
-    const ent = getLastEntity<AgentReplyEntity>(typ, list);
-    if (ent) {
-      ent.sealed = true;
-      // Calculate duration from start time
-      const startedAt = entityStartTimes.current.get(ent.id);
-      if (startedAt) {
-        (ent as any).duration = Math.round((Date.now() - startedAt) / 1000);
-        entityStartTimes.current.delete(ent.id);
-      }
-      if (ent.type === "think") {
-        (ent as ThinkData).totalLength = (ent as ThinkData).content.length;
-      }
-    }
-  };
+  const sealLastEntity = (typ: string, list: AgentReplyEntity[]) => {sealLastEntityFun(typ, list, entityStartTimes);};
+  const resetState = useCallback(resetStateFun(sessionIdRef, isProcessingRef, abortRef), []);
+  const stopStream = useCallback(stopStreamFun(isProcessingRef, abortRef), []);
 
   const handleSend = useCallback((prms:OnSendInput) => {
-      const {prompt,files,onEntityUpdate,onStreamEnd,onSessionName,onSessionCreated,onTokenStats} = prms
-      if (!prompt && (!files || files.length === 0) || isProcessingRef.current) {
-        console.log('ignore send button: ',prompt, files?.length, isProcessingRef.current)
-        return;
-      }
-      isProcessingRef.current = true;
+    const {prompt,files,onEntityUpdate,onStreamEnd,onSessionName,onSessionCreated,onTokenStats} = prms
+    if (!prompt && (!files || files.length === 0) || isProcessingRef.current) {
+      console.log('ignore send button: ',prompt, files?.length, isProcessingRef.current)
+      return;
+    }
+    isProcessingRef.current = true;
+    entitiesRef.current = [{ type: "msg", id: nextMsgId(), content: "", sealed: false }]; // Fresh entity buffer for this stream
+    const markEnded = ()=> handleStreamEnded(streamEnded,isProcessingRef,abortRef,onStreamEnd)
+    try {
+      const streamHndlr = getStreamHandler(sessionIdRef, onSessionCreated, sealLastEntity, entitiesRef, entityStartTimes, onSessionName, onTokenStats, markEnded, onEntityUpdate);
+      const abort = createChatStream(currentSessionId,prompt,files?.length? files : undefined,streamHndlr,getErrHandler(entitiesRef, markEnded));
+      abortRef.current = abort;
+    } catch (er) {
+      console.log('Error in create chat-stream: ',er)
+      markEnded();
+    }
+  },[currentSessionId]);
+  
+  return { sessionId: sessionIdRef.current, handleSend, stopStream, resetState };
+}
 
-      // Fresh entity buffer for this stream
-      entitiesRef.current = [
-        { type: "msg", id: nextMsgId(), content: "", sealed: false },
-      ];
+const getLastEntity = <T extends AgentReplyEntity>(typ: string,list: AgentReplyEntity[]): T | undefined => [...list].reverse().find((e) => e.type === typ) as T | undefined;
 
-      let streamEnded = false;
-      const markEnded = () => {
-        if (streamEnded) {
-          console.log('ignoring markEnd event as stream was ended before...')
-          return;
+function getErrHandler(entitiesRef: RefObject<AgentReplyEntity[]>, markEnded: () => void){
+  return (err: Error) => {
+    console.log('Error in chat-stream processing: ', err);
+    if (err.name !== "AbortError") {
+      for (const ent of entitiesRef.current) ent.sealed = true;
+    }
+    markEnded();
+  };
+}
+
+function getStreamHandler(sessionIdRef: RefObject<string | null>, onSessionCreated: OnSessionCreated | undefined, sealLastEntity: (typ: string, list: AgentReplyEntity[]) => void, entitiesRef: RefObject<AgentReplyEntity[]>, entityStartTimes: RefObject<Map<string, number>>, onSessionName: OnSessionName | undefined, onTokenStats: OnTokenStats | undefined, markEnded: () => void, onEntityUpdate: OnEntityUpdate) {
+  return (event: string, data: Record<string, unknown>) => {
+    switch (event) {
+      case "session":
+        sessionIdRef.current = data.sessionId as string;
+        onSessionCreated?.(data.sessionId as string);
+        break;
+      case "thinking": {
+        sealLastEntity("msg", entitiesRef.current);
+        const content = String(data.content || "");
+        const lastThink = getLastEntity<ThinkData>("think", entitiesRef.current);
+        if (lastThink && !lastThink.sealed) {
+          lastThink.content += content;
+        } else {
+          const id = nextThinkId();
+          entityStartTimes.current.set(id, Date.now());
+          entitiesRef.current.push({ type: "think", id, content });
         }
-        streamEnded = true;
-        console.log('marking stream ended...')
-        isProcessingRef.current = false;
-        abortRef.current = null;
-        onStreamEnd();
-      };
-
-      try {
-        const abort = createChatStream(
-          currentSessionId,
-          prompt,
-          files?.length ? files : undefined,
-          (event: string, data: Record<string, unknown>) => {
-            switch (event) {
-              case "session":
-                sessionIdRef.current = data.sessionId as string;
-                onSessionCreated?.(data.sessionId as string);
-                break;
-
-              case "thinking": {
-                sealLastEntity("msg", entitiesRef.current);
-                const content = String(data.content || "");
-                const lastThink = getLastEntity<ThinkData>("think", entitiesRef.current);
-                if (lastThink && !lastThink.sealed) {
-                  lastThink.content += content;
-                } else {
-                  const id = nextThinkId();
-                  entityStartTimes.current.set(id, Date.now());
-                  entitiesRef.current.push({ type: "think", id, content });
-                }
-                break;
-              }
-              case "text": {
-                sealLastEntity("think", entitiesRef.current);
-                const content = String(data.content || "");
-                const lastMsg = getLastEntity<MsgData>("msg", entitiesRef.current);
-                if (lastMsg && !lastMsg.sealed) {
-                  lastMsg.content += content;
-                } else {
-                  entitiesRef.current.push({ type: "msg", id: nextMsgId(), content, sealed: false });
-                }
-                break;
-              }
-              case "tool_start": {
-                sealLastEntity("think", entitiesRef.current);
-                sealLastEntity("msg", entitiesRef.current);
-                const toolId = data.id as string;
-                entityStartTimes.current.set(toolId, Date.now());
-                entitiesRef.current.push({type: "tool",id: toolId, name: data.name as string,args: data.args});
-                break;
-              }
-              case "tool_update": {
-                updateTool(entitiesRef,data.id,t=>t.partialResult = data.partialResult)
-                break;
-              }
-              case "tool_end": {
-                const toolId = data.id as string;
-                updateTool(entitiesRef,toolId,t=>{
-                  t.result = data.result;
-                  t.isError = data?.isError === true;
-                  t.isComplete = true;
-                  t.sealed = true;
-                  const startedAt = entityStartTimes.current.get(toolId);
-                  if (startedAt) {
-                    t.duration = Math.round((Date.now() - startedAt) / 1000);
-                    entityStartTimes.current.delete(toolId);
-                  }
-                })
-                break;
-              }
-
-              case "session_name": {
-                onSessionName?.(data as { id: string; name: string; updated_at: string; created_at?: string });
-                break;
-              }
-
-              case "record_stats": {
-                // Per-record token stats sent by backend
-                onTokenStats?.(data as unknown as TokenStats);
-                break;
-              }
-
-              case "done":
-              case "error": {
-                for (const ent of entitiesRef.current) ent.sealed = true;
-                markEnded();
-                break;
-              }
-            }
-
-            onEntityUpdate(entitiesRef.current);
-          },
-          (err: Error) => {
-            console.log('Error in chat-stream processing: ',err)
-            if (err.name !== "AbortError") {
-              for (const ent of entitiesRef.current) ent.sealed = true;
-            }
-            markEnded();
-          },
-        );
-        abortRef.current = abort;
-      } catch (er) {
-        console.log('Error in create chat-stream: ',er)
-        markEnded();
+        break;
       }
-    },
-    [currentSessionId],
-  );
+      case "text": {
+        sealLastEntity("think", entitiesRef.current);
+        const content = String(data.content || "");
+        const lastMsg = getLastEntity<MsgData>("msg", entitiesRef.current);
+        if (lastMsg && !lastMsg.sealed) {
+          lastMsg.content += content;
+        } else {
+          entitiesRef.current.push({ type: "msg", id: nextMsgId(), content, sealed: false });
+        }
+        break;
+      }
+      case "tool_start": {
+        sealLastEntity("think", entitiesRef.current);
+        sealLastEntity("msg", entitiesRef.current);
+        const toolId = data.id as string;
+        entityStartTimes.current.set(toolId, Date.now());
+        entitiesRef.current.push({ type: "tool", id: toolId, name: data.name as string, args: data.args });
+        break;
+      }
+      case "tool_update": {
+        updateTool(entitiesRef, data.id, t => t.partialResult = data.partialResult);
+        break;
+      }
+      case "tool_end": {
+        const toolId = data.id as string;
+        updateTool(entitiesRef, toolId, t => {
+          t.result = data.result;
+          t.isError = data?.isError === true;
+          t.isComplete = true;
+          t.sealed = true;
+          const startedAt = entityStartTimes.current.get(toolId);
+          if (startedAt) {
+            t.duration = Math.round((Date.now() - startedAt) / 1000);
+            entityStartTimes.current.delete(toolId);
+          }
+        });
+        break;
+      }
+      case "session_name": {
+        onSessionName?.(data as { id: string; name: string; updated_at: string; created_at?: string; });
+        break;
+      }
+      case "record_stats": {
+        // Per-record token stats sent by backend
+        onTokenStats?.(data as unknown as TokenStats);
+        break;
+      }
+      case "done":
+      case "error": {
+        for (const ent of entitiesRef.current) ent.sealed = true;
+        markEnded();
+        break;
+      }
+    }
+    onEntityUpdate(entitiesRef.current);
+  }
+}
 
-  const resetState = useCallback(() => {
+function stopStreamFun(isProcessingRef: RefObject<boolean>, abortRef: RefObject<AbortChatStream | null>): () => void {
+  return () => {
+    isProcessingRef.current = false;
+    abortRef.current?.();
+  };
+}
+
+function resetStateFun(sessionIdRef: RefObject<string | null>, isProcessingRef: RefObject<boolean>, abortRef: RefObject<AbortChatStream | null>): () => void {
+  return () => {
     sessionIdRef.current = null;
     isProcessingRef.current = false;
     abortRef.current = null;
-  }, []);
+  };
+}
 
-  const stopStream = useCallback(() => {
+function sealLastEntityFun(typ: string, list: AgentReplyEntity[], entityStartTimes: RefObject<Map<string, number>>) {
+  const ent = getLastEntity<AgentReplyEntity>(typ, list);
+  if (ent) {
+    ent.sealed = true;
+    // Calculate duration from start time
+    const startedAt = entityStartTimes.current.get(ent.id);
+    if (startedAt) {
+      (ent as any).duration = Math.round((Date.now() - startedAt) / 1000);
+      entityStartTimes.current.delete(ent.id);
+    }
+    if (ent.type === "think") {
+      (ent as ThinkData).totalLength = (ent as ThinkData).content.length;
+    }
+  }
+}
+
+function handleStreamEnded(streamEnded: RefObject<boolean>,isProcessingRef: RefObject<boolean>, abortRef: RefObject<AbortChatStream | null>,onStreamEnd: OnStreamEnd) {
+    if (streamEnded.current) {
+      console.log('ignoring markEnd event as stream was ended before...');
+      return;
+    }
+    streamEnded.current = true;
+    console.log('marking stream ended...');
     isProcessingRef.current = false;
-    abortRef.current?.();
-  }, []);
-
-  return { sessionId: sessionIdRef.current, handleSend, stopStream, resetState };
+    abortRef.current = null;
+    onStreamEnd();
 }
 
 function updateTool(entitiesRef: React.RefObject<AgentReplyEntity[]>, toolId:any, updateFun:(t:ToolData)=>void){
