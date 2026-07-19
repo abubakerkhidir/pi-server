@@ -62,6 +62,9 @@ export async function handleChatStream(req, res){
       Connection: "keep-alive",
       "X-Accel-Buffering": "no",
     });
+    if (typeof res.flushHeaders === "function") {
+      res.flushHeaders();
+    }
 
     const writeEvent = createSSEWriter(res);
     writeVideoMetadata(writeEvent, videoInfo, images.length);

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { getSettings, getModels, getSessions, getUsername, summarizeSession } from "@/frontend/api";
-import type { ChatLayoutProps, UserSettings, ChatState, ChatRecord, Session, TokenStats, SessionTokenStats, ModelInfo } from "@/frontend/types";
+import type { ChatLayoutProps, UserSettings, ChatState, ChatRecord, Session, TokenStats, SessionTokenStats, ModelInfo, AgentReplyEntity } from "@/frontend/types";
 
 import ChatSidebar from "../../sidebar/ChatSidebar";
 import ChatHeader from "./ChatHeader";
@@ -182,7 +182,8 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
   }, []);
 
   const onEntityUpdate = useCallback(
-    (entities: import("@/frontend/types").AgentReplyEntity[]) => {
+    (entities: AgentReplyEntity[]) => {
+      console.log('got stream: ')
       setChatState((prev) => {
         const last = prev.records[prev.records.length - 1];
         if (!last) return prev;

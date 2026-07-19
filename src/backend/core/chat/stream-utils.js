@@ -9,6 +9,10 @@ export function createSSEWriter(res) {
   return function writeEvent(event, data) {
     if (!res.writableEnded) {
       res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      // If Express compression/proxy buffering is enabled, flush each SSE frame.
+      if (typeof res.flush === "function") {
+        res.flush();
+      }
     }
   };
 }

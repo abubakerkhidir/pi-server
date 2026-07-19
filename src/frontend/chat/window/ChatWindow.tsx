@@ -65,7 +65,7 @@ export default function ChatWindow({
 
   const parsedUser = (rec:any)=> marked.parse(rec.userHtml) || "";
 
-
+  console.log('render wind: ',renderedRecords.length)
   return (
     <div className="chat" id="chatMessages">
       {/* ── Global visibility controls ── */}

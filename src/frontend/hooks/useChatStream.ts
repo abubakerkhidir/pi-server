@@ -43,10 +43,7 @@ export function useChatStream({
   const entityStartTimes = useRef<Map<string, number>>(new Map());
   const abortRef = useRef<AbortChatStream | null>(null);
 
-  const getLastEntity = <T extends AgentReplyEntity>(
-    typ: string,
-    list: AgentReplyEntity[],
-  ): T | undefined =>
+  const getLastEntity = <T extends AgentReplyEntity>(typ: string,list: AgentReplyEntity[]): T | undefined =>
     [...list].reverse().find((e) => e.type === typ) as T | undefined;
 
   const sealLastEntity = (typ: string, list: AgentReplyEntity[]) => {
