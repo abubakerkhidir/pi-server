@@ -64,17 +64,6 @@ export function searchSessions(userId, query) {
   return { sessions, total: sessions.length };
 }
 
-/**
- * Store the session file path in database.
- */
-export function storeSessionFilePath(dbSessionId, sessionFile) {
-  try {
-    getDb().prepare("UPDATE session_metadata SET pi_session_file = ? WHERE id = ?").run(sessionFile, dbSessionId);
-  } catch (err) {
-    console.warn("Failed to store session file path:", err.message);
-  }
-}
-
 export function getSessionMeta(piSessionId) {
   return getDb().prepare("SELECT * FROM session_metadata WHERE id = ?").get(piSessionId);
 }
@@ -86,9 +75,9 @@ export function getSessionMetaByUser(sessionId, usId) {
 /**
  * Create a new session metadata record.
  */
-export function createSessionRecord(dbSessionId, userId, piSessionId, title) {
+export function createSessionRecord(dbSessionId, userId, piSessionId, title,sessionFile) {
   const db = getDb();
-  db.prepare("INSERT INTO session_metadata (id, user_id, pi_session_id, name) VALUES (?, ?, ?, ?)").run(dbSessionId, userId, piSessionId, title);
+  db.prepare("INSERT INTO session_metadata (id, user_id, pi_session_id, name,pi_session_file) VALUES (?, ?, ?, ?,?)").run(dbSessionId, userId, piSessionId, title,sessionFile);
 }
 
 /**

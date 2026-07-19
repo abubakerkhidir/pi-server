@@ -72,7 +72,7 @@ export async function handleChatStream(req, res){
     console.log('got pi session: ', piSessionId, sessionId, dbSessionId);
 
     // Initialize session and record
-    initSessionMetadata(dbSessionId, req.user.userId, piSessionId, effectivePrompt);
+    initSessionMetadata(dbSessionId, req.user.userId, piSessionId, effectivePrompt,session.sessionFile);
     const recordId = createChatRecord(dbSessionId, effectivePrompt);
     saveFileMetadata(recordId, dbSessionId, req.files);
 

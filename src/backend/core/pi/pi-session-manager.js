@@ -1,7 +1,7 @@
 import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
 import { getUserHomeDir } from "../db/user-dao.js";
-import { getSessionMeta, storeSessionFilePath } from "../db/session-dao.js";
+import { getSessionMeta} from "../db/session-dao.js";
 import { loadExistingSession } from "./pi-session-loader.js";
 import { createNewSession } from "./pi-new-session.js";
 import { warning } from "../../utils/logger.js";
@@ -22,7 +22,7 @@ export class PiSessionManager {
     // If we have a piSessionId, try to load the session from the database
     if (piSessionId) {
       const meta = getSessionMeta(piSessionId);
-      console.log('found session meta in db: ',meta)
+      console.log('found session meta in db: ', meta)
       if (meta?.pi_session_file && fs.existsSync(meta.pi_session_file)) {
         try {
           const session = await loadExistingSession(meta.pi_session_file, userId);
@@ -42,13 +42,8 @@ export class PiSessionManager {
     // Create a new session
     const sessionCwd = getUserHomeDir(userId);
     const session = await createNewSession(userId, sessionCwd);
-    console.log('created new sesion: ',session.sessionId)
+    console.log('created new sesion: ',session.sessionId,session.sessionFile)
     const newPiSessionId = session.sessionId || piSessionId || uuidv4();
-
-    // Store the session file path in the database for future loading
-    if (session.sessionFile) {
-      storeSessionFilePath(newPiSessionId, session.sessionFile);
-    }
 
     this.activeSessions.set(newPiSessionId, session);
     this.activeStreams.set(newPiSessionId, new Set());
