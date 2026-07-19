@@ -61,21 +61,50 @@ export class PiSessionManager {
     const streams = this.activeStreams.get(piSessionId);
     streams.add(abortController);
 
-    const debugTiming = (process.env.DEBUG_STREAM_TIMING||'1') === "1";
+    const debugTiming = process.env.DEBUG_STREAM_TIMING === "1";
+    const chunkDelayMs = Number(process.env.STREAM_CHUNK_DELAY_MS || 12);
     let eventCount = 0;
     let lastEmitTs = Date.now();
-    const emitAsync = (payload) => {
-      setImmediate(() => {
-        if (debugTiming) {
-          const now = Date.now();
-          const gap = now - lastEmitTs;
-          lastEmitTs = now;
-          eventCount += 1;
-          const contentLen = typeof payload?.content === "string" ? payload.content.length : 0;
-          console.log(`[stream-timing] #${eventCount} type=${payload?.type} gapMs=${gap} len=${contentLen}`);
+    const queue = [];
+    let draining = false;
+
+    const logSourceTiming = (payload) => {
+      if (!debugTiming) return;
+      const now = Date.now();
+      const gap = now - lastEmitTs;
+      lastEmitTs = now;
+      eventCount += 1;
+      const contentLen = typeof payload?.content === "string" ? payload.content.length : 0;
+      console.log(`[stream-timing] #${eventCount} type=${payload?.type} gapMs=${gap} len=${contentLen}`);
+    };
+
+    const enqueueEvent = (payload, paced = false) => {
+      logSourceTiming(payload);
+      queue.push({ payload, paced });
+      if (!draining) drainQueue();
+    };
+
+    const drainQueue = () => {
+      if (draining) return;
+      draining = true;
+
+      const step = () => {
+        if (queue.length === 0) {
+          draining = false;
+          return;
         }
+
+        const { payload, paced } = queue.shift();
         onEvent?.(payload);
-      });
+
+        if (paced && chunkDelayMs > 0) {
+          setTimeout(step, chunkDelayMs);
+        } else {
+          setImmediate(step);
+        }
+      };
+
+      step();
     };
 
     const unsub = session.subscribe((event) => {
@@ -83,16 +112,16 @@ export class PiSessionManager {
         case "message_update": {
           const ev = event.assistantMessageEvent;
           if (ev.type === "text_delta") {
-            emitAsync({ type: "text", content: ev.delta });
+            enqueueEvent({ type: "text", content: ev.delta }, true);
           } else if (ev.type === "thinking_delta") {
-            emitAsync({ type: "thinking", content: ev.delta });
+            enqueueEvent({ type: "thinking", content: ev.delta }, true);
           }
           break;
         }
         case "message_end": {
           const msg = event.message;
           if (msg && msg.usage) {
-            emitAsync({
+            enqueueEvent({
               type: "usage",
               input: msg.usage.input || 0,
               output: msg.usage.output || 0,
@@ -104,7 +133,7 @@ export class PiSessionManager {
           break;
         }
         case "tool_execution_start": {
-          emitAsync({
+          enqueueEvent({
             type: "tool_start",
             id: event.toolCallId,
             name: event.toolName,
@@ -113,7 +142,7 @@ export class PiSessionManager {
           break;
         }
         case "tool_execution_update": {
-          emitAsync({
+          enqueueEvent({
             type: "tool_update",
             id: event.toolCallId,
             name: event.toolName,
@@ -122,7 +151,7 @@ export class PiSessionManager {
           break;
         }
         case "tool_execution_end": {
-          emitAsync({
+          enqueueEvent({
             type: "tool_end",
             id: event.toolCallId,
             name: event.toolName,
@@ -135,14 +164,14 @@ export class PiSessionManager {
         case "agent_end": {
           try {
             const ctxUsage = session.getContextUsage();
-            emitAsync({
+            enqueueEvent({
               type: "context_usage",
               contextSize: ctxUsage?.tokens ?? null,
               contextWindow: ctxUsage?.contextWindow ?? null,
               contextPercent: ctxUsage?.percent ?? null,
             });
           } catch {}
-          emitAsync({ type: "done" });
+          enqueueEvent({ type: "done" });
           break;
         }
       }
