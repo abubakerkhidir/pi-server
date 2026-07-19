@@ -16,6 +16,18 @@ export function createSSEWriter(res) {
     }
   };
 }
+
+/**
+ * Write an SSE comment frame (heartbeat) to keep intermediaries from buffering.
+ */
+export function writeSSEComment(res, comment = "ping") {
+  if (!res.writableEnded) {
+    res.write(`: ${comment}\n\n`);
+    if (typeof res.flush === "function") {
+      res.flush();
+    }
+  }
+}
 /**
  * Write SSE metadata event for video info.
  */
