@@ -1,12 +1,13 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import type { ThinkingBlockProps } from "@/frontend/types";
 import { copyToClipboard, CopySvg } from "@/frontend/lib/clipboard";
 
 function ThinkingBlock({ id, content, sealed, duration, totalLength, userSettings }: ThinkingBlockProps) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const maxLines = userSettings.thinking_lines || 3;
   const maxH = expanded ? "" : maxLines * 21 + "px";
   const disVal = expanded ? "block" : "none";
+  useEffect(()=>{if(sealed)setExpanded(false)},[sealed])
 
   const title = duration
     ? `thinking for ${duration}s, ${(totalLength || content.length).toLocaleString()} characters`
