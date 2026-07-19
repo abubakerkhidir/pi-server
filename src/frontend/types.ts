@@ -186,10 +186,12 @@ export interface ToolBlockProps {
 }
 
 export interface ThinkingBlockProps {
-  entity: ThinkData;
-  userSettings: { tool_lines: number; thinking_lines: number };
-  content?: string;
+  id: string;
+  content: string;
   sealed?: boolean;
+  duration?: number;
+  totalLength?: number;
+  userSettings: { tool_lines: number; thinking_lines: number };
 }
 
 export interface SettingsModalProps {

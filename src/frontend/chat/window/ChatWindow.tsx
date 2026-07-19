@@ -153,7 +153,7 @@ function autoScroll(chatState:ChatState, prevRecordCount:any,manualScroll:any, c
 
     // During streaming: only auto-scroll if user hasn't scrolled up
     const hasUnsealed = lastRecord.agentReply.entities.some((e) => !e.sealed);
-    console.log('unsealed: ',hasUnsealed)
+    //console.log('unsealed: ',hasUnsealed)
     if (!hasUnsealed){
         //console.log('skip before unsealed')
         return;

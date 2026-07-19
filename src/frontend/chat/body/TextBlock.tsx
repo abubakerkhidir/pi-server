@@ -1,7 +1,12 @@
 import React, { } from "react";
-import type { MsgData } from "@/frontend/types";
 import { copyToClipboard, CopySvg } from "@/frontend/lib/clipboard";
 import { marked } from "marked";
+
+interface TextBlockProps {
+  id: string;
+  content: string;
+  sealed?: boolean;
+}
 
 function normalizeMessageContent(content: string): string {
   return content
@@ -9,10 +14,9 @@ function normalizeMessageContent(content: string): string {
     .replace(/(<[A-Za-z][^<>]*?)\s*\n\s*>/g, "$1>");
 }
 
-function TextBlock({ entity,content,sealed }: { entity: MsgData,content?: string, sealed?: boolean }) {
-  const parsed = marked.parse(normalizeMessageContent(entity.content)) || "";
+function TextBlock({ content }: TextBlockProps) {
+  const parsed = marked.parse(normalizeMessageContent(content)) || "";
 
-  console.log('render text: ',sealed, content?.length)
   return (
     <div className="entity-block entity-msg">
       <div className="markdown" dangerouslySetInnerHTML={{ __html: parsed as string }} />
@@ -20,7 +24,7 @@ function TextBlock({ entity,content,sealed }: { entity: MsgData,content?: string
         <button
           className="copy-btn"
           title="Copy content"
-          onClick={() => copyToClipboard(entity.content)}
+          onClick={() => copyToClipboard(content)}
         >
           <CopySvg size={12} />
         </button>
@@ -29,4 +33,8 @@ function TextBlock({ entity,content,sealed }: { entity: MsgData,content?: string
   );
 }
 
-export default React.memo(TextBlock)
+function areEqual(prev: TextBlockProps, next: TextBlockProps): boolean {
+  return prev.id === next.id && prev.sealed === next.sealed && prev.content === next.content;
+}
+
+export default React.memo(TextBlock, areEqual)

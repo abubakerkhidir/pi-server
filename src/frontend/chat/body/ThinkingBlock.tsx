@@ -2,16 +2,16 @@ import React, { useState } from "react";
 import type { ThinkingBlockProps } from "@/frontend/types";
 import { copyToClipboard, CopySvg } from "@/frontend/lib/clipboard";
 
-function ThinkingBlock({ entity, userSettings,content, sealed }: ThinkingBlockProps) {
-  const [expanded, setExpanded] = useState(false);  //!entity.sealed
+function ThinkingBlock({ id, content, sealed, duration, totalLength, userSettings }: ThinkingBlockProps) {
+  const [expanded, setExpanded] = useState(false);
   const maxLines = userSettings.thinking_lines || 3;
   const maxH = expanded ? "" : maxLines * 21 + "px";
   const disVal = expanded ? "block" : "none";
 
-  const title = entity.duration
-    ? `thinking for ${entity.duration}s, ${(entity.totalLength || entity.content.length).toLocaleString()} characters`
-    : `thinking, ${(entity.totalLength || entity.content.length).toLocaleString()} characters`;
-  console.log('render think: ',sealed,content?.length)
+  const title = duration
+    ? `thinking for ${duration}s, ${(totalLength || content.length).toLocaleString()} characters`
+    : `thinking, ${(totalLength || content.length).toLocaleString()} characters`;
+
   return (
     <div className="thinking-block">
       <div className="cb-header">
@@ -22,22 +22,33 @@ function ThinkingBlock({ entity, userSettings,content, sealed }: ThinkingBlockPr
         >
           {expanded ? "▲" : "▶"}
         </span>
-        {!entity.sealed && <span className="spinner" />}
+        {!sealed && <span className="spinner" />}
         <span className="cb-label">{title}</span>
         <button
           className="copy-btn header-copy"
           title="Copy content"
-          onClick={() => copyToClipboard(entity.content)}
+          onClick={() => copyToClipboard(content)}
         >
           <CopySvg size={12} />
         </button>
-        {entity.duration != null && <span className="tool-duration">{entity.duration}s</span>}
+        {duration != null && <span className="tool-duration">{duration}s</span>}
       </div>
       <div className="cb-body" style={{ maxHeight: maxH, display: disVal }}>
-        <div className="cb-content">{entity.content}</div>
+        <div className="cb-content">{content}</div>
       </div>
     </div>
   );
 }
 
-export default React.memo(ThinkingBlock)
+function areEqual(prev: ThinkingBlockProps, next: ThinkingBlockProps): boolean {
+  return (
+    prev.id === next.id &&
+    prev.sealed === next.sealed &&
+    prev.content === next.content &&
+    prev.duration === next.duration &&
+    prev.totalLength === next.totalLength &&
+    prev.userSettings.thinking_lines === next.userSettings.thinking_lines
+  );
+}
+
+export default React.memo(ThinkingBlock, areEqual)
