@@ -1,15 +1,16 @@
-import { useMemo, useRef, useEffect, useState, useCallback } from "react";
+import { CopyBtn } from "@/frontend/lib/clipboard";
+import { autoScroll, setupBtmVisibilityObserver, setupScrolListner } from "@/frontend/chat/window/chat-utils/scrollUtils";
+import type { ChatState, UserMsg, UserSettings } from "@/frontend/types";
 import { marked } from "marked";
-import type { ChatState, UserSettings, UserMsg } from "@/frontend/types";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AgentReply from "../body/AgentReply";
-import { copyToClipboard, CopySvg } from "@/frontend/lib/clipboard";
 
 marked.setOptions({ breaks: true, gfm: true });
 
 interface ChatWindowProps {
   chatState: ChatState;
   userSettings: UserSettings;
-  onScrollAwayChange?: (isAway: boolean) => void;
+  setShowScrollDown?: (isAway: boolean) => void;
   showScrollDown?: boolean;
   onScrollDownClick?: () => void;
 }
@@ -27,13 +28,7 @@ function escapeHtml(str: string): string {
     .replace(/'/g, "&#039;");
 }
 
-export default function ChatWindow({
-  chatState,
-  userSettings,
-  onScrollAwayChange,
-  showScrollDown,
-  onScrollDownClick,
-}: ChatWindowProps) {
+export default function ChatWindow({chatState,userSettings,setShowScrollDown,showScrollDown}: ChatWindowProps) {
   const chatRef = useRef<HTMLDivElement>(null);
   const prevRecordCount = useRef(chatState.records.length);
 
@@ -45,9 +40,11 @@ export default function ChatWindow({
   const hasAnyTools = useMemo(() => chatState.records.some((r) => r.agentReply.entities.some((e) => e.type === "tool")),[chatState.records]);
   const hasAnyThink = useMemo(() => chatState.records.some((r) => r.agentReply.entities.some((e) => e.type === "think")),[chatState.records]);
 
-  useEffect(()=>setupScrolListner(chatRef,onScrollAwayChange),[])
+  useEffect(()=>setupScrolListner(chatRef,setShowScrollDown),[])
+  useEffect(()=>setupBtmVisibilityObserver(chatRef,setShowScrollDown),[])
+
   // ── Auto-scroll during streaming ──
-  useEffect(() => autoScroll(chatState, prevRecordCount,showScrollDown, chatRef,onScrollAwayChange), [chatState.records]);
+  useEffect(() => autoScroll(chatState, prevRecordCount,showScrollDown, chatRef,setShowScrollDown), [chatState.records]);
   
   const renderedRecords = useMemo(() => {
     return chatState.records.map((record) => {
@@ -84,102 +81,21 @@ export default function ChatWindow({
         </div>
       )}
 
+      {/* ── user/agent records ── */}
       {renderedRecords.map((rec) => (
         <div key={rec.userId}>
           <div className="message user">
             <div className="message-header">You</div>
             <div className="message-content">
               <div className="markdown" dangerouslySetInnerHTML={{ __html: parsedUser(rec) }} />
-              <div className="message-footer">
-                <button
-                  className="copy-btn"
-                  title="Copy prompt"
-                  onClick={() => {
-                    const text = rec.userHtml.replace(/<[^>]*>/g, "");
-                    copyToClipboard(text);
-                  }}
-                >
-                  <CopySvg />
-                </button>
-              </div>
+              <div className="message-footer"><CopyBtn title="Copy prompt" divContent={rec.userHtml} /></div>
             </div>
           </div>
-          <AgentReply
-            recordId={rec.userId}
-            entities={rec.entities}
-            userSettings={userSettings}
-            globalToolsHidden={globalToolsHidden}
-            globalThinkHidden={globalThinkHidden}
-            tokenStats={rec.tokenStats}
-          />
+          <AgentReply recordId={rec.userId} entities={rec.entities} userSettings={userSettings} globalToolsHidden={globalToolsHidden}
+            globalThinkHidden={globalThinkHidden} tokenStats={rec.tokenStats}/>
         </div>
       ))}
       <div id="chatBtmRef" ref={chatRef} />
     </div>
   );
-}
-
-function setupScrolListner(chatRef:any, onScrollAwayChange:any){
-  const myDiv = chatRef.current?.parentElement;
-  if(!myDiv) return
-  const listner = (event:any) => {
-    //console.log('scrol-listner...')
-    if (event.deltaY < 0) {
-      //console.log('User scrolled UP');
-      onScrollAwayChange(true)
-    }
-  }
-  myDiv.addEventListener('wheel',listner)
-  return ()=>{
-    if(myDiv)
-      myDiv.removeEventListener('wheel',listner)
-  }
-}
-
-function autoScroll(chatState:ChatState, prevRecordCount:any,manualScroll:any, chatRef:any,onScrollAwayChange:any){
-    const lastRecord = chatState.records[chatState.records.length-1]
-    if(!lastRecord){
-        console.log('skip as no record')
-        return
-    }
-    const recordsAdded = chatState.records.length > prevRecordCount.current;
-    prevRecordCount.current = chatState.records.length;
-    if (recordsAdded) {
-      onScrollAwayChange?.(false)
-      handleScrolToBtm(chatRef, false);
-      //console.log('scrolled due to new records')
-      return;
-    }
-
-    // During streaming: only auto-scroll if user hasn't scrolled up
-    const hasUnsealed = lastRecord.agentReply.entities.some((e) => !e.sealed);
-    //console.log('unsealed: ',hasUnsealed)
-    if (!hasUnsealed){
-        //console.log('skip before unsealed')
-        return;
-    }
-    if (manualScroll){
-        //console.log('skipped due to manual scroll')
-        return;
-    }
-
-    handleScrolToBtm(chatRef, false);
-}
-
-export function scrollToBtm(){
-  handleScrollToBtmDiv(document.getElementById("chatBtmRef"), false);
-}
-
-export function handleScrolToBtm(endRef: React.RefObject<HTMLDivElement | null>, small: boolean) {
-  handleScrollToBtmDiv(endRef.current, small);
-}
-
-export function handleScrollToBtmDiv(btmDiv: any | null, small: boolean) {
-  btmDiv?.scrollIntoView({ behavior: "smooth" });
-  setTimeout(() => {
-    btmDiv?.scrollIntoView({ behavior: "smooth" });
-    if (small) {
-      window.scrollTo(0, document.body.scrollHeight);
-    }
-  }, 100);
 }

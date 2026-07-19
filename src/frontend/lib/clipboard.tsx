@@ -62,3 +62,21 @@ export function TextSvg({ size = 14 }: { size?: number }) {
     </svg>
   );
 }
+
+export function CopyBtn(p:{divContent?:string, className?:string,title:string}){
+  return (
+    <button className={p.className??"copy-btn"} title={p.title} onClick={getCopyBtnHandler(p.divContent)}>
+      <CopySvg />
+    </button>
+  )
+}
+
+
+function getCopyBtnHandler(divContent?: string){
+  return () => {
+    if(divContent){
+      const text = divContent.replace(/<[^>]*>/g, "");
+      copyToClipboard(text);
+    }
+  };
+}

@@ -20,17 +20,14 @@ export type OnTokenStats = (stats: TokenStats) => void;
 
 export interface UseChatStreamResult {
   sessionId: string | null;
-  handleSend: (
-    prompt: string,
-    files: File[] | undefined,
-    onEntityUpdate: OnEntityUpdate,
-    onStreamEnd: OnStreamEnd,
-    onSessionName?: OnSessionName,
-    onSessionCreated?: OnSessionCreated,
-    onTokenStats?: OnTokenStats,
-  ) => void;
+  handleSend: (prms:OnSendInput) => void;
   stopStream: () => void;
   resetState: () => void;
+}
+
+export interface OnSendInput{
+  prompt: string, files: File[] | undefined, onEntityUpdate: OnEntityUpdate, onStreamEnd: OnStreamEnd, onSessionName?: OnSessionName, 
+  onSessionCreated?: OnSessionCreated, onTokenStats?: OnTokenStats
 }
 
 export function useChatStream({
@@ -62,17 +59,8 @@ export function useChatStream({
     }
   };
 
-  const handleSend = useCallback(
-    (
-      prompt: string,
-      files: File[] | undefined,
-      onEntityUpdate: OnEntityUpdate,
-      onStreamEnd: OnStreamEnd,
-      onSessionName?: OnSessionName,
-      onSessionCreated?: OnSessionCreated,
-      onTokenStats?: OnTokenStats,
-    ) => {
-
+  const handleSend = useCallback((prms:OnSendInput) => {
+      const {prompt,files,onEntityUpdate,onStreamEnd,onSessionName,onSessionCreated,onTokenStats} = prms
       if (!prompt && (!files || files.length === 0) || isProcessingRef.current) {
         console.log('ignore send button: ',prompt, files?.length, isProcessingRef.current)
         return;
