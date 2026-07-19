@@ -83,11 +83,11 @@ export interface ToolData {
   type: "tool";
   id: string; // from agent (tool_call_id)
   name: string;
-  args: Record<string, unknown> | undefined;
-  partialResult: unknown | undefined;
-  result: unknown | undefined;
-  isError: boolean;
-  isComplete: boolean;
+  args?: any;
+  partialResult?: unknown ;
+  result?: unknown;
+  isError?: boolean;
+  isComplete?: boolean;
   sealed?: boolean;
   duration?: number; // seconds
 }

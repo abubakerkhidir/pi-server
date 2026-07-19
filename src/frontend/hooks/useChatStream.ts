@@ -125,7 +125,6 @@ export function useChatStream({
                 }
                 break;
               }
-
               case "text": {
                 sealLastEntity("think", entitiesRef.current);
                 const content = String(data.content || "");
@@ -137,55 +136,31 @@ export function useChatStream({
                 }
                 break;
               }
-
               case "tool_start": {
                 sealLastEntity("think", entitiesRef.current);
                 sealLastEntity("msg", entitiesRef.current);
                 const toolId = data.id as string;
                 entityStartTimes.current.set(toolId, Date.now());
-                entitiesRef.current.push({
-                  type: "tool",
-                  id: toolId,
-                  name: data.name as string,
-                  args: data.args as Record<string, unknown> | undefined,
-                  partialResult: undefined,
-                  result: undefined,
-                  isError: false,
-                  isComplete: false,
-                });
+                entitiesRef.current.push({type: "tool",id: toolId, name: data.name as string,args: data.args});
                 break;
               }
-
               case "tool_update": {
-                const toolId = data.id as string;
-                const idx = entitiesRef.current.findIndex(
-                  (e) =>
-                    e.type === "tool" &&
-                    (e as ToolData).id === toolId &&
-                    !(e as ToolData).isComplete,
-                );
-                if (idx >= 0) (entitiesRef.current[idx] as ToolData).partialResult = data.partialResult;
+                updateTool(entitiesRef,data.id,t=>t.partialResult = data.partialResult)
                 break;
               }
-
               case "tool_end": {
                 const toolId = data.id as string;
-                const idx = entitiesRef.current.findIndex(
-                  (e) =>
-                    e.type === "tool" &&
-                    (e as ToolData).id === toolId &&
-                    !(e as ToolData).isComplete,
-                );
-                if (idx >= 0) {
-                  (entitiesRef.current[idx] as ToolData).result = data.result;
-                  (entitiesRef.current[idx] as ToolData).isError = !!data.isError;
-                  (entitiesRef.current[idx] as ToolData).isComplete = true;
+                updateTool(entitiesRef,toolId,t=>{
+                  t.result = data.result;
+                  t.isError = data?.isError === true;
+                  t.isComplete = true;
+                  t.sealed = true;
                   const startedAt = entityStartTimes.current.get(toolId);
                   if (startedAt) {
-                    (entitiesRef.current[idx] as any).duration = Math.round((Date.now() - startedAt) / 1000);
+                    t.duration = Math.round((Date.now() - startedAt) / 1000);
                     entityStartTimes.current.delete(toolId);
                   }
-                }
+                })
                 break;
               }
 
@@ -240,3 +215,19 @@ export function useChatStream({
 
   return { sessionId: sessionIdRef.current, handleSend, stopStream, resetState };
 }
+
+function updateTool(entitiesRef: React.RefObject<AgentReplyEntity[]>, toolId:any, updateFun:(t:ToolData)=>void){
+  const t = findTool(entitiesRef,toolId)
+  if(t)
+    updateFun(t)  
+}
+
+function findTool(entitiesRef: React.RefObject<AgentReplyEntity[]>, toolId?:string){
+  const idx = entitiesRef.current.findIndex((e)=>isMatchToolId(e, toolId));
+  return idx >= 0? (entitiesRef.current[idx] as ToolData) : undefined;
+}
+
+function isMatchToolId(e: AgentReplyEntity, toolId?: string): unknown {
+  return e.type === "tool" && (e as ToolData).id === toolId && !(e as ToolData).isComplete;
+}
+

@@ -4,6 +4,7 @@ import { getUserHomeDir } from "../db/user-dao.js";
 import { getSessionMeta, storeSessionFilePath } from "../db/session-dao.js";
 import { loadExistingSession } from "./pi-session-loader.js";
 import { createNewSession } from "./pi-new-session.js";
+import { warning } from "../../utils/logger.js";
 
 export class PiSessionManager {
   constructor(cwd) {
@@ -17,11 +18,11 @@ export class PiSessionManager {
     if (piSessionId && this.activeSessions.has(piSessionId)) {
       return { session: this.activeSessions.get(piSessionId), piSessionId };
     }
-
+    console.log('getOrCreateSession: ',userId, piSessionId)
     // If we have a piSessionId, try to load the session from the database
     if (piSessionId) {
       const meta = getSessionMeta(piSessionId);
-
+      console.log('found session meta in db: ',meta)
       if (meta?.pi_session_file && fs.existsSync(meta.pi_session_file)) {
         try {
           const session = await loadExistingSession(meta.pi_session_file, userId);
@@ -33,6 +34,8 @@ export class PiSessionManager {
         } catch (err) {
           console.warn("Failed to load session from file:", err.message);
         }
+      }else{
+        warning('session file not found: ',meta?.pi_session_file)
       }
     }
 
