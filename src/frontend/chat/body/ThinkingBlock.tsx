@@ -41,15 +41,4 @@ function ThinkingBlock({ id, content, sealed, duration, totalLength, userSetting
   );
 }
 
-function areEqual(prev: ThinkingBlockProps, next: ThinkingBlockProps): boolean {
-  return (
-    prev.id === next.id &&
-    prev.sealed === next.sealed &&
-    prev.content === next.content &&
-    prev.duration === next.duration &&
-    prev.totalLength === next.totalLength &&
-    prev.userSettings.thinking_lines === next.userSettings.thinking_lines
-  );
-}
-
-export default React.memo(ThinkingBlock, areEqual)
+export default React.memo(ThinkingBlock)

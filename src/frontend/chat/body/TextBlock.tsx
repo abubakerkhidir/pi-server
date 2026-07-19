@@ -33,8 +33,4 @@ function TextBlock({ content, sealed }: TextBlockProps) {
   );
 }
 
-function areEqual(prev: TextBlockProps, next: TextBlockProps): boolean {
-  return prev.id === next.id && prev.sealed === next.sealed && prev.content === next.content;
-}
-
-export default React.memo(TextBlock, areEqual)
+export default React.memo(TextBlock)

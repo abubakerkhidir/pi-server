@@ -199,21 +199,11 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
   const onEntityUpdate = useCallback(
     (entities: AgentReplyEntity[]) => {
       console.log('got stream: ')
-      const entitiesSnapshot = cloneEntitiesSnapshot(entities);
       setChatState((prev) => {
         const last = prev.records[prev.records.length - 1];
         if (!last) return prev;
-        const updatedLast: ChatRecord = {
-          ...last,
-          agentReply: {
-            ...last.agentReply,
-            entities: entitiesSnapshot,
-          },
-        };
-        return {
-          ...prev,
-          records: [...prev.records.slice(0, -1), updatedLast],
-        };
+        last.agentReply.entities = entities;
+        return { records: [...prev.records] };
       });
     },
     [],
@@ -224,17 +214,8 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
       setChatState((prev) => {
         const last = prev.records[prev.records.length - 1];
         if (!last) return prev;
-        const updatedLast: ChatRecord = {
-          ...last,
-          agentReply: {
-            ...last.agentReply,
-            tokenStats: stats,
-          },
-        };
-        return {
-          ...prev,
-          records: [...prev.records.slice(0, -1), updatedLast],
-        };
+        last.agentReply.tokenStats = stats;
+        return { records: [...prev.records] };
       });
     },
     [],
@@ -313,6 +294,7 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
     setCurrentSessionId(null);
     resetState();
     reloadSessions();
+    setShowScrollDown(false)
     // Clear URL hash so a fresh session will be created
     if (window.location.hash) {
       window.history.replaceState(null, "", window.location.pathname);

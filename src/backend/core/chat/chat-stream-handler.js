@@ -6,7 +6,7 @@ import { getPiManager, removeEntityBuffer, setEntityBuffer } from "./state.js";
 import { processUploadedFiles } from "./file-processor.js";
 import { createEntityBuffer } from "./entity-buffer.js";
 import { createStreamEventHandler } from "./event-handler.js";
-import { createSSEWriter, writeSSEComment, wrapOnEventForNaming, writeDoneEvent, writeErrorResponse, writeSessionEvent, writeVideoMetadata } from "./stream-utils.js";
+import { createSSEWriter, wrapOnEventForNaming, writeDoneEvent, writeErrorResponse, writeSessionEvent, writeVideoMetadata } from "./stream-utils.js";
 import {initSessionMetadata,generateSessionNameIfNeeded} from "./session-setup.js";
 import { createChatRecord } from "../db/chat-record-dao.js";
 import { saveFileMetadata } from "../db/chat-files-dao.js";
@@ -48,7 +48,6 @@ export async function handleChatStream(req, res){
   let videoInfo = null;
   const tempDirs = [];
   let dbSessionId = undefined
-  let heartbeat = null;
   try {
     // Process uploaded files
     const fileResult = await processUploadedFiles(req.files);
@@ -59,25 +58,13 @@ export async function handleChatStream(req, res){
     // Setup SSE
     res.writeHead(200, {
       "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache, no-transform",
+      "Cache-Control": "no-cache",
       Connection: "keep-alive",
       "X-Accel-Buffering": "no",
-      "Content-Encoding": "identity",
     });
-    res.socket?.setNoDelay?.(true);
-    res.socket?.setKeepAlive?.(true, 15000);
-    res.socket?.setTimeout?.(0);
     if (typeof res.flushHeaders === "function") {
       res.flushHeaders();
     }
-
-    // Initial padding/comment frame helps some clients/proxies start streaming immediately.
-    writeSSEComment(res, "stream-open");
-
-    // Keep the stream active to reduce buffering at intermediaries and in browsers.
-    heartbeat = setInterval(() => {
-      writeSSEComment(res, "hb");
-    }, 1000);
 
     const writeEvent = createSSEWriter(res);
     writeVideoMetadata(writeEvent, videoInfo, images.length);
@@ -132,10 +119,6 @@ export async function handleChatStream(req, res){
     console.log('Error in pi session: ',err)
     writeErrorResponse(res, err.message);
   } finally {
-    if (heartbeat) {
-      clearInterval(heartbeat);
-      heartbeat = null;
-    }
     scheduleCleanup(tempDirs);
     removeEntityBuffer(dbSessionId);
   }

@@ -61,67 +61,21 @@ export class PiSessionManager {
     const streams = this.activeStreams.get(piSessionId);
     streams.add(abortController);
 
-    const debugTiming = process.env.DEBUG_STREAM_TIMING === "1";
-    const chunkDelayMs = Number(process.env.STREAM_CHUNK_DELAY_MS || 12);
-    let eventCount = 0;
-    let lastEmitTs = Date.now();
-    const queue = [];
-    let draining = false;
-
-    const logSourceTiming = (payload) => {
-      if (!debugTiming) return;
-      const now = Date.now();
-      const gap = now - lastEmitTs;
-      lastEmitTs = now;
-      eventCount += 1;
-      const contentLen = typeof payload?.content === "string" ? payload.content.length : 0;
-      console.log(`[stream-timing] #${eventCount} type=${payload?.type} gapMs=${gap} len=${contentLen}`);
-    };
-
-    const enqueueEvent = (payload, paced = false) => {
-      logSourceTiming(payload);
-      queue.push({ payload, paced });
-      if (!draining) drainQueue();
-    };
-
-    const drainQueue = () => {
-      if (draining) return;
-      draining = true;
-
-      const step = () => {
-        if (queue.length === 0) {
-          draining = false;
-          return;
-        }
-
-        const { payload, paced } = queue.shift();
-        onEvent?.(payload);
-
-        if (paced && chunkDelayMs > 0) {
-          setTimeout(step, chunkDelayMs);
-        } else {
-          setImmediate(step);
-        }
-      };
-
-      step();
-    };
-
     const unsub = session.subscribe((event) => {
       switch (event.type) {
         case "message_update": {
           const ev = event.assistantMessageEvent;
           if (ev.type === "text_delta") {
-            enqueueEvent({ type: "text", content: ev.delta }, true);
+            onEvent?.({ type: "text", content: ev.delta });
           } else if (ev.type === "thinking_delta") {
-            enqueueEvent({ type: "thinking", content: ev.delta }, true);
+            onEvent?.({ type: "thinking", content: ev.delta });
           }
           break;
         }
         case "message_end": {
           const msg = event.message;
           if (msg && msg.usage) {
-            enqueueEvent({
+            onEvent?.({
               type: "usage",
               input: msg.usage.input || 0,
               output: msg.usage.output || 0,
@@ -133,7 +87,7 @@ export class PiSessionManager {
           break;
         }
         case "tool_execution_start": {
-          enqueueEvent({
+          onEvent?.({
             type: "tool_start",
             id: event.toolCallId,
             name: event.toolName,
@@ -142,7 +96,7 @@ export class PiSessionManager {
           break;
         }
         case "tool_execution_update": {
-          enqueueEvent({
+          onEvent?.({
             type: "tool_update",
             id: event.toolCallId,
             name: event.toolName,
@@ -151,7 +105,7 @@ export class PiSessionManager {
           break;
         }
         case "tool_execution_end": {
-          enqueueEvent({
+          onEvent?.({
             type: "tool_end",
             id: event.toolCallId,
             name: event.toolName,
@@ -164,14 +118,14 @@ export class PiSessionManager {
         case "agent_end": {
           try {
             const ctxUsage = session.getContextUsage();
-            enqueueEvent({
+            onEvent?.({
               type: "context_usage",
               contextSize: ctxUsage?.tokens ?? null,
               contextWindow: ctxUsage?.contextWindow ?? null,
               contextPercent: ctxUsage?.percent ?? null,
             });
           } catch {}
-          enqueueEvent({ type: "done" });
+          onEvent?.({ type: "done" });
           break;
         }
       }

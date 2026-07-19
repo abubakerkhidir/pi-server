@@ -9,30 +9,8 @@ export function createSSEWriter(res) {
   return function writeEvent(event, data) {
     if (!res.writableEnded) {
       res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-      // If Express compression/proxy buffering is enabled, flush each SSE frame.
-      if (typeof res.flush === "function") {
-        res.flush();
-      } else {
-        // In plain Express (no compression middleware), res.flush is usually undefined.
-        // Best-effort socket uncork nudges buffered chunks to the client.
-        res.socket?.uncork?.();
-      }
     }
   };
-}
-
-/**
- * Write an SSE comment frame (heartbeat) to keep intermediaries from buffering.
- */
-export function writeSSEComment(res, comment = "ping") {
-  if (!res.writableEnded) {
-    res.write(`: ${comment}\n\n`);
-    if (typeof res.flush === "function") {
-      res.flush();
-    } else {
-      res.socket?.uncork?.();
-    }
-  }
 }
 /**
  * Write SSE metadata event for video info.

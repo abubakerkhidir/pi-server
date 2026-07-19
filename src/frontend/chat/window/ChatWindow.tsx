@@ -183,4 +183,3 @@ export function handleScrollToBtmDiv(btmDiv: any | null, small: boolean) {
     }
   }, 100);
 }
-
