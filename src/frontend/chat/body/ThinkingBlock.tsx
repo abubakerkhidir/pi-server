@@ -11,7 +11,8 @@ function ThinkingBlock({ id, content, sealed, duration, totalLength, userSetting
   const title = duration
     ? `thinking for ${duration}s, ${(totalLength || content.length).toLocaleString()} characters`
     : `thinking, ${(totalLength || content.length).toLocaleString()} characters`;
-
+  
+  console.log('render think: ',sealed,content.length)
   return (
     <div className="thinking-block">
       <div className="cb-header">

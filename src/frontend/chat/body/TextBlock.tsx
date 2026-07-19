@@ -14,9 +14,9 @@ function normalizeMessageContent(content: string): string {
     .replace(/(<[A-Za-z][^<>]*?)\s*\n\s*>/g, "$1>");
 }
 
-function TextBlock({ content }: TextBlockProps) {
+function TextBlock({ content, sealed }: TextBlockProps) {
   const parsed = marked.parse(normalizeMessageContent(content)) || "";
-
+  console.log('render text: ',sealed,content.length)
   return (
     <div className="entity-block entity-msg">
       <div className="markdown" dangerouslySetInnerHTML={{ __html: parsed as string }} />
