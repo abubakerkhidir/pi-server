@@ -30,7 +30,6 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
   const [showScrollDown, setShowScrollDown] = useState(false);
   const [chatState, setChatState] = useState<ChatState>({ records: [] });
   const pendingSummaryRef = useRef<string | null>(null);
-  const isProcessingRef = useRef(isProcessing);
   const loadMoreOffsetRef = useRef(0);
   
   //callback functions
@@ -49,10 +48,9 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
 
   //effects
   useEffect(sideBarResizeListner(setSidebarCollapsed), []);
-  useEffect(() => {isProcessingRef.current = isProcessing;}, [isProcessing]);
   useEffect(() => {loadSessions(false);}, [loadSessions]);  // Initial fetch — runs after mount, doesn't block render
   useEffect(getSettingsLoaderFun(setUserSettings, userSettings, setCurrentModel), []);
-  useEffect(getPageUrlHashEffect(isProcessingRef, loadAndShowSession), []);
+  useEffect(getPageUrlHashEffect(isProcessing, loadAndShowSession), []);
 
   return (
     <div className="chat-layout">

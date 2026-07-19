@@ -4,6 +4,7 @@ import type { ChatState, AgentReplyEntity } from "../types";
 
 export function useStreamEndHandler(setIsProcessing: Dispatch<SetStateAction<boolean>>, currentSessionId: string|null) {
   return useCallback(() => {
+    console.log('got stream-end event...')
     setIsProcessing(false);
     // Ensure URL hash reflects the session (in case session_name didn't fire)
     const sid = currentSessionId;

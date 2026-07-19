@@ -40,13 +40,13 @@ export function getNewChatHandler(setChatState: Dispatch<SetStateAction<ChatStat
     }
     setTimeout(() => { scrollToBtm(); setTimeout(() => { scrollToBtm(); }, 500); }, 500);
   };
-}export function getPageUrlHashEffect(isProcessingRef: RefObject<boolean>, loadAndShowSession: (sessionId: string) => Promise<void>): import("react").EffectCallback {
+}export function getPageUrlHashEffect(isProcessing: boolean, loadAndShowSession: (sessionId: string) => Promise<void>): import("react").EffectCallback {
   return () => {
     const handleHashChange = async () => {
       const hash = window.location.hash.replace("#", "");
       if (!hash) return;
       // Don't reload session mid-stream — that would wipe the streaming state
-      if (isProcessingRef.current) return;
+      if (isProcessing) return;
       await loadAndShowSession(hash);
     };
     window.addEventListener("hashchange", handleHashChange);
