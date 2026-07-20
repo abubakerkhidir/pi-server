@@ -21,6 +21,7 @@ function handleTextEvent(event, entityBuffer, writeEvent, state) {
  */
 function handleThinkingEvent(event, entityBuffer, writeEvent, state) {
   if (state.firstTokenTime === null) state.firstTokenTime = Date.now();
+  state.thinkChars = (state.thinkChars || 0) + (event.content?.length || 0);
   const lastThink = entityBuffer.lastEntity('think');
   if (lastThink && !lastThink.saved) {
     lastThink.content += event.content;
@@ -107,6 +108,10 @@ function handleContextUsageEvent(event, state) {
  */
 function handleDoneEvent(entityBuffer, recordId, dbSessionId, responseStartTime, state) {
   entityBuffer.flushAll();
+  // If provider didn't report reasoning tokens but thinking content exists, estimate from char count
+  if (state.usageData && !state.usageData.think_tokens && state.thinkChars > 0) {
+    state.usageData.think_tokens = Math.round(state.thinkChars / 4);
+  }
   const tokenStats = calculateTokenStats(state.usageData, responseStartTime, state) //.firstTokenTime);
   saveTokenStats(recordId, tokenStats);
   updateSessionContextUsage(dbSessionId, state.contextUsage);
@@ -121,7 +126,7 @@ function handleDoneEvent(entityBuffer, recordId, dbSessionId, responseStartTime,
 export function createStreamEventHandler(params) {
   const {writeEvent,entityBuffer,dbSessionId,recordId,responseStartTime,userId,req} = params;
 
-  const state = {firstTokenTime: null,usageData: null,contextUsage: null};
+  const state = {firstTokenTime: null,usageData: null,contextUsage: null,thinkChars: 0};
 
   // Handler params that need to be passed to async handlers
   const handlerParams = {recordId,dbSessionId,userId,req,};
