@@ -69,7 +69,7 @@ async function apiFetch(path: string, options: ApiFetchOptions = {}): Promise<Re
 
 async function apiCall<T>(method: "POST"|"PUT", path: string, body?: any) {
   const res = await apiFetch(path, {
-    method: "POST",
+    method: method,
     headers: body !== undefined ? { "Content-Type": "application/json" } : {},
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });

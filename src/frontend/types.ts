@@ -115,6 +115,16 @@ export interface TokenStats {
   prompt_token_s: number;
   output_token_s: number;
   ttft_ms: number;
+
+  total_prompt: number;
+  total_think: number;
+  total_output: number;
+  total_text: number;
+  context_used_pct: number;
+  context_size: number;
+  context_used?: number;  // actual context tokens used (from pi SDK)
+  context_percent?: number;  // percentage of context used (from pi SDK)
+  ttft_avg_ms: number;
 }
 
 export interface SessionTokenStats {

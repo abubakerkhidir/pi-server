@@ -107,7 +107,7 @@ export class PiSessionManager {
         }
         case "message_end": {
           const msg = event.message;
-          //console.log('msg-End event: ',msg.usage)
+          console.log('msg-End event: ',msg.usage)
           if (msg && msg.usage) {
             onEvent?.({
               type: "usage",

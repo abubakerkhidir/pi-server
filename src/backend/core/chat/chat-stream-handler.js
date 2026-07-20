@@ -113,6 +113,8 @@ export async function handleChatStream(req, res){
     // Post-prompt tasks
     await generateSessionNameIfNeeded(dbSessionId, effectivePrompt, getFullText(), writeEvent,req);
 
+    console.log('session stats: ',session.getSessionStats(), session.getContextUsage())
+    
     // Signal completion
     writeDoneEvent(writeEvent, res, lastEvent);
     removeEntityBuffer(dbSessionId);

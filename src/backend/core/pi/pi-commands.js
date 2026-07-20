@@ -44,6 +44,7 @@ export async function executeBuiltinCommand(commandName, args, session, onEvent)
         tokensAfter,
         savedPct: saved,
       });
+      console.log('session stats: ',session.getSessionStats(), session.getContextUsage())
       //onEvent?.({ type: "text", content: `\nDone. Context compacted from ${tokensBefore} → ${tokensAfter} tokens (${saved}% saved).` });
     } catch (err) {
       onEvent?.({ type: "text", content: `\nCompaction failed: ${err.message}` });
@@ -53,3 +54,13 @@ export async function executeBuiltinCommand(commandName, args, session, onEvent)
   }
   throw new Error(`Unknown built-in command: ${commandName}`);
 }
+
+//todo send token-usage after compact, make sesion-stats in chatlayout uses backend event instead of calculating
+//call session. getSessionStats(): SessionStats; and getContextUsage()
+//tokens: {
+    //     input: number;
+    //     output: number;
+    //     cacheRead: number;
+    //     cacheWrite: number;
+    //     total: number;
+    // };
