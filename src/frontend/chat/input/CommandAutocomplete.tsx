@@ -18,9 +18,12 @@ export default function CommandAutocomplete({ value, sessionId, onSelect }: Comm
   const [activeIdx, setActiveIdx] = useState(0);
   const fetchedForSession = useRef<string | null>(null);
 
-  // Lazily fetch commands when user starts typing a slash
   const isSlashMode = value.startsWith("/") && !value.includes(" ");
+  const query = isSlashMode ? value.slice(1).toLowerCase() : "";
+  const matches = isSlashMode ? commands.filter((c) => c.name.toLowerCase().startsWith(query)) : [];
+  const clampedIdx = Math.min(activeIdx, Math.max(matches.length - 1, 0));
 
+  // Lazily fetch commands when user starts typing a slash
   useEffect(() => {
     if (!isSlashMode) return;
     if (fetchedForSession.current === sessionId) return;
@@ -33,28 +36,26 @@ export default function CommandAutocomplete({ value, sessionId, onSelect }: Comm
     fetchedForSession.current = null;
   }, [sessionId]);
 
-  if (!isSlashMode || commands.length === 0) return null;
+  // Reset active index when query changes
+  useEffect(() => { setActiveIdx(0); }, [query]);
 
-  const query = value.slice(1).toLowerCase();
-  const matches = commands.filter((c) => c.name.toLowerCase().startsWith(query));
-  if (matches.length === 0) return null;
-
-  const clampedIdx = Math.min(activeIdx, matches.length - 1);
-
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === "ArrowDown") { e.preventDefault(); setActiveIdx((i) => Math.min(i + 1, matches.length - 1)); }
-    else if (e.key === "ArrowUp") { e.preventDefault(); setActiveIdx((i) => Math.max(i - 1, 0)); }
-    else if (e.key === "Tab" || e.key === "Enter") {
-      if (matches[clampedIdx]) { e.preventDefault(); onSelect("/" + matches[clampedIdx].name); }
-    } else if (e.key === "Escape") { onSelect(value); /* keep current, close */ }
-  };
-
+  // Keyboard navigation — only active when dropdown is visible
   useEffect(() => {
+    if (!isSlashMode || matches.length === 0) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "ArrowDown") { e.preventDefault(); setActiveIdx((i) => Math.min(i + 1, matches.length - 1)); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); setActiveIdx((i) => Math.max(i - 1, 0)); }
+      else if (e.key === "Tab" || e.key === "Enter") {
+        if (matches[clampedIdx]) { e.preventDefault(); onSelect("/" + matches[clampedIdx].name); }
+      } else if (e.key === "Escape") {
+        onSelect(value);
+      }
+    };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  });
+  }, [isSlashMode, matches, clampedIdx, onSelect, value]);
 
-  useEffect(() => { setActiveIdx(0); }, [query]);
+  if (!isSlashMode || matches.length === 0) return null;
 
   return (
     <ul className="cmd-autocomplete">
