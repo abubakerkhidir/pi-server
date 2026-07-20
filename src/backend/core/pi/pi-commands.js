@@ -44,11 +44,11 @@ export async function executeBuiltinCommand(commandName, args, session, onEvent)
         tokensAfter,
         savedPct: saved,
       });
-      onEvent?.({ type: "text", content: `\nDone. Context compacted from ${tokensBefore} → ${tokensAfter} tokens (${saved}% saved).` });
+      //onEvent?.({ type: "text", content: `\nDone. Context compacted from ${tokensBefore} → ${tokensAfter} tokens (${saved}% saved).` });
     } catch (err) {
       onEvent?.({ type: "text", content: `\nCompaction failed: ${err.message}` });
     }
-    onEvent?.({ type: "done" });
+    onEvent?.({ type: "done", sendDirectly:true });
     return;
   }
   throw new Error(`Unknown built-in command: ${commandName}`);

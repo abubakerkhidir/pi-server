@@ -175,10 +175,15 @@ export function createStreamEventHandler(params) {
 
       case "error": 
       case "done": {
-        const tokenStats = handleDoneEvent(entityBuffer, recordId, dbSessionId, responseStartTime, state);
-        writeEvent("record_stats", tokenStats);
-        lastEvent.event = event
-        onAgentEndResolve();
+        if(event.sendDirectly){
+          lastEvent.event = event
+          onAgentEndResolve();
+        }else{
+          const tokenStats = handleDoneEvent(entityBuffer, recordId, dbSessionId, responseStartTime, state);
+          writeEvent("record_stats", tokenStats);
+          lastEvent.event = event
+          onAgentEndResolve();
+        }
         break;
       }
 
