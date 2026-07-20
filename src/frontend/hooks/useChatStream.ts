@@ -36,7 +36,6 @@ export function useChatStream({currentSessionId,}: UseChatStreamOptions): UseCha
   const entitiesRef = useRef<AgentReplyEntity[]>([]);
   const entityStartTimes = useRef<Map<string, number>>(new Map());    // Track entity start times for live duration calculation
   const abortRef = useRef<AbortChatStream | null>(null);
-  const streamEnded = useRef(false);
 
   const sealLastEntity = (typ: string, list: AgentReplyEntity[]) => {sealLastEntityFun(typ, list, entityStartTimes);};
   const resetState = useCallback(resetStateFun(sessionIdRef, isProcessingRef, abortRef), []);
@@ -50,7 +49,7 @@ export function useChatStream({currentSessionId,}: UseChatStreamOptions): UseCha
     }
     isProcessingRef.current = true;
     entitiesRef.current = [{ type: "msg", id: nextMsgId(), content: "", sealed: false }]; // Fresh entity buffer for this stream
-    const markEnded = ()=> handleStreamEnded(streamEnded,isProcessingRef,abortRef,onStreamEnd)
+    const markEnded = ()=> handleStreamEnded(isProcessingRef,abortRef,onStreamEnd)
     try {
       const streamHndlr = getStreamHandler(sessionIdRef, onSessionCreated, sealLastEntity, entitiesRef, entityStartTimes, onSessionName, onTokenStats, markEnded, onEntityUpdate);
       const abort = createChatStream(currentSessionId,prompt,files?.length? files : undefined,streamHndlr,getErrHandler(entitiesRef, markEnded));
@@ -185,14 +184,12 @@ function sealLastEntityFun(typ: string, list: AgentReplyEntity[], entityStartTim
   }
 }
 
-function handleStreamEnded(streamEnded: RefObject<boolean>,isProcessingRef: RefObject<boolean>, abortRef: RefObject<AbortChatStream | null>,onStreamEnd: OnStreamEnd) {
-    if (streamEnded.current) {
+function handleStreamEnded(isProcessingRef: RefObject<boolean>, abortRef: RefObject<AbortChatStream | null>,onStreamEnd: OnStreamEnd) {
+    if (!isProcessingRef.current) {
       console.log('ignoring markEnd event as stream was ended before...');
       return;
     }
     console.log('stream-end event received from backend... ')
-    streamEnded.current = true;
-    console.log('marking stream ended...');
     isProcessingRef.current = false;
     abortRef.current = null;
     onStreamEnd();

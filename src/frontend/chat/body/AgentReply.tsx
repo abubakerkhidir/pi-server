@@ -49,7 +49,7 @@ export default function AgentReply({
   const entityJsx: React.ReactNode[] = [];
   for (const entity of entities) {
     if (entity.type === "msg") {
-      console.log('agent-txt: ',entity.content.length)
+      //console.log('agent-txt: ',entity.content.length)
       if (!collapsed) entityJsx.push(<TextBlock key={entity.id} id={entity.id} content={entity.content} sealed={entity.sealed} />);
     } else if (entity.type === "think") {
       if (!thinkHidden && !collapsed) {
