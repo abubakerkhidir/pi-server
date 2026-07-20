@@ -190,6 +190,7 @@ function handleStreamEnded(streamEnded: RefObject<boolean>,isProcessingRef: RefO
       console.log('ignoring markEnd event as stream was ended before...');
       return;
     }
+    console.log('stream-end event received from backend... ')
     streamEnded.current = true;
     console.log('marking stream ended...');
     isProcessingRef.current = false;

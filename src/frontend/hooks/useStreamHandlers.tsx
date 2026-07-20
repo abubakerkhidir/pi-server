@@ -9,6 +9,7 @@ export function useStreamEndHandler(setIsProcessing: Dispatch<SetStateAction<boo
     // Ensure URL hash reflects the session (in case session_name didn't fire)
     const sid = currentSessionId;
     if (sid && window.location.hash !== `#${sid}`) {
+      console.log('replace window url hash: ',window.location.hash, sid)
       window.history.replaceState(null, "", `#${sid}`);
     }
   }, [currentSessionId]);
@@ -16,7 +17,7 @@ export function useStreamEndHandler(setIsProcessing: Dispatch<SetStateAction<boo
 
 export function useOnEntityUpdate(setChatState: Dispatch<SetStateAction<ChatState>>) {
   return useCallback((entities: AgentReplyEntity[]) => {
-    console.log('got stream: ');
+    //console.log('got stream: ');
     setChatState((prev) => {
       const last = prev.records[prev.records.length - 1];
       if (!last) return prev;

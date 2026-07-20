@@ -98,7 +98,7 @@ export default function AgentReply({
       .map((e) => (e as any).content || "");
     copyToClipboard(parts.join("\n\n"));
   }, [entities]);
-  console.log('render agent reply: ',entities.length)
+  //console.log('render agent reply: ',entities.length)
   return (
     <div className="message assistant">
       <div className="message-header assistant-header-row">

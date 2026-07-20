@@ -86,7 +86,7 @@ function ToolBlock({ entity, userSettings,content,sealed }: ToolBlockProps) {
     if (entity.result !== undefined) s += "\n" + JSON.stringify(entity.result, null, 2);
     return s;
   }, [entity.name, entity.args, entity.result]);
-  console.log('render tool: ',entity.name, sealed, content)
+  //console.log('render tool: ',entity.name, sealed, content)
   return (
     <div className="tool-block" data-tool-id={entity.id}>
       <div className="cb-header">
