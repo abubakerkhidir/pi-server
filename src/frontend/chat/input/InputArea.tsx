@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { InputAreaProps, SessionTokenStats } from "@/frontend/types";
 import FileChips from "./FileChips";
+import CommandAutocomplete from "./CommandAutocomplete";
 
 /** Format a number: if > 1000, show in K (e.g. 1500 → "1.5K"), otherwise raw */
 function fmt(n: number): string {
@@ -14,6 +15,7 @@ function fmt(n: number): string {
 interface InputAreaExtendedProps extends InputAreaProps {
   sessionStats?: SessionTokenStats;
   showScrollDown?:boolean, setShowScrollDown?:(a:boolean)=>void
+  sessionId?: string | null;
 }
 
 export default function InputArea({
@@ -25,7 +27,8 @@ export default function InputArea({
   uploadedFiles,
   onAddFile,
   onRemoveFile,
-  sessionStats,showScrollDown,setShowScrollDown
+  sessionStats,showScrollDown,setShowScrollDown,
+  sessionId,
 }: InputAreaExtendedProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -39,6 +42,11 @@ export default function InputArea({
   }, [value]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Let CommandAutocomplete handle arrow/tab/enter when dropdown is open
+    if (value.startsWith("/") && !value.includes(" ") && ["ArrowDown","ArrowUp","Tab"].includes(e.key)) {
+      e.preventDefault();
+      return;
+    }
     // Submit on plain Enter only — Shift/Ctrl/Meta+Enter insert a newline
     if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
       e.preventDefault();
@@ -82,6 +90,11 @@ export default function InputArea({
         </div>
       )}
       <div className="input-wrapper">
+        <CommandAutocomplete
+          value={value}
+          sessionId={sessionId ?? null}
+          onSelect={(cmd) => { onValueChange(cmd); }}
+        />
         <div className="input-row">
           {/* File chips appear on top of the input line */}
           {uploadedFiles.length > 0 && (

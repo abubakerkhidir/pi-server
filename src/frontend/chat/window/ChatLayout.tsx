@@ -78,6 +78,7 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
           summarizing={summarizing}
           sidebarCollapsed={sidebarCollapsed}
           onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+          sessionId={currentSessionId}
         />
         <ChatWindow chatState={chatState} userSettings={userSettings} setShowScrollDown={setShowScrollDown} showScrollDown={showScrollDown}/>
         <InputArea
@@ -92,6 +93,7 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
           sessionStats={sessionStats}
           showScrollDown={showScrollDown}
           setShowScrollDown={setShowScrollDown}
+          sessionId={currentSessionId}
         />
       </div>
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} onSave={(s) => setUserSettings({ ...userSettings, ...s })} onResumeSession={handleResumeSession} onSettingsChange={setUserSettings}/>

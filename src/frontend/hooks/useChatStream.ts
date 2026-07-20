@@ -142,6 +142,14 @@ function getStreamHandler(sessionIdRef: RefObject<string | null>, onSessionCreat
         onTokenStats?.(data as unknown as TokenStats);
         break;
       }
+      case "compact_result": {
+        sealLastEntity("think", entitiesRef.current);
+        sealLastEntity("msg", entitiesRef.current);
+        const { summary, tokensBefore, tokensAfter, savedPct } = data as { summary: string; tokensBefore: number; tokensAfter: number; savedPct: number };
+        const summaryText = `**Context compacted** — ${tokensBefore} → ${tokensAfter} tokens (${savedPct}% saved)\n\n${summary}`;
+        entitiesRef.current.push({ type: "msg", id: nextMsgId(), content: summaryText, sealed: true });
+        break;
+      }
       case "done":
       case "error": {
         for (const ent of entitiesRef.current) ent.sealed = true;

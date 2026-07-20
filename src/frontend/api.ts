@@ -27,6 +27,23 @@ interface ApiFetchOptions extends RequestInit {
   headers?: Record<string, string>;
 }
 
+async function apiFetchWithPrms(path: string, options: ApiFetchOptions = {}, ...prms:any) {
+  let url = path
+  if(prms){
+    const params = new URLSearchParams();
+    for (let i = 0; i < prms.length; i++) {
+      if(prms[i])
+        params.set(prms[i], prms[i+1]);
+      i++;
+    }
+    url+= `?${params}`
+    
+  }
+  const res = await apiFetch(url);
+  const data= await res.json() 
+  return {res,data}
+}
+
 async function apiFetch(path: string, options: ApiFetchOptions = {}): Promise<Response> {
   const token = getToken();
   const headers: Record<string, string> = { ...options.headers };
@@ -50,53 +67,42 @@ async function apiFetch(path: string, options: ApiFetchOptions = {}): Promise<Re
   return res;
 }
 
-export async function register(username: string, password: string): Promise<Record<string, unknown>> {
-  const res = await fetch("/api/auth/register", {
+async function apiCall<T>(method: "POST"|"PUT", path: string, body?: any) {
+  const res = await apiFetch(path, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
+    headers: body !== undefined ? { "Content-Type": "application/json" } : {},
+    body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Registration failed");
-  return data;
+  return {res,data};
+}
+
+async function apiPost<T>(path: string, body?: any) {return apiCall("POST",path,body)}
+
+async function apiPut<T>(path: string, body: Record<string, unknown>) { return apiCall("PUT",path,body)}
+
+export async function register(username: string, password: string): Promise<Record<string, unknown>> {
+  return (await apiPost("/api/auth/register",{ username, password })).data;
 }
 
 export async function login(username: string, password: string): Promise<Record<string, unknown>> {
-  const res = await fetch("/api/auth/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Login failed");
-  return data;
+  return (await apiPost("/api/auth/login",{ username, password })).data;
 }
 
 export async function getSettings(): Promise<Record<string, unknown>> {
-  const res = await apiFetch("/api/settings");
-  return res.json();
+  return (await apiFetch("/api/settings")).json();
 }
 
 export async function updateSettings(settings: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const res = await apiFetch("/api/settings", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(settings),
-  });
-  return res.json();
+  return apiPut("/api/settings", settings);
 }
 
 export async function getTools(): Promise<Record<string, unknown>> {
-  const res = await apiFetch("/api/tools");
-  return res.json();
+  return (await apiFetch("/api/tools")).json();
 }
 
 export async function getSessions(limit?: number, offset?: number): Promise<{ sessions: unknown[]; total: number }> {
-  const params = new URLSearchParams();
-  if (limit !== undefined) params.set("limit", String(limit));
-  if (offset !== undefined) params.set("offset", String(offset));
-  const res = await apiFetch(`/api/sessions?${params}`);
-  return res.json();
+  return (await apiFetchWithPrms("/api/sessions",undefined,limit?"limit":undefined,limit,offset?"offset":undefined,offset)).data;
 }
 
 export async function deleteSession(id: string): Promise<void> {
@@ -104,35 +110,36 @@ export async function deleteSession(id: string): Promise<void> {
 }
 
 export async function searchSessions(q: string): Promise<{ sessions: unknown[]; total: number }> {
-  const params = new URLSearchParams();
-  params.set("q", q);
-  const res = await apiFetch(`/api/sessions/search?${params}`);
-  return res.json();
+  return (await apiFetchWithPrms("/api/sessions/search",undefined,"q",q)).data;
 }
 
 export async function renameSession(id: string, name: string): Promise<void> {
-  await apiFetch(`/api/sessions/${id}/name`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name }),
-  });
+  await apiPut(`/api/sessions/${id}/name`, { name });
 }
 
 export async function getModels(): Promise<Record<string, unknown>> {
-  const res = await apiFetch("/api/models");
-  return res.json();
+  return (await apiFetch("/api/models")).json();
 }
 
 export async function summarizeSession(sessionId: string): Promise<{ summary: string }> {
-  const res = await apiFetch(`/api/chat/session/${encodeURIComponent(sessionId)}/summarize`, {
-    method: "POST",
-  });
-  return res.json();
+  return (await apiPost(`/api/chat/session/${encodeURIComponent(sessionId)}/summarize`)).data;
 }
 
 export async function getChatHistory(sessionId: string): Promise<unknown> {
-  const res = await apiFetch(`/api/chat/history/${sessionId}`);
-  return res.json();
+  return (await apiFetch(`/api/chat/history/${sessionId}`)).json();
+}
+
+export async function getCommands(sessionId: string | null): Promise<{ name: string; description: string; source: string }[]> {
+  if (!sessionId) return [];
+  return (await apiFetchWithPrms("/api/chat/commands",undefined,"sessionId",encodeURIComponent(sessionId))).data.commands ?? [];
+}
+
+export async function getThinkingInfo(sessionId: string): Promise<{ current: string | null; available: string[] }> {
+  return (await apiFetchWithPrms("/api/chat/thinking",undefined,"sessionId",encodeURIComponent(sessionId))).data;
+}
+
+export async function setThinkingLevel(sessionId: string, level: string): Promise<{ level: string }> {
+  return (await apiPost("/api/chat/thinking", { sessionId, level })).data;
 }
 
 export type ChatStreamCallback = (event: string, data: Record<string, unknown>) => void;

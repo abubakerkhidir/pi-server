@@ -143,3 +143,51 @@
   border-color: var(--danger);
   color: var(--danger);
 }
+
+/* ── Think-level selector ── */
+.think-level-selector {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.think-level-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.think-level-options {
+  display: flex;
+  gap: 2px;
+}
+
+.think-level-btn {
+  padding: 2px 7px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.think-level-btn:hover {
+  border-color: #f59e0b;
+  color: #f59e0b;
+}
+
+.think-level-btn.active {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.5);
+  color: #f59e0b;
+}
+
+.think-level-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

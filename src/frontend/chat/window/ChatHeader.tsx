@@ -1,5 +1,6 @@
 import ModelSelector from "../../config/models/ModelSelector";
 import type { ModelInfo } from "@/frontend/types";
+import ThinkLevelSelector from "./ThinkLevelSelector";
 
 interface ChatHeaderProps {
   username: string | null;
@@ -12,6 +13,7 @@ interface ChatHeaderProps {
   modelInfo: ModelInfo | null;
   onSummarizeAndNew: () => void;
   summarizing: boolean;
+  sessionId?: string | null;
 }
 
 export default function ChatHeader({
@@ -25,6 +27,7 @@ export default function ChatHeader({
   modelInfo,
   onSummarizeAndNew,
   summarizing,
+  sessionId,
 }: ChatHeaderProps) {
   const inputTypes = modelInfo?.input || [];
   const hasVision = inputTypes.includes("image");
@@ -40,6 +43,9 @@ export default function ChatHeader({
         )}
         <span className="logo">pi-server</span>
         <ModelSelector currentModel={currentModel} onModelSelect={onModelSelect} />
+        {hasReasoning && (
+          <ThinkLevelSelector sessionId={sessionId ?? null} modelId={modelInfo?.id ?? null} />
+        )}
         <span className="model-tags">
           {hasVision && <span className="model-tag vision">vision</span>}
           {hasReasoning && <span className="model-tag reasoning">reasoning</span>}

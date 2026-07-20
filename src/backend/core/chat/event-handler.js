@@ -160,6 +160,15 @@ export function createStreamEventHandler(params) {
         handleUsageEvent(event, state);
         break;
 
+      case "compact_result":
+        writeEvent("compact_result", {
+          summary: event.summary,
+          tokensBefore: event.tokensBefore,
+          tokensAfter: event.tokensAfter,
+          savedPct: event.savedPct,
+        });
+        break;
+
       case "context_usage":
         handleContextUsageEvent(event, state);
         break;

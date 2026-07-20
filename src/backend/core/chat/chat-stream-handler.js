@@ -101,6 +101,7 @@ export async function handleChatStream(req, res){
 
     // Run the prompt
     let startTime = new Date().getTime()
+    console.log('running prompt: ',effectivePrompt)
     await piManager.prompt(piSessionId, effectivePrompt, {
       images: images.length > 0 ? images : undefined,
       onEvent: wrappedOnEvent,

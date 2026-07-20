@@ -5,6 +5,7 @@ import { getSessionMeta} from "../db/session-dao.js";
 import { loadExistingSession } from "./pi-session-loader.js";
 import { createNewSession } from "./pi-new-session.js";
 import { warning } from "../../utils/logger.js";
+import { BUILTIN_COMMANDS, parseBuiltinCommand, executeBuiltinCommand } from "./pi-commands.js";
 
 export class PiSessionManager {
   constructor(cwd) {
@@ -51,10 +52,42 @@ export class PiSessionManager {
     return { session, piSessionId: newPiSessionId };
   }
 
+  getCommands(piSessionId) {
+    const session = this.activeSessions.get(piSessionId);
+    const extensionCmds = session ? (session.getCommands?.() ?? []) : [];
+    return [
+      ...BUILTIN_COMMANDS.map((c) => ({ name: c.name, description: c.description, source: "builtin" })),
+      ...extensionCmds.map((c) => ({ name: c.name, description: c.description || "", source: c.source || "extension" })),
+    ];
+  }
+
+  getThinkingInfo(piSessionId) {
+    const session = this.activeSessions.get(piSessionId);
+    if (!session) return null;
+    return {
+      current: session.thinkingLevel ?? null,
+      available: session.getAvailableThinkingLevels?.() ?? [],
+    };
+  }
+
+  setThinkingLevel(piSessionId, level) {
+    const session = this.activeSessions.get(piSessionId);
+    if (!session) throw new Error(`Session ${piSessionId} not found`);
+    session.setThinkingLevel(level);
+    return session.thinkingLevel;
+  }
+
   async prompt(piSessionId, text, { images, onEvent } = {}) {
     const session = this.activeSessions.get(piSessionId);
     if (!session) {
       throw new Error(`Session ${piSessionId} not found`);
+    }
+
+    // Intercept built-in slash commands (e.g. /compact)
+    const builtin = parseBuiltinCommand(text);
+    if (builtin) {
+      await executeBuiltinCommand(builtin.name, builtin.args, session, onEvent);
+      return;
     }
 
     const abortController = new AbortController();
