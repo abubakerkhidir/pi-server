@@ -31,7 +31,7 @@ function buildEntityParams(entity, recordId, dbSessionId, seq) {
     seq,
     entity.type,
     entity.type === 'think' || entity.type === 'msg' ? entity.content
-      : entity.type === 'compact' ? JSON.stringify({ summary: entity.summary, tokensBefore: entity.tokensBefore, tokensAfter: entity.tokensAfter, savedPct: entity.savedPct })
+      : entity.type === 'compact' ? JSON.stringify({ summary: entity.summary, tokensBefore: entity.tokensBefore, tokensAfter: entity.tokensAfter, savedPct: entity.savedPct, failed: entity.failed })
       : null,
     entity.type === 'tool' ? entity.toolName : null,
     entity.type === 'tool' ? JSON.stringify(entity.toolArgs ?? {}) : null,

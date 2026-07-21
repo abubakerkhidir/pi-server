@@ -3,6 +3,7 @@ import { authMiddleware } from "../middleware/auth.js";
 import upload from "../middleware/upload.js";
 import { handleChatStream } from "../core/chat/chat-stream-handler.js";
 import { getPiManager } from "../core/chat/state.js";
+import { SessionManager, createAgentSession } from "@earendil-works/pi-coding-agent";
 
 const router = Router();
 
@@ -19,10 +20,25 @@ router.get("/chat/commands", authMiddleware, (req, res) => {
   }
 });
 
-router.get("/chat/thinking", authMiddleware, (req, res) => {
-  const { sessionId } = req.query;
+router.get("/chat/thinking", authMiddleware, async (req, res) => {
+  const { sessionId, modelId, modelProvider } = req.query;
   const piManager = getPiManager();
-  const info = piManager.getThinkingInfo(sessionId);
+  let model = null;
+  // Look up the model if provided (for when session isn't loaded yet)
+  if (modelId && modelProvider) {
+    try {
+      const sm = SessionManager.inMemory();
+      const { session: tmp } = await createAgentSession({
+        sessionManager: sm,
+        cwd: process.cwd(),
+      });
+      model = tmp.modelRegistry.find(modelProvider, modelId);
+      tmp.dispose();
+    } catch {
+      /* model lookup failed, will use session levels */
+    }
+  }
+  const info = piManager.getThinkingInfo(sessionId, model);
   res.json(info ?? { current: null, available: [] });
 });
 

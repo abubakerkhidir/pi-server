@@ -6,6 +6,19 @@ import { loadExistingSession } from "./pi-session-loader.js";
 import { createNewSession } from "./pi-new-session.js";
 import { warning } from "../../utils/logger.js";
 import { BUILTIN_COMMANDS, parseBuiltinCommand, executeBuiltinCommand } from "./pi-commands.js";
+import { SessionManager, createAgentSession } from "@earendil-works/pi-coding-agent";
+
+const EXTENDED_THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"];
+
+function computeThinkingLevels(model) {
+  if (!model?.reasoning) return ["off"];
+  return EXTENDED_THINKING_LEVELS.filter((level) => {
+    const mapped = model.thinkingLevelMap?.[level];
+    if (mapped === null) return false;
+    if (level === "xhigh") return mapped !== undefined;
+    return true;
+  });
+}
 
 export class PiSessionManager {
   constructor(cwd) {
@@ -61,8 +74,16 @@ export class PiSessionManager {
     ];
   }
 
-  getThinkingInfo(piSessionId) {
+  getThinkingInfo(piSessionId, model) {
     const session = this.activeSessions.get(piSessionId);
+    // If we have a model but no active session (e.g., model changed but no message sent yet),
+    // compute available levels from the model itself
+    if (model && !session) {
+      return {
+        current: null,
+        available: computeThinkingLevels(model),
+      };
+    }
     if (!session) return null;
     return {
       current: session.thinkingLevel ?? null,

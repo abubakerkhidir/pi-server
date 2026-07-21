@@ -48,7 +48,12 @@ export async function applyUserModel(session, userId) {
   const userMap = loadSettingsFromDb(userId);
   if (userMap.model_id && !session.model) {
     try {
-      await session.setModel(userMap.model_id);
+      const [provider, ...rest] = userMap.model_id.split("/");
+      const modelId = rest.join("/");
+      const model = session.modelRegistry.find(provider, modelId);
+      if (model) {
+        await session.setModel(model);
+      }
     } catch { }
   }
 }

@@ -10,7 +10,12 @@ export function getSettingsLoaderFun(setUserSettings: Dispatch<SetStateAction<Us
       setUserSettings({ ...userSettings, ...settings });
       const allModels = ((m as { groups: { models: ModelInfo[]; }[]; }).groups || []).flatMap((g) => g.models);
       if (allModels.length > 0) {
-        const found = settings.model_id ? allModels.find((model) => model.id === settings.model_id) : undefined;
+        let found;
+        if (settings.model_id) {
+          const [provider, ...rest] = settings.model_id.split("/");
+          const modelId = rest.join("/");
+          found = allModels.find((model) => model.provider === provider && model.id === modelId);
+        }
         setCurrentModel(found || allModels[0]);
       }
     }).catch((err) => {

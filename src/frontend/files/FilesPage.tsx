@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { getFiles, type FileRecord, type FilesResponse } from "@/frontend/api";
+import { getFiles, deleteFile, type FileRecord, type FilesResponse } from "@/frontend/api";
 import ThumbTooltip from "./ThumbTooltip";
 
 const MIME_ICONS: Record<string, string> = {
@@ -60,6 +60,7 @@ export default function FilesPage({ onBack }: FilesPageProps) {
   const [typeFilter, setTypeFilter] = useState("");
   const [page, setPage] = useState(1);
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Debounce search
   useEffect(() => {
@@ -83,6 +84,19 @@ export default function FilesPage({ onBack }: FilesPageProps) {
   }, [page, debouncedSearch, typeFilter]);
 
   useEffect(() => { loadFiles(); }, [loadFiles]);
+
+  const handleDelete = async (f: FileRecord) => {
+    if (!confirm(`Delete "${f.file_name}"? This cannot be undone.`)) return;
+    setDeletingId(f.id);
+    try {
+      await deleteFile(f.id);
+      loadFiles();
+    } catch (err) {
+      console.error("Failed to delete file:", err);
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const totalPages = data?.totalPages ?? 0;
 
@@ -154,6 +168,14 @@ export default function FilesPage({ onBack }: FilesPageProps) {
                       >
                         {"\u2B07"}
                       </a>
+                      <button
+                        className="files-delete-btn"
+                        disabled={deletingId === f.id}
+                        onClick={() => handleDelete(f)}
+                        title="Delete"
+                      >
+                        {deletingId === f.id ? "\u22EF" : "\u2715"}
+                      </button>
                     </td>
                   </tr>
                 ))}

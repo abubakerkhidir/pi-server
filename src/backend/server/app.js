@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import path from "path";
 import { initDb, closeDb } from "../core/db/db.js";
 import authRoutes from "../routes/auth.js";
@@ -21,7 +22,8 @@ const PORT = process.env.PORT || 3500;
 function createApp() {
   const app = express();
 
-  app.use(cors());
+  app.use(cors({ origin: true, credentials: true }));
+  app.use(cookieParser());
   app.use(express.json({ limit: "100mb" }));
 
   // Serve React frontend build

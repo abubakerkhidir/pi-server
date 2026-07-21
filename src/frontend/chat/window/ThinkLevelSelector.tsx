@@ -5,6 +5,8 @@ interface ThinkLevelSelectorProps {
   sessionId: string | null;
   /** When model changes or session changes, re-fetch */
   modelId: string | null;
+  /** Provider of the model (e.g. "openrouter") */
+  modelProvider: string | null;
 }
 
 const LEVEL_LABELS: Record<string, string> = {
@@ -16,14 +18,23 @@ const LEVEL_LABELS: Record<string, string> = {
   xhigh: "max",
 };
 
-export default function ThinkLevelSelector({ sessionId, modelId }: ThinkLevelSelectorProps) {
+export default function ThinkLevelSelector({ sessionId, modelId, modelProvider }: ThinkLevelSelectorProps) {
   const [available, setAvailable] = useState<string[]>([]);
   const [current, setCurrent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!sessionId) return;
-    getThinkingInfo(sessionId)
+    if (!sessionId && modelId) {
+      // No session yet — use model info directly to show available levels
+      getThinkingInfo("", modelId, modelProvider ?? undefined)
+        .then((info) => {
+          setAvailable(info.available ?? []);
+          setCurrent(info.current);
+        })
+        .catch(() => {});
+      return;
+    }
+    getThinkingInfo(sessionId, modelId ?? undefined, modelProvider ?? undefined)
       .then((info) => {
         setAvailable(info.available ?? []);
         setCurrent(info.current);
@@ -31,14 +42,20 @@ export default function ThinkLevelSelector({ sessionId, modelId }: ThinkLevelSel
       .catch(() => {});
   }, [sessionId, modelId]);
 
-  if (!sessionId || available.length === 0) return null;
+  // Only require available levels; sessionId can be empty when showing model-based levels
+  if (available.length === 0) return null;
 
   const handleChange = async (level: string) => {
     if (loading) return;
     setLoading(true);
     try {
-      const res = await setThinkingLevel(sessionId, level);
-      setCurrent(res.level);
+      // Only update level if we have a session; otherwise it's model-only display
+      if (sessionId) {
+        const res = await setThinkingLevel(sessionId, level);
+        setCurrent(res.level);
+      } else {
+        setCurrent(level); // just update local state for display
+      }
     } catch {}
     setLoading(false);
   };

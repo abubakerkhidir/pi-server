@@ -44,7 +44,7 @@ export default function ChatHeader({
         <span className="logo">pi-server</span>
         <ModelSelector currentModel={currentModel} onModelSelect={onModelSelect} />
         {hasReasoning && (
-          <ThinkLevelSelector sessionId={sessionId ?? null} modelId={modelInfo?.id ?? null} />
+          <ThinkLevelSelector sessionId={sessionId ?? null} modelId={modelInfo?.id ?? null} modelProvider={modelInfo?.provider ?? null} />
         )}
         <span className="model-tags">
           {hasVision && <span className="model-tag vision">vision</span>}

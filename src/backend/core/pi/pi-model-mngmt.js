@@ -17,9 +17,12 @@ function groupModelsByProvider(models) {
     });
   }
 
-  return Array.from(providers.entries()).map(([provider, models]) => ({
+    return Array.from(providers.entries()).map(([provider, models]) => ({
     provider,
-    models,
+    models: models.map((m) => ({
+      ...m,
+      provider,
+    })),
   }));
 }
 

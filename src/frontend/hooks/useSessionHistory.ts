@@ -5,7 +5,7 @@ import type { ChatRecord, ChatState, TokenStats, SessionTokenStats } from "@/fro
  * Backend response for session history — new entity-based format.
  */
 interface BackendEntity {
-  type: "think" | "msg" | "tool";
+  type: "think" | "msg" | "tool" | "compact";
   content?: string;
   name?: string;
   args?: Record<string, unknown>;
@@ -14,6 +14,11 @@ interface BackendEntity {
   isComplete?: boolean;
   duration?: number;
   totalLength?: number;
+  summary?: string;
+  tokensBefore?: number;
+  tokensAfter?: number;
+  savedPct?: number;
+  failed?: boolean;
 }
 
 interface BackendRecord {
@@ -73,6 +78,19 @@ function mapEntity(
       isError: !!e.isError,
       isComplete: !!e.isComplete,
       duration: e.duration,
+    };
+  }
+  if (e.type === "compact") {
+    return {
+      ...base,
+      type: "compact" as const,
+      id: `compact-${index}`,
+      summary: e.summary,
+      tokensBefore: e.tokensBefore,
+      tokensAfter: e.tokensAfter,
+      savedPct: e.savedPct,
+      duration: e.duration,
+      failed: e.failed,
     };
   }
   // Fallback — treat as msg

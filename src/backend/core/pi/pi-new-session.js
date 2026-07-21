@@ -35,10 +35,17 @@ export async function createNewSession(userId, sessionCwd) {
 
   if (userMap.model_id) {
     try {
-      console.log('setting llm model to: ',userMap.model_id)
-      await session.setModel(userMap.model_id);
+      const [provider, ...rest] = userMap.model_id.split("/");
+      const modelId = rest.join("/");
+      const model = session.modelRegistry.find(provider, modelId);
+      console.log('setting llm model to:', userMap.model_id, modelId, provider, model!==undefined?JSON.stringify(model):null);
+      if (model) {
+        await session.setModel(model);
+      } else {
+        console.log('model not found in registry:', userMap.model_id);
+      }
     } catch (err) {
-	console.log('error setting model: ',userMap.model_id,err)
+      console.log('error setting model:', userMap.model_id, err.message);
     }
   }
   return session;

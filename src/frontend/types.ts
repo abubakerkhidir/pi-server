@@ -23,6 +23,7 @@ export interface ChatMessage {
 export interface ModelInfo {
   id: string;
   name: string;
+  provider: string;
   input?: string[];
   reasoning?: boolean;
   contextWindow?: number;
@@ -52,6 +53,7 @@ export interface Settings {
   thinking_lines?: number;
   tool_lines?: number;
   model_id?: string;
+  model_provider?: string;
   home_dir?: string;
   tools_enabled?: string[];
 }

@@ -47,6 +47,8 @@ export async function createUser(username, password) {
   return userId;
 }
 
+const COOKIE_OPTS = { httpOnly: true, sameSite: "lax", path: "/" };
+
 router.post("/register", async (req, res) => {
   const { username, password } = req.body;
 
@@ -61,6 +63,7 @@ router.post("/register", async (req, res) => {
 
   const userId = await createUser(username, password);
   const token = generateToken({ id: userId, username });
+  res.cookie("token", token, COOKIE_OPTS);
   res.json({ token, username });
 });
 
@@ -82,6 +85,7 @@ router.post("/login", async (req, res) => {
   }
 
   const token = generateToken({ id: user.id, username: user.username });
+  res.cookie("token", token, COOKIE_OPTS);
   res.json({ token, username: user.username });
 });
 

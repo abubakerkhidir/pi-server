@@ -1,4 +1,4 @@
-import { getUsername } from "@/frontend/api";
+import { getUsername, updateSettings } from "@/frontend/api";
 import type { ChatLayoutProps, ChatState, ModelInfo, Session, UserSettings } from "@/frontend/types";
 import { Dispatch, SetStateAction, useCallback, useEffect, useRef, useState } from "react";
 import { getLoadSessionHandler, getMoreSessionHndlr, getReloadSessionsHndlr, getResumeSessionHandler } from "@/frontend/chat/window/chat-utils/sessionMngmtUtils";
@@ -39,7 +39,14 @@ export default function ChatLayout({ onLogout, onShowFiles }: ChatLayoutProps) {
   const handleNewChat = getNewChatHandler(setChatState, setCurrentSessionId, resetState, reloadSessions, setShowScrollDown)
   const handleSummarizeAndNew = useCallback(getSummarizeAndNewHandler(currentSessionId, handleNewChat, setSummarizing, pendingSummaryRef), [handleNewChat]);
   const handleResumeSession = getResumeSessionHandler(setChatState, setCurrentSessionId, resetState);
-  const handleModelSelect = (model: ModelInfo) => setCurrentModel(model);
+  const handleModelSelect = (model: ModelInfo) => {
+    setCurrentModel(model);
+    // Clear the active session so the next prompt creates a fresh session
+    // with the newly selected model (the backend reads model_id from DB when creating sessions)
+    setCurrentSessionId(null);
+    setChatState({ records: [] });
+    updateSettings({ model_id: `${model.provider}/${model.id}` }).catch(() => {});
+  };
   const handleStopStream = useStopStream(stopStream, setIsProcessing);
   const loadAndShowSession = getLoadSessionHandler(currentSessionId, setChatState, setCurrentSessionId, reloadSessions);
   const username = getUsername();

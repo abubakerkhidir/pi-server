@@ -12,11 +12,18 @@ export function generateToken(user) {
 
 export function authMiddleware(req, res, next) {
   const header = req.headers.authorization;
-  if (!header || !header.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "Missing or invalid authorization header" });
+  let token = null;
+
+  if (header && header.startsWith("Bearer ")) {
+    token = header.slice(7);
+  } else if (req.cookies && req.cookies.token) {
+    token = req.cookies.token;
   }
 
-  const token = header.slice(7);
+  if (!token) {
+    return res.status(401).json({ error: "Missing or invalid authorization" });
+  }
+
   try {
     const payload = jwt.verify(token, JWT_SECRET);
     req.user = { userId: payload.userId, username: payload.username };

@@ -5,8 +5,15 @@ export function getChatFilesByRec(recId) {
   return getDb().prepare("SELECT * FROM chat_files WHERE record_id = ? ORDER BY created_at ASC").all(recId);
 }
 
-export function getFileById(fileId) {
-  return getDb().prepare(`SELECT f.* FROM chat_files f WHERE f.id = ?`).get(fileId);
+export function getFileById(fileId, userId) {
+    if (userId) {
+        return getDb().prepare(`
+            SELECT f.* FROM chat_files f
+            JOIN session_metadata s ON f.session_id = s.id
+            WHERE f.id = ? AND s.user_id = ?
+        `).get(fileId, userId);
+    }
+    return getDb().prepare(`SELECT f.* FROM chat_files f WHERE f.id = ?`).get(fileId);
 }
 
 export function saveFileMetadata(recordId, dbSessionId, files) {
@@ -28,6 +35,26 @@ export function insertFile(fileId, recordId, sessionId, fileType, fileName, file
 }
 
 /**
+ * Delete a file record by id. Returns the deleted row for caller to unlink.
+ */
+export function deleteFileById(fileId, userId) {
+    const db = getDb();
+    let row;
+    if (userId) {
+        row = db.prepare(`
+            SELECT f.file_path FROM chat_files f
+            JOIN session_metadata s ON f.session_id = s.id
+            WHERE f.id = ? AND s.user_id = ?
+        `).get(fileId, userId);
+    } else {
+        row = db.prepare("SELECT file_path FROM chat_files WHERE id = ?").get(fileId);
+    }
+    if (!row) return null;
+    db.prepare("DELETE FROM chat_files WHERE id = ?").run(fileId);
+    return row;
+}
+
+/**
  * Get all file paths for a session (for cleanup on deletion).
  */
 export function getFilesBySession(sessionId) {
@@ -37,11 +64,15 @@ export function getFilesBySession(sessionId) {
 /**
  * Get paginated files with session names, search, and type filter.
  */
-export function getAllFilesPaginated({ page = 1, limit = 20, search, type }) {
+export function getAllFilesPaginated({ page = 1, limit = 20, search, type, userId }) {
     const db = getDb();
     const conditions = [];
     const params = [];
 
+    if (userId) {
+        conditions.push("s.user_id = ?");
+        params.push(userId);
+    }
     if (search) {
         conditions.push("(f.file_name LIKE ? OR s.name LIKE ?)");
         const q = `%${search}%`;
