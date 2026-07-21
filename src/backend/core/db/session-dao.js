@@ -69,7 +69,7 @@ export function getSessionMeta(piSessionId) {
 }
 
 export function getSessionMetaByUser(sessionId, usId) {
-  return getDb().prepare("SELECT id, name, context_size, context_used, context_percent FROM session_metadata WHERE id = ? AND user_id = ?").get(sessionId, usId);
+  return getDb().prepare("SELECT * FROM session_metadata WHERE id = ? AND user_id = ?").get(sessionId, usId);
 }
 
 /**
