@@ -109,19 +109,6 @@ function loadSessionRecords(sessionId) {
 }
 
 /**
- * Add context usage from pi SDK to session stats.
- */
-function addContextUsage(sessionStats, meta) {
-  if (meta.context_used != null) {
-    sessionStats.context_used = meta.context_used;
-  }
-  if (meta.context_percent != null) {
-    sessionStats.context_percent = meta.context_percent;
-  }
-  return sessionStats;
-}
-
-/**
  * Extract token stats from a record (handles both formats).
  */
 function extractRecordTokenStats(rec) {
@@ -131,41 +118,17 @@ function extractRecordTokenStats(rec) {
   return {prompt: rec.prompt_tokens || 0, think: rec.think_tokens || 0, output: rec.output_tokens || 0};
 }
 
-/**
- * Accumulate token stats across all records in a session.
- * @param {Array} records - Array of records each with a tokenStats field
- * @param {number} contextSize - The model's context window size in tokens
- * @returns {Object} { total_prompt, total_think, total_output, context_used_pct, context_size }
- */
-function computeSessionTokenStats(records, contextSize) {
-  let totalPrompt = 0;
-  let totalThink = 0;
-  let totalOutput = 0;
-
-  for (const rec of records) {
-    const stats = extractRecordTokenStats(rec);
-    totalPrompt += stats.prompt;
-    totalThink += stats.think;
-    totalOutput += stats.output;
-  }
-
-  const totalUsed = totalPrompt + totalThink + totalOutput;
-  const contextSizeNum = contextSize || 128000;
-  const contextUsedPct = contextSizeNum > 0 ? Math.round((totalUsed / contextSizeNum) * 100) : 0;
-
-  return {total_prompt: totalPrompt,total_think: totalThink,total_output: totalOutput,context_used_pct: contextUsedPct,context_size: contextSizeNum};
-}
-
 //  GET /api/chat/history/:sessionId — load session history
 router.get("/chat/history/:sessionId", authMiddleware, (req, res) => {
   const { sessionId } = req.params;
-  const meta = getSessionMetaByUser(sessionId, req.user.userId);
-  if (!meta) return res.status(404).json({ error: "Session not found" });
+  const s = getSessionMetaByUser(sessionId, req.user.userId);
+  if (!s) return res.status(404).json({ error: "Session not found" });
   const records = loadSessionRecords(sessionId);
-  const contextSize = meta.context_size || 128000;
-  let sessionStats = computeSessionTokenStats(records, contextSize);
-  sessionStats = addContextUsage(sessionStats, meta);
-  res.json({ sessionId: meta.id, name: meta.name, records, sessionStats });
+  const contextSize = s.context_size || 128000;
+  let sessionStats = {total_input:s.total_input,total_cache_read:s.total_cache_read,total_cache_write:s.total_cache_write,total_reasoning:s.total_reasoning,
+    total_output:s.total_output,context_size:s.context_size,context_used:s.context_used, context_percent:s.context_percent
+  }
+  res.json({ sessionId: s.id, name: s.name, records, sessionStats });
 });
 
 export default router;
