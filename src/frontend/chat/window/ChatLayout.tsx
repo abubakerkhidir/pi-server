@@ -11,6 +11,7 @@ import { getNewChatHandler, getPageUrlHashEffect, getSummarizeAndNewHandler } fr
 import { useHandleSend } from "./chat-utils/useSendUtils";
 import ChatHeader from "./ChatHeader";
 import ChatWindow from "./ChatWindow";
+import { getSettingsLoaderFun } from "./chat-utils/settingsUtils";
 
 const EXTENDED_THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"];
 
@@ -153,7 +154,7 @@ export default function ChatLayout({ onLogout, onShowFiles }: ChatLayoutProps) {
           username={username}
           onSettingsClick={() => setShowSettings(true)}
           onLogout={onLogout}
-          currentModel={currentModel?.name || "Select a model"}
+          currentModel={currentModel?.name}
           onModelSelect={handleModelSelect}
           onThinkLevelChange={handleThinkLevelChange}
           modelInfo={currentModel}
@@ -164,6 +165,7 @@ export default function ChatLayout({ onLogout, onShowFiles }: ChatLayoutProps) {
           onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
           sessionId={currentSessionId}
           isProcessing={isProcessing}
+          userSettings={userSettings}
         />
         <ChatWindow chatState={chatState} userSettings={userSettings} setShowScrollDown={setShowScrollDown} showScrollDown={showScrollDown}/>
         <InputArea

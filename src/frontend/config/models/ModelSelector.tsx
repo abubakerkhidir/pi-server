@@ -1,42 +1,29 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { getModels } from "@/frontend/api";
 
-import type { ModelInfo } from "@/frontend/types";
+import type { ModelInfo, ModelProvider, UserSettings } from "@/frontend/types";
 
-interface ModelSelectorProps {
-  currentModel: string;
-  onModelSelect: (model: ModelInfo) => void;
-  disabled?: boolean;
-}
+interface ModelSelectorProps {currentModel?: string; onModelSelect: (model: ModelInfo) => void; disabled?: boolean; userSettings: UserSettings, sessionId?:string}
 
-export default function ModelSelector({
-  currentModel,
-  onModelSelect,
-  disabled = false,
-}: ModelSelectorProps) {
+export default function ModelSelector({currentModel, onModelSelect, disabled = false,userSettings}: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
-  const [providerList, setProviderList] = useState<{ provider: string; models: ModelInfo[] }[]>([]);
-  const [selectedProvider, setSelectedProvider] = useState<{provider: string;models: ModelInfo[];} | null>(null);
 
+  const [providerList, setProviderList] = useState<ModelProvider[]>([]);
+  const [selectedProvider, setSelectedProvider] = useState<ModelProvider | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  //useEffect(() => {getModels().then((r) => {setProviderList((r as { groups: typeof providerList }).groups || []);}).catch(e => {console.log('err: ',e)})}, []);
   useEffect(() => {
-    getModels()
-      .then((r) => {
-        setProviderList((r as { groups: typeof providerList }).groups || []);
-      })
-      .catch(() => {});
-  }, []);
+    if(userSettings.providers && providerList && !currentModel){
+
+    }
+  },[userSettings?.providers])
 
   // Close dropdown when clicking outside
   useEffect(() => {
     if (!open) return;
-
     const close = (e: MouseEvent) => {
-      if (
-        !dropdownRef.current?.contains(e.target as Node) &&
-        !((e.target as HTMLElement)?.closest(".model-selector"))
-      ) {
+      if (!dropdownRef.current?.contains(e.target as Node) && !((e.target as HTMLElement)?.closest(".model-selector"))) {
         setOpen(false);
         setSelectedProvider(null);
         document.removeEventListener("click", close);
@@ -60,65 +47,31 @@ export default function ModelSelector({
   };
 
   return (
-    <div
-      className="model-selector"
-      ref={dropdownRef}
-      onClick={handleClick}
-      style={{ cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.5 : 1 }}
-    >
-      <span className="model-current">{currentModel}</span>
+    <div className="model-selector" ref={dropdownRef} onClick={handleClick} style={{ cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.5 : 1 }}>
+      <span className="model-current">{currentModel|| "Select a model"}</span>
       <span className="model-arrow">▾</span>
 
       {open && !disabled && (
-        <div
-          className="model-dropdown"
-          onClick={(e) => e.stopPropagation()}
-          style={{ position: "absolute", top: "100%", left: 0, marginTop: 4 }}
-        >
+        <div className="model-dropdown" onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top: "100%", left: 0, marginTop: 4 }} >
           {selectedProvider ? (
             <>
               <div
-                style={{
-                  padding: "6px 10px",
-                  fontSize: 13,
-                  cursor: "pointer",
-                  borderRadius: 6,
-                }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = "var(--surface3)")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background = "")
-                }
+                style={{ padding: "6px 10px", fontSize: 13, cursor: "pointer", borderRadius: 6, }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface3)")}
+                onMouseLeave={(e) =>(e.currentTarget.style.background = "")}
                 onClick={() => setSelectedProvider(null)}
               >
                 ← Back to providers
               </div>
-              <div
-                style={{
-                  padding: "4px 10px",
-                  fontSize: 10,
-                  color: "var(--text-muted)",
-                  textTransform: "uppercase",
-                }}
-              >
+              <div style={{padding: "4px 10px", fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase"}}>
                 {selectedProvider.provider}
               </div>
               {selectedProvider.models.map((m) => (
                 <div
                   key={m.id}
-                  style={{
-                    padding: "6px 10px",
-                    fontSize: 13,
-                    cursor: "pointer",
-                    borderRadius: 6,
-                  }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.background = "var(--surface3)")
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.background = "")
-                  }
+                  style={{padding: "6px 10px", fontSize: 13, cursor: "pointer", borderRadius: 6}}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface3)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "")}
                   onClick={() => handleModelSelect(m)}
                 >
                   {m.name}
@@ -126,24 +79,11 @@ export default function ModelSelector({
               ))}
             </>
           ) : (
-            providerList.length === 0 ? (
-              <div style={{ padding: 8, color: "var(--text-dim)" }}>No models</div>
-            ) : (
+            providerList.length === 0 ? (<div style={{ padding: 8, color: "var(--text-dim)" }}>No models</div>) : (
               providerList.map((g) => (
-                <div
-                  key={g.provider}
-                  style={{
-                    padding: "6px 10px",
-                    fontSize: 13,
-                    cursor: "pointer",
-                    borderRadius: 6,
-                  }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.background = "var(--surface3)")
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.background = "")
-                  }
+                <div key={g.provider} style={{ padding: "6px 10px", fontSize: 13, cursor: "pointer", borderRadius: 6, }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface3)")}
+                  onMouseLeave={(e) =>(e.currentTarget.style.background = "")}
                   onClick={() => setSelectedProvider(g)}
                 >
                   {g.provider} ({g.models.length})
@@ -155,4 +95,17 @@ export default function ModelSelector({
       )}
     </div>
   );
+}
+
+function findModel(userSettings: UserSettings, model:any){
+  // const allModels = ((m as { groups: { models: ModelInfo[]; }[]; }).groups || []).flatMap((g) => g.models);
+  //     if (allModels.length > 0) {
+  //       let found;
+  //       if (settings.model_id) {
+  //         const [provider, ...rest] = settings.model_id.split("/");
+  //         const modelId = rest.join("/");
+  //         found = allModels.find((model) => model.provider === provider && model.id === modelId);
+  //       }
+  //       setCurrentModel(found || allModels[0]);
+  //     }
 }

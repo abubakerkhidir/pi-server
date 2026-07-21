@@ -172,6 +172,7 @@ export interface ChatState {
   records: ChatRecord[];
   sessionStats?: SessionTokenStats;
 }
+export interface ModelProvider {provider: string; models: ModelInfo[];}
 
 export type UserSettings = {
   send_on_enter?: boolean;
@@ -190,6 +191,7 @@ export type UserSettings = {
   home_dir?: string;
   tools_enabled?: string[];
   think_level?: string;
+  providers?:ModelProvider[]
 };
 
 

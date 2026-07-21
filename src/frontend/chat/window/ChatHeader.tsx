@@ -1,12 +1,12 @@
 import ModelSelector from "../../config/models/ModelSelector";
-import type { ModelInfo } from "@/frontend/types";
+import type { ModelInfo, UserSettings } from "@/frontend/types";
 import ThinkLevelSelector from "./ThinkLevelSelector";
 
 interface ChatHeaderProps {
   username: string | null;
   onSettingsClick: () => void;
   onLogout: () => void;
-  currentModel: string;
+  currentModel?: string;
   onModelSelect: (model: ModelInfo) => void;
   onThinkLevelChange: (level: string) => void;
   sidebarCollapsed: boolean;
@@ -17,23 +17,12 @@ interface ChatHeaderProps {
   summarizing: boolean;
   sessionId?: string | null;
   isProcessing: boolean;
+  userSettings: UserSettings
 }
 
 export default function ChatHeader({
-  username,
-  onSettingsClick,
-  onLogout,
-  currentModel,
-  onModelSelect,
-  onThinkLevelChange,
-  sidebarCollapsed,
-  onSidebarToggle,
-  modelInfo,
-  currentThinkLevel,
-  onSummarizeAndNew,
-  summarizing,
-  sessionId,
-  isProcessing,
+  username,onSettingsClick, onLogout, currentModel, onModelSelect, onThinkLevelChange, sidebarCollapsed, onSidebarToggle, modelInfo, currentThinkLevel, onSummarizeAndNew,
+  summarizing, sessionId, isProcessing, userSettings
 }: ChatHeaderProps) {
   const inputTypes = modelInfo?.input || [];
   const hasVision = inputTypes.includes("image");
@@ -49,21 +38,10 @@ export default function ChatHeader({
         )}
         <span className="logo">pi-server</span>
         <div className="model-select-wrapper" style={{ display: "inline-block", position: "relative" }}>
-          <ModelSelector
-            currentModel={currentModel}
-            onModelSelect={onModelSelect}
-            disabled={isProcessing}
-          />
+          <ModelSelector userSettings={userSettings} currentModel={currentModel} onModelSelect={onModelSelect} disabled={isProcessing}/>
         </div>
         {hasReasoning && (
-          <ThinkLevelSelector
-            sessionId={sessionId ?? null}
-            modelId={modelInfo?.id ?? null}
-            modelProvider={modelInfo?.provider ?? null}
-            currentLevel={currentThinkLevel}
-            onLevelChange={onThinkLevelChange}
-            disabled={isProcessing}
-          />
+          <ThinkLevelSelector sessionId={sessionId ?? null} modelId={modelInfo?.id} modelProvider={modelInfo?.provider} currentLevel={currentThinkLevel} onLevelChange={onThinkLevelChange} disabled={isProcessing}/>
         )}
         <span className="model-tags">
           {hasVision && <span className="model-tag vision">vision</span>}
@@ -71,12 +49,7 @@ export default function ChatHeader({
         </span>
       </div>
       <div className="header-right">
-        <button
-          className="icon-btn"
-          onClick={onSummarizeAndNew}
-          disabled={summarizing}
-          title={summarizing ? "Summarizing current session…" : "Summarize session and start new task"}
-        >
+        <button className="icon-btn" onClick={onSummarizeAndNew} disabled={summarizing} title={summarizing ? "Summarizing current session…" : "Summarize session and start new task"}>
           {summarizing ? "⋯" : "📋"}
         </button>
         <span style={{ fontSize: 12, color: "var(--text-dim)" }}>{username || ""}</span>
