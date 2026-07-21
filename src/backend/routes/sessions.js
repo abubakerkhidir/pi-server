@@ -1,6 +1,8 @@
 import { Router } from "express";
+import fs from "fs";
 import { authMiddleware } from "../middleware/auth.js";
-import { getUserSessions, deleteUserSession, updateSessionName, searchSessions } from "../core/db/session-dao.js";
+import { getUserSessions, deleteUserSession, updateSessionName, searchSessions, getSessionMetaByUser } from "../core/db/session-dao.js";
+import { getFilesBySession } from "../core/db/chat-files-dao.js";
 
 const router = Router();
 
@@ -12,12 +14,34 @@ router.get("/sessions", authMiddleware, (req, res) => {
   res.json({ sessions, total });
 });
 
-//  DELETE /api/sessions/:id — delete a session
+//  DELETE /api/sessions/:id — delete a session and its files
 router.delete("/sessions/:id", authMiddleware, (req, res) => {
-  const deleted = deleteUserSession(req.params.id, req.user.userId);
+  const sessionId = req.params.id;
+  const userId = req.user.userId;
+
+  // Collect file paths before deletion ( CASCADE will remove DB records )
+  const meta = getSessionMetaByUser(sessionId, userId);
+  if (!meta) {
+    return res.status(404).json({ error: "Session not found" });
+  }
+
+  const filePaths = getFilesBySession(sessionId);
+  const deleted = deleteUserSession(sessionId, userId);
   if (!deleted) {
     return res.status(404).json({ error: "Session not found" });
   }
+
+  // Delete physical files (best-effort, don't fail the request)
+  for (const f of filePaths) {
+    if (f.file_path) {
+      try { fs.unlinkSync(f.file_path); } catch {}
+    }
+  }
+  // Delete pi session file
+  if (meta.pi_session_file) {
+    try { fs.unlinkSync(meta.pi_session_file); } catch {}
+  }
+
   res.json({ ok: true });
 });
 

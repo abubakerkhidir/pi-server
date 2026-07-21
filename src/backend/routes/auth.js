@@ -2,11 +2,12 @@ import { Router } from "express";
 import bcrypt from "bcrypt";
 import fs from "fs";
 import path from "path";
+import os from "os";
 import { generateToken, authMiddleware } from "../middleware/auth.js";
 import { insertUser, getUserByUsername } from "../core/db/user-dao.js";
 import { insertSettings } from "../core/db/settings-dao.js";
 
-export const USERS_DIR = path.join(process.cwd(), "users");
+export const USERS_DIR = path.join(os.homedir(), ".pi-server", "users");
 
 const router = Router();
 /**

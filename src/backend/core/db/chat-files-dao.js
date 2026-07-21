@@ -27,3 +27,10 @@ export function insertFile(fileId, recordId, sessionId, fileType, fileName, file
     return record;
 }
 
+/**
+ * Get all file paths for a session (for cleanup on deletion).
+ */
+export function getFilesBySession(sessionId) {
+    return getDb().prepare("SELECT file_path FROM chat_files WHERE session_id = ?").all(sessionId);
+}
+

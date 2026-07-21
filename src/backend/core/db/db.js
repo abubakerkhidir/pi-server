@@ -1,8 +1,9 @@
 import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
+import os from "os";
 
-const DB_DIR = path.join(process.cwd(), ".pi-server");
+const DB_DIR = path.join(os.homedir(), ".pi-server", "db");
 const DB_PATH = path.join(DB_DIR, "pi-server.db");
 
 let db;
@@ -41,6 +42,15 @@ function createSessionTables() {
       pi_session_id TEXT,
       pi_session_file TEXT,
       name TEXT,
+      context_size INTEGER,
+      context_used INTEGER,
+      context_percent REAL,
+      total_input INTEGER DEFAULT 0,
+      total_output INTEGER DEFAULT 0,
+      total_cache_read INTEGER DEFAULT 0,
+      total_cache_write INTEGER DEFAULT 0,
+      total_reasoning INTEGER DEFAULT 0,
+      total_cost DOUBLE DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -54,7 +64,6 @@ function createSessionTables() {
  * Create chat files table.
  */
 function createFileTables() {
-  //db.exec('DROP TABLE chat_files;')
   db.exec(`
     CREATE TABLE IF NOT EXISTS chat_files (
       id TEXT PRIMARY KEY,
@@ -66,6 +75,8 @@ function createFileTables() {
       file_size INTEGER NOT NULL,
       mime_type TEXT,
       asset_id TEXT,
+      tool_name TEXT,
+      chat_entity_id INTEGER,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (record_id) REFERENCES chat_records(id) ON DELETE CASCADE,
       FOREIGN KEY (session_id) REFERENCES session_metadata(id) ON DELETE CASCADE
@@ -75,8 +86,6 @@ function createFileTables() {
     CREATE INDEX IF NOT EXISTS idx_chat_files_asset ON chat_files(asset_id);
     CREATE INDEX IF NOT EXISTS idx_chat_files_session ON chat_files(session_id);
     CREATE INDEX IF NOT EXISTS idx_chat_files_id ON chat_files(id);
-    
-
   `);
 }
 
@@ -90,6 +99,13 @@ function createEntityTables() {
       session_id TEXT NOT NULL,
       user_msg_content TEXT NOT NULL,
       agent_reply_id TEXT,
+      prompt_tokens INTEGER DEFAULT 0,
+      think_tokens INTEGER DEFAULT 0,
+      output_tokens INTEGER DEFAULT 0,
+      prompt_token_s INTEGER DEFAULT 0,
+      output_token_s INTEGER DEFAULT 0,
+      duration_ms INTEGER,
+      ttft_ms INTEGER,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (session_id) REFERENCES session_metadata(id) ON DELETE CASCADE
     );
@@ -99,13 +115,15 @@ function createEntityTables() {
       record_id TEXT NOT NULL,
       session_id TEXT NOT NULL,
       seq INTEGER NOT NULL,
-      type TEXT NOT NULL CHECK(type IN ('think','msg','tool')),
+      type TEXT NOT NULL,
       content TEXT,
       tool_name TEXT,
       tool_args TEXT,
       tool_result TEXT,
       tool_is_error INTEGER DEFAULT 0,
       is_complete INTEGER DEFAULT 0,
+      duration_ms INTEGER,
+      content_length INTEGER,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (record_id) REFERENCES chat_records(id) ON DELETE CASCADE,
       FOREIGN KEY (session_id) REFERENCES session_metadata(id) ON DELETE CASCADE
@@ -113,60 +131,18 @@ function createEntityTables() {
 
     CREATE INDEX IF NOT EXISTS idx_chat_records_session ON chat_records(session_id);
     CREATE INDEX IF NOT EXISTS idx_chat_entities_record ON chat_entities(record_id);
+    CREATE INDEX IF NOT EXISTS idx_chat_entities_session ON chat_entities(session_id);
   `);
 }
 
 /**
- * Add columns that may not exist in older schemas.
- */
-function addMissingColumns() {
-  // Users table
-  try { db.exec("ALTER TABLE users ADD COLUMN home_dir TEXT"); } catch {}
-
-  // Entity duration/content length
-  try { db.exec("ALTER TABLE chat_entities ADD COLUMN duration_ms INTEGER"); } catch {}
-  try { db.exec("ALTER TABLE chat_entities ADD COLUMN content_length INTEGER"); } catch {}
-
-  // Token stats columns
-  try { db.exec("ALTER TABLE chat_records ADD COLUMN prompt_tokens INTEGER DEFAULT 0"); } catch {}
-  try { db.exec("ALTER TABLE chat_records ADD COLUMN think_tokens INTEGER DEFAULT 0"); } catch {}
-  try { db.exec("ALTER TABLE chat_records ADD COLUMN output_tokens INTEGER DEFAULT 0"); } catch {}
-  try { db.exec("ALTER TABLE chat_records ADD COLUMN prompt_token_s INTEGER DEFAULT 0"); } catch {}
-  try { db.exec("ALTER TABLE chat_records ADD COLUMN output_token_s INTEGER DEFAULT 0"); } catch {}
-  try { db.exec("ALTER TABLE chat_records ADD COLUMN duration_ms INTEGER"); } catch {}
-  try { db.exec("ALTER TABLE chat_records ADD COLUMN ttft_ms INTEGER"); } catch {}
-
-  // Session-level context size
-  try { db.exec("ALTER TABLE session_metadata ADD COLUMN context_size INTEGER"); } catch {}
-  // Context usage from pi SDK
-  try { db.exec("ALTER TABLE session_metadata ADD COLUMN context_used INTEGER"); } catch {}
-  try { db.exec("ALTER TABLE session_metadata ADD COLUMN context_percent REAL"); } catch {}
-//total_input=?,total_output=?, total_cache_read=?,total_cache_write=?,total_reasoning=?,total_cost=?
-  try { db.exec("ALTER TABLE session_metadata ADD COLUMN total_input INTEGER DEFAULT 0"); } catch {}
-  try { db.exec("ALTER TABLE session_metadata ADD COLUMN total_output INTEGER DEFAULT 0"); } catch {}
-  try { db.exec("ALTER TABLE session_metadata ADD COLUMN total_cache_read INTEGER DEFAULT 0"); } catch {}
-  try { db.exec("ALTER TABLE session_metadata ADD COLUMN total_cache_write INTEGER DEFAULT 0"); } catch {}
-  try { db.exec("ALTER TABLE session_metadata ADD COLUMN total_reasoning INTEGER DEFAULT 0"); } catch {}
-  try { db.exec("ALTER TABLE session_metadata ADD COLUMN total_cost DOUBLE DEFAULT 0"); } catch {}
-
-  // Session file path for loading sessions after restart
-  try { db.exec("ALTER TABLE session_metadata ADD COLUMN pi_session_file TEXT"); } catch {}
-
-  // Generated file tracking columns
-  try { db.exec("ALTER TABLE chat_files ADD COLUMN tool_name TEXT"); } catch {}
-  try { db.exec("ALTER TABLE chat_files ADD COLUMN chat_entity_id INTEGER"); } catch {}
-  try { db.exec("ALTER TABLE chat_files ADD COLUMN asset_id TEXT"); } catch {}
-}
-
-/**
- * Create all database tables and add missing columns.
+ * Create all database tables.
  */
 function createTables() {
   createUserTables();
   createSessionTables();
   createFileTables();
   createEntityTables();
-  addMissingColumns();
 }
 
 export function initDb() {

@@ -1,14 +1,17 @@
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import os from "os";
 import { getUserById } from "../core/db/user-dao.js";
+
+const USERS_DIR = path.join(os.homedir(), ".pi-server", "users");
 
 /**
  * Get the user's upload directory.
  */
 function getUserUploadDir(userId) {
   const user = getUserById(userId);
-  const userDir = user?.home_dir || path.join(process.cwd(), "users", user?.username || "default");
+  const userDir = user?.home_dir || path.join(USERS_DIR, user?.username || "default");
   const uploadDir = path.join(userDir, "uploads");
   fs.mkdirSync(uploadDir, { recursive: true });
   return uploadDir;

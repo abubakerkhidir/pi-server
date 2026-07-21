@@ -1,7 +1,9 @@
 import fs from "fs";
 import path from "path";
+import os from "os";
 import { getDb } from "./db.js";
 
+const USERS_DIR = path.join(os.homedir(), ".pi-server", "users");
 
 /**
  * Get the user's home directory.
@@ -9,7 +11,7 @@ import { getDb } from "./db.js";
 export function getUserHomeDir(userId) {
   const db = getDb();
   const user = db.prepare("SELECT home_dir, username FROM users WHERE id = ?").get(userId);
-  const userDir = path.join(process.cwd(), "users", user?.username || "default");
+  const userDir = path.join(USERS_DIR, user?.username || "default");
   let sessionCwd = user?.home_dir || userDir;
   try {
     if (!fs.statSync(sessionCwd).isDirectory()) sessionCwd = userDir;

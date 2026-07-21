@@ -1,5 +1,8 @@
 import path from "path";
+import os from "os";
 import { getDb } from "./db.js";
+
+const USERS_DIR = path.join(os.homedir(), ".pi-server", "users");
 
 const DEFAULT_TOOLS = ["read", "ls", "bash", "find", "grep", "get_search_content"];
 
@@ -52,7 +55,7 @@ export function loadUserSettings(userId) {
 
   const user = db.prepare("SELECT home_dir, username FROM users WHERE id = ?").get(userId);
   if (user) {
-    settings.home_dir = user.home_dir || path.join(process.cwd(), "users", user.username);
+    settings.home_dir = user.home_dir || path.join(USERS_DIR, user.username);
     settings.username = user.username;
   }
 
