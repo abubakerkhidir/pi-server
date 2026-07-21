@@ -94,7 +94,7 @@ export async function handleChatStream(req, res){
     setEntityBuffer(dbSessionId, entityBuffer);
     const responseStartTime = Date.now();
 
-    const { onEvent,onAgentEnd, lastEvent } = createStreamEventHandler({ writeEvent, entityBuffer, res, dbSessionId, recordId, responseStartTime, userId: req.user.userId, req });
+    const { onEvent,onAgentEnd, lastEvent } = createStreamEventHandler({ writeEvent, entityBuffer, res, dbSessionId, recordId, responseStartTime, userId: req.user.userId, req, session });
 
     // Track full text for session naming
     const { wrappedOnEvent, getFullText } = wrapOnEventForNaming(onEvent);

@@ -43,6 +43,23 @@ function parseToolEntity(entity) {
 }
 
 /**
+ * Parse a compact entity from database row.
+ * Content column stores JSON: { summary, tokensBefore, tokensAfter, savedPct }
+ */
+function parseCompactEntity(entity) {
+  let data = {};
+  try { data = JSON.parse(entity.content || '{}'); } catch {}
+  return {
+    type: 'compact',
+    summary: data.summary || null,
+    tokensBefore: data.tokensBefore ?? null,
+    tokensAfter: data.tokensAfter ?? null,
+    savedPct: data.savedPct ?? null,
+    duration: entity.duration_ms ?? null,
+  };
+}
+
+/**
  * Parse entities from database rows.
  */
 function parseEntities(entities) {
@@ -51,6 +68,7 @@ function parseEntities(entities) {
       case 'think': return parseThinkEntity(entity);
       case 'msg':   return parseMessageEntity(entity);
       case 'tool':  return parseToolEntity(entity);
+      case 'compact': return parseCompactEntity(entity);
       default:      return null;
     }
   }).filter(Boolean);

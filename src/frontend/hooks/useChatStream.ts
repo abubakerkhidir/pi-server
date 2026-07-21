@@ -1,11 +1,13 @@
 import { useRef, useCallback, RefObject } from "react";
 import { createChatStream, type AbortChatStream } from "@/frontend/api";
-import type { AgentReplyEntity, MsgData, ToolData, ThinkData, TokenStats } from "@/frontend/types";
+import type { AgentReplyEntity, MsgData, ToolData, ThinkData, CompactData, TokenStats } from "@/frontend/types";
 
 let thinkCounter = 0;
 let msgCounter = 0;
+let compactCounter = 0;
 const nextThinkId = () => `think-${++thinkCounter}`;
 const nextMsgId = () => `msg-${++msgCounter}`;
+const nextCompactId = () => `compact-${++compactCounter}`;
 
 interface UseChatStreamOptions {
   currentSessionId: string | null;
@@ -84,6 +86,7 @@ function getStreamHandler(sessionIdRef: RefObject<string | null>, onSessionCreat
         break;
       case "thinking": {
         sealLastEntity("msg", entitiesRef.current);
+        sealLastEntity("compact", entitiesRef.current);
         const content = String(data.content || "");
         const lastThink = getLastEntity<ThinkData>("think", entitiesRef.current);
         if (lastThink && !lastThink.sealed) {
@@ -97,6 +100,7 @@ function getStreamHandler(sessionIdRef: RefObject<string | null>, onSessionCreat
       }
       case "text": {
         sealLastEntity("think", entitiesRef.current);
+        sealLastEntity("compact", entitiesRef.current);
         const content = String(data.content || "");
         const lastMsg = getLastEntity<MsgData>("msg", entitiesRef.current);
         if (lastMsg && !lastMsg.sealed) {
@@ -109,6 +113,7 @@ function getStreamHandler(sessionIdRef: RefObject<string | null>, onSessionCreat
       case "tool_start": {
         sealLastEntity("think", entitiesRef.current);
         sealLastEntity("msg", entitiesRef.current);
+        sealLastEntity("compact", entitiesRef.current);
         const toolId = data.id as string;
         entityStartTimes.current.set(toolId, Date.now());
         entitiesRef.current.push({ type: "tool", id: toolId, name: data.name as string, args: data.args });
@@ -142,12 +147,30 @@ function getStreamHandler(sessionIdRef: RefObject<string | null>, onSessionCreat
         onTokenStats?.(data as unknown as TokenStats);
         break;
       }
-      case "compact_result": {
+      case "compact_start": {
         sealLastEntity("think", entitiesRef.current);
         sealLastEntity("msg", entitiesRef.current);
-        const { summary, tokensBefore, tokensAfter, savedPct } = data as { summary: string; tokensBefore: number; tokensAfter: number; savedPct: number };
-        const summaryText = `**Context compacted** — ${tokensBefore} → ${tokensAfter} tokens (${savedPct}% saved)\n\n${summary}`;
-        entitiesRef.current.push({ type: "msg", id: nextMsgId(), content: summaryText, sealed: true });
+        const id = nextCompactId();
+        entityStartTimes.current.set(id, Date.now());
+        entitiesRef.current.push({ type: "compact", id, sealed: false });
+        break;
+      }
+      case "compact_result": {
+        const { summary, tokensBefore, tokensAfter, savedPct, duration } = data as {
+          summary: string; tokensBefore: number; tokensAfter: number; savedPct: number; duration?: number;
+        };
+        const compact = getLastEntity<CompactData>("compact", entitiesRef.current);
+        if (compact && !compact.sealed) {
+          compact.summary = summary;
+          compact.tokensBefore = tokensBefore;
+          compact.tokensAfter = tokensAfter;
+          compact.savedPct = savedPct;
+          if (duration != null) {
+            compact.duration = duration;
+            entityStartTimes.current.delete(compact.id);
+          }
+        }
+        sealLastEntity("compact", entitiesRef.current);
         break;
       }
       case "done":

@@ -101,7 +101,19 @@ export interface ThinkData {
   totalLength?: number; // characters
 }
 
-export type AgentReplyEntity = MsgData | ToolData | ThinkData;
+export interface CompactData {
+  type: "compact";
+  id: string;
+  summary?: string;
+  tokensBefore?: number;
+  tokensAfter?: number;
+  savedPct?: number;
+  startedAt?: number;
+  duration?: number; // milliseconds
+  sealed?: boolean;
+}
+
+export type AgentReplyEntity = MsgData | ToolData | ThinkData | CompactData;
 
 export interface UserMsg {
   content: string;

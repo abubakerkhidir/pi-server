@@ -149,6 +149,26 @@ export class PiSessionManager {
           });
           break;
         }
+        case "compaction_start": {
+          onEvent?.({ type: "compact_start", reason: event.reason });
+          break;
+        }
+        case "compaction_end": {
+          if (event.result && !event.aborted) {
+            const { summary, tokensBefore, estimatedTokensAfter } = event.result;
+            const savedPct = tokensBefore > 0
+              ? Math.round((1 - estimatedTokensAfter / tokensBefore) * 100)
+              : 0;
+            onEvent?.({
+              type: "compact_result",
+              summary,
+              tokensBefore,
+              tokensAfter: estimatedTokensAfter,
+              savedPct,
+            });
+          }
+          break;
+        }
         case "agent_end": {
           try {
             const ctxUsage = session.getContextUsage();

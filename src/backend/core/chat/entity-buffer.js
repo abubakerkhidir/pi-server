@@ -9,11 +9,14 @@ function calculateDuration(startedAt) {
 }
 
 /**
- * Calculate content length for think or message entities.
+ * Calculate content length for think, message, or compact entities.
  */
 function calculateContentLength(entity) {
   if (entity.type === 'think' || entity.type === 'msg') {
     return (entity.content || '').length;
+  }
+  if (entity.type === 'compact') {
+    return (entity.summary || '').length;
   }
   return null;
 }
@@ -27,7 +30,9 @@ function buildEntityParams(entity, recordId, dbSessionId, seq) {
     dbSessionId,
     seq,
     entity.type,
-    entity.type === 'think' || entity.type === 'msg' ? entity.content : null,
+    entity.type === 'think' || entity.type === 'msg' ? entity.content
+      : entity.type === 'compact' ? JSON.stringify({ summary: entity.summary, tokensBefore: entity.tokensBefore, tokensAfter: entity.tokensAfter, savedPct: entity.savedPct })
+      : null,
     entity.type === 'tool' ? entity.toolName : null,
     entity.type === 'tool' ? JSON.stringify(entity.toolArgs ?? {}) : null,
     entity.type === 'tool' ? JSON.stringify(entity.result ?? null) : null,

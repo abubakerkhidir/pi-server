@@ -31,6 +31,35 @@ function calculateOutputTokensPerSecond(outputTokens, generationSec) {
   return generationSec > 0 ? Math.round(outputTokens / generationSec) : 0;
 }
 
+//this is called whenever usage_data event is sent by pi-session-manager during message-end (one agentReply can have multiple msg-end event so we accumlate total on the state for the agentReply and for entire session)
+export function fillUsageData(event, state) {
+  const input = event.input || 0;
+  const output = event.output || 0;
+  const cacheRead = event.cacheRead || 0
+  const cacheWrite = event.cacheWrite || 0
+  const reasoning = event.reasoning || 0
+  if (!state.usageData) {
+    state.usageData = {
+      prompt_tokens: input,
+      output_tokens: output,
+      think_tokens: reasoning,
+      cache_read: cacheRead,
+      cache_write: cacheWrite,
+    };
+  } else {
+    state.usageData.prompt_tokens += input;
+    state.usageData.output_tokens += output;
+    state.usageData.think_tokens += reasoning;
+    state.usageData.cache_read += cacheRead;
+    state.usageData.cache_write += cacheWrite;
+  }
+  state.cumulativeInput += input;
+  state.cumulativeOutput += output;
+  state.cumulativeCacheRead += cacheRead;
+  state.cumulativeCacheWrite += cacheWrite;
+  state.cumulativeReasoning += reasoning;
+}   
+
 /**
  * Calculate token stats from usage data and timing.
  * @param {Object} usageData - Accumulated usage data
@@ -38,7 +67,11 @@ function calculateOutputTokensPerSecond(outputTokens, generationSec) {
  * @param {number} firstTokenTime - First token timestamp
  * @returns {Object} Token stats
  */
-export function calculateTokenStats(usageData, responseStartTime, state) {
+export function calculateTokenStats(usageData, responseStartTime, state, session) {
+  // If provider didn't report reasoning tokens but thinking content exists, estimate from char count
+  if (usageData && !usageData.think_tokens && state.thinkChars > 0) {
+    usageData.think_tokens = Math.round(state.thinkChars / 4);
+  }
   const totalDurationMs = Date.now() - responseStartTime;
   const ttftMs = state.firstTokenTime ? state.firstTokenTime - responseStartTime : totalDurationMs;
 
@@ -49,7 +82,25 @@ export function calculateTokenStats(usageData, responseStartTime, state) {
   const ttftSec = ttftMs / 1000;
   const generationSec = calculateGenerationSeconds(totalDurationMs, ttftMs);
 
-  return {
+  // Build session totals for lifetime tracking across compactions. After compaction, getSessionStats() only returns current-turn usage because
+  // previous messages were removed. We use cumulativeInput/Output (tracked in handleUsageEvent) to reconstruct the full lifetime total.
+  let sessionTotals = {};
+  if (session) {
+    try {
+      const sdkStats = session.getSessionStats();
+      const sdkTokens = sdkStats?.tokens || {};
+      const outputTotal = state.compactOccurred? (sdkTokens.output || 0) + state.cumulativeOutput: state.cumulativeOutput;
+      const inputTotal = state.compactOccurred? (sdkTokens.input || 0) + state.cumulativeInput: state.cumulativeInput;
+      const cacheReadTotal = state.compactOccurred? (sdkTokens.cacheRead || 0) + state.cumulativeCacheRead: state.cumulativeCacheRead;
+      const cacheWriteTotal = state.compactOccurred? (sdkTokens.cacheWrite || 0) + state.cumulativeCacheWrite: state.cumulativeCacheWrite;
+      const reasoningTotal = state.compactOccurred? (sdkTokens.reasoning || 0) + state.cumulativeReasoning: state.cumulativeReasoning;
+      const ctxSize = sdkStats?.contextUsage?.tokens || sdkTokens?.total || state.contextUsage.contextSize || 0
+      const ctxWin = sdkStats?.contextUsage?.contextWindow || state.contextUsage.contextWindow || 128000
+      const ctxPercent = sdkStats?.contextUsage?.percent || state.contextUsage.contextPercent || 0
+      sessionTotals = {ctxSize,ctxWin,ctxPercent,total_input: inputTotal,total_output: outputTotal,total_cache_read:cacheReadTotal,total_cache_write:cacheWriteTotal,total_reasoning:reasoningTotal, total_cost: sdkStats?.cost || 0};
+    } catch {}
+  }     
+  const tokenUsage= {
     prompt_tokens: promptTokens,
     think_tokens: thinkTokens,
     output_tokens: outputTokens,
@@ -57,9 +108,10 @@ export function calculateTokenStats(usageData, responseStartTime, state) {
     output_token_s: calculateOutputTokensPerSecond(outputTokens, generationSec),
     ttft_ms: ttftMs,
     totalDurationMs,
-    contextSize: state.contextUsage.contextSize, 
-    contextPercent: state.contextUsage.contextPercent
+    sessionTotals
   };
+
+  return tokenUsage
 }
 
 /**

@@ -4,6 +4,7 @@ import { copyToClipboard, CopySvg, TextSvg } from "@/frontend/lib/clipboard";
 import ToolBlock from "./ToolBlock";
 import ThinkingBlock from "./ThinkingBlock";
 import TextBlock from "./TextBlock";
+import CompactBlock from "./CompactBlock";
 
 interface AgentReplyProps {
   recordId: string;
@@ -69,6 +70,23 @@ export default function AgentReply({
       if (!toolsHidden && !collapsed) {
         entityJsx.push(
           <ToolBlock key={entity.id} entity={entity} userSettings={userSettings} content={entity.args?.content} sealed={entity.sealed} />,
+        );
+      }
+    } else if (entity.type === "compact") {
+      if (!collapsed) {
+        entityJsx.push(
+          <CompactBlock
+            key={entity.id}
+            id={entity.id}
+            summary={entity.summary}
+            tokensBefore={entity.tokensBefore}
+            tokensAfter={entity.tokensAfter}
+            savedPct={entity.savedPct}
+            startedAt={entity.startedAt}
+            duration={entity.duration}
+            sealed={entity.sealed}
+            type="compact"
+          />,
         );
       }
     }

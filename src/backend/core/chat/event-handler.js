@@ -1,4 +1,4 @@
-import { calculateTokenStats, saveTokenStats, updateSessionContextUsage } from "./token-stats.js";
+import { fillUsageData,calculateTokenStats, saveTokenStats, updateSessionContextUsage } from "./token-stats.js";
 
 
 /**
@@ -7,6 +7,7 @@ import { calculateTokenStats, saveTokenStats, updateSessionContextUsage } from "
 function handleTextEvent(event, entityBuffer, writeEvent, state) {
   if (state.firstTokenTime === null) state.firstTokenTime = Date.now();
   entityBuffer.sealAndSave('think');
+  entityBuffer.sealAndSave('compact');
   const lastMsg = entityBuffer.lastEntity('msg');
   if (lastMsg && !lastMsg.saved) {
     lastMsg.content += event.content;
@@ -22,6 +23,7 @@ function handleTextEvent(event, entityBuffer, writeEvent, state) {
 function handleThinkingEvent(event, entityBuffer, writeEvent, state) {
   if (state.firstTokenTime === null) state.firstTokenTime = Date.now();
   state.thinkChars = (state.thinkChars || 0) + (event.content?.length || 0);
+  entityBuffer.sealAndSave('compact');
   const lastThink = entityBuffer.lastEntity('think');
   if (lastThink && !lastThink.saved) {
     lastThink.content += event.content;
@@ -39,6 +41,7 @@ function handleToolStartEvent(event, entityBuffer, writeEvent, state) {
   if (state.firstTokenTime === null) state.firstTokenTime = Date.now();
   entityBuffer.sealAndSave('think');
   entityBuffer.sealAndSave('msg');
+  entityBuffer.sealAndSave('compact');
   entityBuffer.addEntity({type: 'tool',toolId: event.id,toolName: event.name,toolArgs: event.args ?? {},result: null,isError: false,isComplete: false,startedAt: Date.now(),saved: false});
   writeEvent("tool_start", {id: event.id,name: event.name,args: event.args});
 }
@@ -71,25 +74,51 @@ function saveToolToBuffer(tool, reslt, err, entityBuffer) {
   }
 }
 
-/**
- * Handle usage event from pi session - accumulate across multiple API calls.
- */
+//Handle usage event from pi session - accumulate across multiple API calls. Also tracks cumulative lifetime tokens (survives compaction resets).
 function handleUsageEvent(event, state) {
-  if (!state.usageData) {
-    state.usageData = {
-      prompt_tokens: event.input || 0,
-      output_tokens: event.output || 0,
-      think_tokens: event.reasoning || 0,
-      cache_read: event.cacheRead || 0,
-      cache_write: event.cacheWrite || 0,
-    };
-  } else {
-    state.usageData.prompt_tokens += event.input || 0;
-    state.usageData.output_tokens += event.output || 0;
-    state.usageData.think_tokens += event.reasoning || 0;
-    state.usageData.cache_read += event.cacheRead || 0;
-    state.usageData.cache_write += event.cacheWrite || 0;
+  fillUsageData(event,state)
+}
+
+/**
+ * Handle compact_start event - seal previous entities (safety) and add compact entity.
+ */
+function handleCompactStartEvent(entityBuffer, writeEvent, state) {
+  entityBuffer.sealAndSave('think');
+  entityBuffer.sealAndSave('msg');
+  state.compactStartedAt = Date.now();
+  entityBuffer.addEntity({
+    type: 'compact',
+    summary: null,
+    tokensBefore: null,
+    tokensAfter: null,
+    savedPct: null,
+    startedAt: state.compactStartedAt,
+    saved: false,
+  });
+}
+
+/**
+ * Handle compact_result event - update compact entity with data and seal it.
+ */
+function handleCompactResultEvent(event, entityBuffer, writeEvent, state) {
+  const compact = entityBuffer.lastEntity('compact');
+  if (compact && !compact.saved) {
+    compact.summary = event.summary;
+    compact.tokensBefore = event.tokensBefore;
+    compact.tokensAfter = event.tokensAfter;
+    compact.savedPct = event.savedPct;
   }
+  entityBuffer.sealAndSave('compact');
+  const duration = state.compactStartedAt ? Date.now() - state.compactStartedAt : null;
+  state.compactStartedAt = null;
+  state.compactOccurred = true;
+  writeEvent("compact_result", {
+    summary: event.summary,
+    tokensBefore: event.tokensBefore,
+    tokensAfter: event.tokensAfter,
+    savedPct: event.savedPct,
+    duration,
+  });
 }
 
 /**
@@ -106,16 +135,17 @@ function handleContextUsageEvent(event, state) {
 /**
  * Handle done event - flush entities and save token stats.
  */
-function handleDoneEvent(entityBuffer, recordId, dbSessionId, responseStartTime, state) {
+function handleDoneEvent(entityBuffer, recordId, dbSessionId, responseStartTime, state, session) {
   entityBuffer.flushAll();
   // If provider didn't report reasoning tokens but thinking content exists, estimate from char count
   if (state.usageData && !state.usageData.think_tokens && state.thinkChars > 0) {
     state.usageData.think_tokens = Math.round(state.thinkChars / 4);
   }
-  const tokenStats = calculateTokenStats(state.usageData, responseStartTime, state) //.firstTokenTime);
+  const tokenStats = calculateTokenStats(state.usageData, responseStartTime, state, session);
   saveTokenStats(recordId, tokenStats);
   updateSessionContextUsage(dbSessionId, state.contextUsage);
-  return tokenStats;
+
+  return tokenStats
 }
 
 /**
@@ -124,9 +154,17 @@ function handleDoneEvent(entityBuffer, recordId, dbSessionId, responseStartTime,
  * @returns {Function} onEvent handler
  */
 export function createStreamEventHandler(params) {
-  const {writeEvent,entityBuffer,dbSessionId,recordId,responseStartTime,userId,req} = params;
+  const {writeEvent,entityBuffer,dbSessionId,recordId,responseStartTime,userId,req,session} = params;
 
-  const state = {firstTokenTime: null,usageData: null,contextUsage: null,thinkChars: 0};
+  const state = {
+    firstTokenTime: null,
+    usageData: null,
+    contextUsage: null,
+    thinkChars: 0,
+    cumulativeInput: 0, cumulativeCacheRead:0, cumulativeCacheWrite:0, cumulativeReasoning: 0, cumulativeOutput: 0,
+    compactOccurred: false,
+    compactStartedAt: null,
+  };
 
   // Handler params that need to be passed to async handlers
   const handlerParams = {recordId,dbSessionId,userId,req,};
@@ -160,13 +198,12 @@ export function createStreamEventHandler(params) {
         handleUsageEvent(event, state);
         break;
 
+      case "compact_start":
+        handleCompactStartEvent(entityBuffer, writeEvent, state);
+        break;
+
       case "compact_result":
-        writeEvent("compact_result", {
-          summary: event.summary,
-          tokensBefore: event.tokensBefore,
-          tokensAfter: event.tokensAfter,
-          savedPct: event.savedPct,
-        });
+        handleCompactResultEvent(event, entityBuffer, writeEvent, state);
         break;
 
       case "context_usage":
@@ -179,7 +216,7 @@ export function createStreamEventHandler(params) {
           lastEvent.event = event
           onAgentEndResolve();
         }else{
-          const tokenStats = handleDoneEvent(entityBuffer, recordId, dbSessionId, responseStartTime, state);
+          const tokenStats = handleDoneEvent(entityBuffer, recordId, dbSessionId, responseStartTime, state, session);
           writeEvent("record_stats", tokenStats);
           lastEvent.event = event
           onAgentEndResolve();
