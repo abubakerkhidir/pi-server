@@ -50,6 +50,7 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
   useEffect(getSettingsLoaderFun(setUserSettings, userSettings, setCurrentModel), []);
   useEffect(getPageUrlHashEffect(isProcessing, loadAndShowSession), []);
 
+  console.log('rndr chat: ',chatState)
   return (
     <div className="chat-layout">
       <ChatSidebar
