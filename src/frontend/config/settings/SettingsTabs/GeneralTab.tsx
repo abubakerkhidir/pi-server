@@ -7,6 +7,15 @@ interface GeneralTabProps {
   onChange: (field: keyof Settings, value: unknown) => void;
 }
 
+const THINK_LEVELS = [
+  { value: "off", label: "Off" },
+  { value: "minimal", label: "Minimal" },
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
+  { value: "xhigh", label: "Max" },
+];
+
 const Checkbox: React.FC<{ field: keyof Settings; label: string; desc: string; settings: Settings }> = ({ field, label, desc, settings }) => (
   <div className="setting-item">
     <label>
@@ -100,16 +109,32 @@ export default function GeneralTab({ settings, models, onChange }: GeneralTabPro
         {numField("thinking_lines", "Thinking lines", "Default visible lines for reasoning blocks.", 3, 20)}
         {numField("tool_lines", "Tool lines", "Default visible lines for tool output blocks.", 5, 50)}
 
+        <div className="setting-item" key="think_level">
+          <label>
+            Default Think Level
+            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>— Default thinking level for reasoning models (used when switching models without an active session).</span>
+          </label>
+          <select
+            style={{ maxWidth: 200, padding: "6px 10px", background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)", fontSize: 13 }}
+            value={settings.think_level || "medium"}
+            onChange={(e) => onChange("think_level", e.target.value)}
+          >
+            {THINK_LEVELS.map((lvl) => (
+              <option key={lvl.value} value={lvl.value}>{lvl.label}</option>
+            ))}
+          </select>
+        </div>
+
         <div className="setting-item" key="model">
           <label>
             Model
-            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>— AI model to use for responses.</span>
+            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>— Default AI model to use for responses.</span>
           </label>
           <select id="model_id" style={{ maxWidth: 300, padding: "6px 10px", background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)", fontSize: 13 }} value={settings.model_id || ""} onChange={(e) => onChange("model_id", e.target.value)}>
             <option value="">Default</option>
             {models.map((g) => (
               <optgroup key={g.provider} label={escapeHtmlSimple(g.provider)}>
-                {g.models.map((m) => (<option key={m.id} value={m.id}>{m.name}</option>))}
+                {g.models.map((m) => (<option key={m.id} value={`${g.provider}/${m.id}`}>{m.name}</option>))}
               </optgroup>
             ))}
           </select>

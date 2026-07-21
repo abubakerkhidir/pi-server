@@ -15,6 +15,7 @@ export function getDefaultSettings() {
     thinking_lines: 3,
     tool_lines: 5,
     model_id: "",
+    think_level: "medium",
     send_on_enter: true,
     copy_text_as_plain: true,
     enable_continue: true,

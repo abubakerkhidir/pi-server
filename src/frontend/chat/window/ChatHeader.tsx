@@ -8,12 +8,15 @@ interface ChatHeaderProps {
   onLogout: () => void;
   currentModel: string;
   onModelSelect: (model: ModelInfo) => void;
+  onThinkLevelChange: (level: string) => void;
   sidebarCollapsed: boolean;
   onSidebarToggle: () => void;
   modelInfo: ModelInfo | null;
+  currentThinkLevel: string | null;
   onSummarizeAndNew: () => void;
   summarizing: boolean;
   sessionId?: string | null;
+  isProcessing: boolean;
 }
 
 export default function ChatHeader({
@@ -22,12 +25,15 @@ export default function ChatHeader({
   onLogout,
   currentModel,
   onModelSelect,
+  onThinkLevelChange,
   sidebarCollapsed,
   onSidebarToggle,
   modelInfo,
+  currentThinkLevel,
   onSummarizeAndNew,
   summarizing,
   sessionId,
+  isProcessing,
 }: ChatHeaderProps) {
   const inputTypes = modelInfo?.input || [];
   const hasVision = inputTypes.includes("image");
@@ -42,9 +48,22 @@ export default function ChatHeader({
           </button>
         )}
         <span className="logo">pi-server</span>
-        <ModelSelector currentModel={currentModel} onModelSelect={onModelSelect} />
+        <div className="model-select-wrapper" style={{ display: "inline-block", position: "relative" }}>
+          <ModelSelector
+            currentModel={currentModel}
+            onModelSelect={onModelSelect}
+            disabled={isProcessing}
+          />
+        </div>
         {hasReasoning && (
-          <ThinkLevelSelector sessionId={sessionId ?? null} modelId={modelInfo?.id ?? null} modelProvider={modelInfo?.provider ?? null} />
+          <ThinkLevelSelector
+            sessionId={sessionId ?? null}
+            modelId={modelInfo?.id ?? null}
+            modelProvider={modelInfo?.provider ?? null}
+            currentLevel={currentThinkLevel}
+            onLevelChange={onThinkLevelChange}
+            disabled={isProcessing}
+          />
         )}
         <span className="model-tags">
           {hasVision && <span className="model-tag vision">vision</span>}

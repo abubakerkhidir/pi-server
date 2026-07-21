@@ -3,7 +3,7 @@ import { authMiddleware } from "../middleware/auth.js";
 import upload from "../middleware/upload.js";
 import { handleChatStream } from "../core/chat/chat-stream-handler.js";
 import { getPiManager } from "../core/chat/state.js";
-import { SessionManager, createAgentSession } from "@earendil-works/pi-coding-agent";
+import { getPiModelById, computeThinkingLevels } from "../core/pi/pi-model-mngmt.js";
 
 const router = Router();
 
@@ -20,38 +20,46 @@ router.get("/chat/commands", authMiddleware, (req, res) => {
   }
 });
 
+// Get available/current thinking levels for a session (or model-only)
 router.get("/chat/thinking", authMiddleware, async (req, res) => {
   const { sessionId, modelId, modelProvider } = req.query;
   const piManager = getPiManager();
+
   let model = null;
-  // Look up the model if provided (for when session isn't loaded yet)
   if (modelId && modelProvider) {
-    try {
-      const sm = SessionManager.inMemory();
-      const { session: tmp } = await createAgentSession({
-        sessionManager: sm,
-        cwd: process.cwd(),
-      });
-      model = tmp.modelRegistry.find(modelProvider, modelId);
-      tmp.dispose();
-    } catch {
-      /* model lookup failed, will use session levels */
-    }
+    model = await getPiModelById(modelProvider, modelId);
   }
+
   const info = piManager.getThinkingInfo(sessionId, model);
   res.json(info ?? { current: null, available: [] });
 });
 
-router.post("/chat/thinking", authMiddleware, (req, res) => {
+// Set thinking level on a session
+router.post("/chat/thinking", authMiddleware, async (req, res) => {
   const { sessionId, level } = req.body;
   if (!sessionId || !level) return res.status(400).json({ error: "sessionId and level required" });
   const piManager = getPiManager();
   try {
-    const effective = piManager.setThinkingLevel(sessionId, level);
+    const effective = await piManager.setThinkingLevel(sessionId, level, req.user.userId);
     res.json({ level: effective });
   } catch (err) {
     res.status(404).json({ error: err.message });
   }
 });
 
-export default router
+// Change model on a session
+router.post("/chat/session-model", authMiddleware, async (req, res) => {
+  const { sessionId, provider, modelId } = req.body;
+  if (!sessionId || !provider || !modelId) {
+    return res.status(400).json({ error: "sessionId, provider, and modelId required" });
+  }
+  const piManager = getPiManager();
+  try {
+    const result = await piManager.setModelOnSession(sessionId, provider, modelId, req.user.userId);
+    res.json(result);
+  } catch (err) {
+    res.status(404).json({ error: err.message });
+  }
+});
+
+export default router;

@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
-import { getThinkingInfo, setThinkingLevel } from "@/frontend/api";
+import { getThinkingInfo } from "@/frontend/api";
 
 interface ThinkLevelSelectorProps {
   sessionId: string | null;
-  /** When model changes or session changes, re-fetch */
   modelId: string | null;
-  /** Provider of the model (e.g. "openrouter") */
   modelProvider: string | null;
+  currentLevel: string | null;
+  onLevelChange: (level: string) => void;
+  disabled: boolean;
 }
 
 const LEVEL_LABELS: Record<string, string> = {
@@ -18,46 +19,71 @@ const LEVEL_LABELS: Record<string, string> = {
   xhigh: "max",
 };
 
-export default function ThinkLevelSelector({ sessionId, modelId, modelProvider }: ThinkLevelSelectorProps) {
+export default function ThinkLevelSelector({
+  sessionId,
+  modelId,
+  modelProvider,
+  currentLevel,
+  onLevelChange,
+  disabled,
+}: ThinkLevelSelectorProps) {
   const [available, setAvailable] = useState<string[]>([]);
-  const [current, setCurrent] = useState<string | null>(null);
+  const [displayLevel, setDisplayLevel] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Fetch available levels when model or session changes
   useEffect(() => {
-    if (!sessionId && modelId) {
-      // No session yet — use model info directly to show available levels
-      getThinkingInfo("", modelId, modelProvider ?? undefined)
-        .then((info) => {
-          setAvailable(info.available ?? []);
-          setCurrent(info.current);
-        })
-        .catch(() => {});
-      return;
-    }
-    getThinkingInfo(sessionId, modelId ?? undefined, modelProvider ?? undefined)
-      .then((info) => {
+    const fetchLevels = async () => {
+      if (!modelId) return;
+      setLoading(true);
+      try {
+        const info = await getThinkingInfo(
+          sessionId ?? undefined,
+          modelId,
+          modelProvider ?? undefined
+        );
         setAvailable(info.available ?? []);
-        setCurrent(info.current);
-      })
-      .catch(() => {});
+        
+        // Determine the display level
+        if (sessionId && info.current) {
+          // Session active: use server-reported current level
+          setDisplayLevel(info.current);
+        } else if (!sessionId) {
+          // No session: use the parent's currentLevel (auto-set from default)
+          // Fall back to available levels if parent's level isn't in available
+          if (info.available.includes(currentLevel ?? "")) {
+            setDisplayLevel(currentLevel);
+          } else {
+            // Find closest available level
+            const fallback = info.available.find(lvl => {
+              const idx = info.available.indexOf(lvl);
+              const currentIdx = info.available.indexOf(currentLevel ?? "");
+              return currentIdx >= 0 ? idx <= currentIdx : true;
+            }) ?? info.available[0];
+            setDisplayLevel(fallback);
+          }
+        }
+      } catch {
+        // ignore
+      }
+      setLoading(false);
+    };
+    fetchLevels();
   }, [sessionId, modelId]);
 
-  // Only require available levels; sessionId can be empty when showing model-based levels
+  // Update display when parent's currentLevel changes
+  useEffect(() => {
+    if (!sessionId && currentLevel && available.includes(currentLevel)) {
+      setDisplayLevel(currentLevel);
+    }
+  }, [currentLevel, sessionId, available]);
+
   if (available.length === 0) return null;
 
-  const handleChange = async (level: string) => {
-    if (loading) return;
-    setLoading(true);
-    try {
-      // Only update level if we have a session; otherwise it's model-only display
-      if (sessionId) {
-        const res = await setThinkingLevel(sessionId, level);
-        setCurrent(res.level);
-      } else {
-        setCurrent(level); // just update local state for display
-      }
-    } catch {}
-    setLoading(false);
+  const handleChange = (level: string) => {
+    if (disabled) return;
+    setDisplayLevel(level);
+    onLevelChange(level);
   };
 
   return (
@@ -67,8 +93,8 @@ export default function ThinkLevelSelector({ sessionId, modelId, modelProvider }
         {available.map((lvl) => (
           <button
             key={lvl}
-            className={`think-level-btn${current === lvl ? " active" : ""}`}
-            disabled={loading}
+            className={`think-level-btn${displayLevel === lvl ? " active" : ""}`}
+            disabled={disabled}
             onClick={() => handleChange(lvl)}
           >
             {LEVEL_LABELS[lvl] ?? lvl}

@@ -168,9 +168,9 @@ export async function deleteFile(fileId: string): Promise<void> {
   return (await apiFetchWithPrms(`/api/files/${fileId}`, { method: "DELETE" })).data;
 }
 
-export async function getThinkingInfo(sessionId: string, modelId?: string, modelProvider?: string): Promise<{ current: string | null; available: string[] }> {
+export async function getThinkingInfo(sessionId?: string | null, modelId?: string, modelProvider?: string): Promise<{ current: string | null; available: string[] }> {
   const params: string[] = [];
-  if (sessionId) { params.push("sessionId", encodeURIComponent(sessionId)); }
+  if (sessionId && sessionId !== "") { params.push("sessionId", encodeURIComponent(sessionId)); }
   if (modelId) { params.push("modelId", modelId); }
   if (modelProvider) { params.push("modelProvider", modelProvider); }
   return (await apiFetchWithPrms("/api/chat/thinking", undefined, ...params)).data;
@@ -178,6 +178,10 @@ export async function getThinkingInfo(sessionId: string, modelId?: string, model
 
 export async function setThinkingLevel(sessionId: string, level: string): Promise<{ level: string }> {
   return (await apiPost("/api/chat/thinking", { sessionId, level })).data;
+}
+
+export async function changeSessionModel(sessionId: string, provider: string, modelId: string): Promise<{ model: { id: string; name: string; provider: string; input?: string[]; reasoning?: boolean }; availableLevels: string[]; currentLevel: string }> {
+  return (await apiPost("/api/chat/session-model", { sessionId, provider, modelId })).data;
 }
 
 export type ChatStreamCallback = (event: string, data: Record<string, unknown>) => void;
@@ -190,12 +194,18 @@ export function createChatStream(
   files: File[] | undefined,
   onEvent: ChatStreamCallback,
   onError: ChatStreamErrorCallback,
+  modelId?: string,
+  modelProvider?: string,
+  thinkLevel?: string,
 ): AbortChatStream {
   const abortController = new AbortController();
 
   const formData = new FormData();
   formData.append("prompt", prompt);
   if (sessionId) formData.append("sessionId", sessionId);
+  if (modelId) formData.append("modelId", modelId);
+  if (modelProvider) formData.append("modelProvider", modelProvider);
+  if (thinkLevel) formData.append("thinkLevel", thinkLevel);
   if (files) {
     for (const f of files) {
       formData.append("files", f);

@@ -56,6 +56,7 @@ export interface Settings {
   model_provider?: string;
   home_dir?: string;
   tools_enabled?: string[];
+  think_level?: string;
 }
 
 export interface ToolGroup {
@@ -188,6 +189,7 @@ export type UserSettings = {
   model_id?: string;
   home_dir?: string;
   tools_enabled?: string[];
+  think_level?: string;
 };
 
 

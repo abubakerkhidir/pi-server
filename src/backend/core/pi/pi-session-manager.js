@@ -6,19 +6,7 @@ import { loadExistingSession } from "./pi-session-loader.js";
 import { createNewSession } from "./pi-new-session.js";
 import { warning } from "../../utils/logger.js";
 import { BUILTIN_COMMANDS, parseBuiltinCommand, executeBuiltinCommand } from "./pi-commands.js";
-import { SessionManager, createAgentSession } from "@earendil-works/pi-coding-agent";
-
-const EXTENDED_THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"];
-
-function computeThinkingLevels(model) {
-  if (!model?.reasoning) return ["off"];
-  return EXTENDED_THINKING_LEVELS.filter((level) => {
-    const mapped = model.thinkingLevelMap?.[level];
-    if (mapped === null) return false;
-    if (level === "xhigh") return mapped !== undefined;
-    return true;
-  });
-}
+import { getPiModelById, computeThinkingLevels, findFallbackLevel } from "./pi-model-mngmt.js";
 
 export class PiSessionManager {
   constructor(cwd) {
@@ -65,9 +53,22 @@ export class PiSessionManager {
     return { session, piSessionId: newPiSessionId };
   }
 
+  /**
+   * Load a session into the active list if not already loaded.
+   */
+  async ensureSessionLoaded(piSessionId, userId) {
+    if (!piSessionId) return null;
+    if (this.activeSessions.has(piSessionId)) {
+      return this.activeSessions.get(piSessionId);
+    }
+    const { session } = await this.getOrCreateSession(userId, piSessionId);
+    return session;
+  }
+
   getCommands(piSessionId) {
     const session = this.activeSessions.get(piSessionId);
-    const extensionCmds = session ? (session.getCommands?.() ?? []) : [];
+    if (!session) return [];
+    const extensionCmds = session.getCommands?.() ?? [];
     return [
       ...BUILTIN_COMMANDS.map((c) => ({ name: c.name, description: c.description, source: "builtin" })),
       ...extensionCmds.map((c) => ({ name: c.name, description: c.description || "", source: c.source || "extension" })),
@@ -91,17 +92,77 @@ export class PiSessionManager {
     };
   }
 
-  setThinkingLevel(piSessionId, level) {
-    const session = this.activeSessions.get(piSessionId);
+  async setModelOnSession(piSessionId, provider, modelId, userId, currentThinkLevel) {
+    // Load session if not already in active list
+    const session = await this.ensureSessionLoaded(piSessionId, userId);
     if (!session) throw new Error(`Session ${piSessionId} not found`);
-    session.setThinkingLevel(level);
+
+    const model = session.modelRegistry.find(provider, modelId);
+    if (!model) throw new Error(`Model ${provider}/${modelId} not found`);
+
+    await session.setModel(model);
+
+    // Determine available levels for new model
+    const availableLevels = computeThinkingLevels(model);
+    
+    // Adjust think level if current is not available
+    let effectiveLevel = currentThinkLevel;
+    if (effectiveLevel && !availableLevels.includes(effectiveLevel)) {
+      effectiveLevel = findFallbackLevel(effectiveLevel, availableLevels);
+    }
+    if (!effectiveLevel || (effectiveLevel === "off" && availableLevels.length > 0)) {
+      effectiveLevel = availableLevels[0] || "off";
+    }
+
+    // Set the thinking level
+    try {
+      await session.setThinkingLevel(effectiveLevel);
+    } catch {
+      // Some models may not support setThinkingLevel
+    }
+
+    return { 
+      model: { id: model.id, name: model.name, provider: model.provider, input: model.input, reasoning: model.reasoning },
+      availableLevels, 
+      currentLevel: session.thinkingLevel || effectiveLevel 
+    };
+  }
+
+  async setThinkingLevel(piSessionId, level, userId) {
+    // Load session if not already in active list
+    const session = await this.ensureSessionLoaded(piSessionId, userId);
+    if (!session) throw new Error(`Session ${piSessionId} not found`);
+    try {
+      await session.setThinkingLevel(level);
+    } catch (err) {
+      throw new Error(`Failed to set thinking level: ${err.message}`);
+    }
     return session.thinkingLevel;
   }
 
-  async prompt(piSessionId, text, { images, onEvent } = {}) {
+  async prompt(piSessionId, text, { images, onEvent, modelId, modelProvider, thinkLevel } = {}) {
     const session = this.activeSessions.get(piSessionId);
     if (!session) {
       throw new Error(`Session ${piSessionId} not found`);
+    }
+
+    // Apply model override if provided (from top-bar during no-session state)
+    if (modelId && modelProvider && session.model?.id !== modelId) {
+      try {
+        const model = session.modelRegistry.find(modelProvider, modelId);
+        if (model) {
+          await session.setModel(model);
+          // Apply think level override
+          if (thinkLevel) {
+            const available = computeThinkingLevels(model);
+            if (available.includes(thinkLevel)) {
+              await session.setThinkingLevel(thinkLevel);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to apply model override on prompt:', err.message);
+      }
     }
 
     // Intercept built-in slash commands (e.g. /compact)

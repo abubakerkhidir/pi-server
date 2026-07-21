@@ -75,6 +75,13 @@ function applyStringUpdates(current, updates) {
     current.model_id = updates.model_id;
   }
 
+  if (updates.think_level !== undefined) {
+    if (typeof updates.think_level !== "string") {
+      return { error: "think_level must be a string" };
+    }
+    current.think_level = updates.think_level;
+  }
+
   return null;
 }
 

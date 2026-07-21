@@ -6,7 +6,7 @@ import ToolsTab from "./SettingsTabs/ToolsTab";
 
 export default function SettingsModal({ isOpen, onClose, onSave, onResumeSession, onSettingsChange }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<"general" | "tools">("general");
-  const [settings, setSettings] = useState<Settings>({ send_on_enter: true, copy_text_as_plain: true, enable_continue: true, parse_pdf_as_image: false, confirm_title_change: true, first_line_title: false, llm_title: false, system_message: "", paste_to_file_length: 0, max_image_resolution: 0, thinking_lines: 3, tool_lines: 5, home_dir: "", tools_enabled: [], model_id: "" });
+  const [settings, setSettings] = useState<Settings>({ send_on_enter: true, copy_text_as_plain: true, enable_continue: true, parse_pdf_as_image: false, confirm_title_change: true, first_line_title: false, llm_title: false, system_message: "", paste_to_file_length: 0, max_image_resolution: 0, thinking_lines: 3, tool_lines: 5, home_dir: "", tools_enabled: [], model_id: "", think_level: "medium" });
   const [toolGroups, setToolGroups] = useState<ToolGroup[]>([]);
   const [models, setModels] = useState<{ provider: string; models: { id: string; name: string }[] }[]>([]);
   const [loading, setLoading] = useState(true);

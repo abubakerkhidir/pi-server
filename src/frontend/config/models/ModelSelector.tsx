@@ -6,20 +6,17 @@ import type { ModelInfo } from "@/frontend/types";
 interface ModelSelectorProps {
   currentModel: string;
   onModelSelect: (model: ModelInfo) => void;
+  disabled?: boolean;
 }
 
 export default function ModelSelector({
   currentModel,
   onModelSelect,
+  disabled = false,
 }: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
-  const [providerList, setProviderList] = useState<
-    { provider: string; models: ModelInfo[] }[]
-  >([]);
-  const [selectedProvider, setSelectedProvider] = useState<{
-    provider: string;
-    models: ModelInfo[];
-  } | null>(null);
+  const [providerList, setProviderList] = useState<{ provider: string; models: ModelInfo[] }[]>([]);
+  const [selectedProvider, setSelectedProvider] = useState<{provider: string;models: ModelInfo[];} | null>(null);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -51,10 +48,12 @@ export default function ModelSelector({
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (disabled) return;
     setOpen(true);
   };
 
   const handleModelSelect = (model: ModelInfo) => {
+    if (disabled) return;
     onModelSelect(model);
     setOpen(false);
     setSelectedProvider(null);
@@ -65,11 +64,12 @@ export default function ModelSelector({
       className="model-selector"
       ref={dropdownRef}
       onClick={handleClick}
+      style={{ cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.5 : 1 }}
     >
       <span className="model-current">{currentModel}</span>
       <span className="model-arrow">▾</span>
 
-      {open && (
+      {open && !disabled && (
         <div
           className="model-dropdown"
           onClick={(e) => e.stopPropagation()}
