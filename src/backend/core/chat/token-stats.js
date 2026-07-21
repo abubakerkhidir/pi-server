@@ -32,7 +32,7 @@ export function fillUsageData(event, state) {
     state.usageData.cache_write += cacheWrite;
   }
   state.sessionTotals.total_input += input;
-  state.sessionTotals.total_cache_write += output;
+  state.sessionTotals.total_output += output;
   state.sessionTotals.total_cache_read += cacheRead;
   state.sessionTotals.total_cache_write += cacheWrite;
   state.sessionTotals.total_reasoning += reasoning;

@@ -83,8 +83,9 @@ export default function InputArea({
         <div className="session-stats-bar" title={`Context: ${sessionStats.context_percent ??0}% of ${sessionStats.context_size.toLocaleString()} tokens`}>
           <span className="session-stat">total-prompt: {fmt(sessionStats.total_input)}</span>
           <span className="session-stat">total-think: {fmt(sessionStats.total_reasoning)}</span>
-          <span className="session-stat">total-text: {fmt(sessionStats.total_output)}</span>
-          <span className="session-stat">total-output: {fmt(sessionStats.total_output||0+sessionStats.total_reasoning||0)}</span>
+          <span className="session-stat">cache-read: {fmt(sessionStats.total_cache_read)}</span>
+          <span className="session-stat">cache-write: {fmt(sessionStats.total_cache_write)}</span>
+          <span className="session-stat">total-output: {fmt(sessionStats.total_output)}</span>
           <span className="session-stat">ctx: {Math.round(sessionStats.context_percent||0)}%/{fmt(sessionStats.context_size)}</span>
         </div>
       )}
