@@ -88,6 +88,7 @@ function handleCompactStartEvent(entityBuffer, writeEvent, state) {
   state.compactStartedAt = Date.now();
   state.beforeCompact = {...state.sessionTotals}
   entityBuffer.addEntity({type: 'compact', summary: null, tokensBefore: null, tokensAfter: null, savedPct: null, startedAt: state.compactStartedAt, saved: false});
+  writeEvent("compact_start", { startedAt: state.compactStartedAt });
 }
 
 /**
@@ -105,7 +106,11 @@ function handleCompactResultEvent(event, entityBuffer, writeEvent, state) {
   const duration = state.compactStartedAt ? Date.now() - state.compactStartedAt : null;
   state.compactStartedAt = null;
   handleUsageEvent({input:event.tokensBefore, output:event.tokensAfter,cacheRead:0,cacheWrite:0,reasoning:0}, state);
-  writeEvent("compact_result", {summary: event.summary,tokensBefore: event.tokensBefore,tokensAfter: event.tokensAfter,savedPct: event.savedPct,duration});
+  // Update contextUsage with post-compaction values so calculateTokenStats picks them up
+  // (session.getContextUsage() returns null tokens until next LLM response)
+  const ctxWindow = state.contextUsage?.contextWindow || 128000;
+  state.contextUsage = {contextSize: event.tokensAfter, contextWindow: ctxWindow, contextPercent: ctxWindow > 0 ? (event.tokensAfter / ctxWindow) * 100 : 0};
+  writeEvent("compact_result", {summary: event.summary,tokensBefore: event.tokensBefore,tokensAfter: event.tokensAfter,savedPct: event.savedPct,duration,failed: event.failed});
 }
 
 /**
@@ -186,15 +191,10 @@ export function createStreamEventHandler(params) {
 
       case "error": 
       case "done": {
-        if(event.sendDirectly){
-          lastEvent.event = event
-          onAgentEndResolve();
-        }else{
-          const tokenStats = handleDoneEvent(entityBuffer, recordId, dbSessionId, responseStartTime, state, session);
-          writeEvent("record_stats", tokenStats);
-          lastEvent.event = event
-          onAgentEndResolve();
-        }
+        const tokenStats = handleDoneEvent(entityBuffer, recordId, dbSessionId, responseStartTime, state, session);
+        writeEvent("record_stats", tokenStats);
+        lastEvent.event = event
+        onAgentEndResolve();
         break;
       }
 

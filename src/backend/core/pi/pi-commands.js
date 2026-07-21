@@ -37,13 +37,11 @@ export async function executeBuiltinCommand(commandName, args, session, onEvent)
       const tokensBefore = result?.tokensBefore ?? 0;
       const tokensAfter = result?.estimatedTokensAfter ?? 0;
       const saved = tokensBefore > 0 ? Math.round((1 - tokensAfter / tokensBefore) * 100) : 0;
-      onEvent?.({type:'usage', input:event.tokensBefore, output:event.tokensAfter,cacheRead:0,cacheWrite:0,reasoning:0})
       onEvent?.({type: "compact_result",summary: result?.summary ?? "",tokensBefore,tokensAfter,savedPct: saved,failed:false});
-      console.log('session stats: ',session.getSessionStats(), session.getContextUsage())
     } catch (err) {
       onEvent?.({ type: "compact_result", summary: `Compaction failed: ${err.message}`,failed:true });
     }
-    onEvent?.({ type: "done", sendDirectly:true });
+    onEvent?.({ type: "done" });
     return;
   }
   throw new Error(`Unknown built-in command: ${commandName}`);

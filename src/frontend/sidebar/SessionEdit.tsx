@@ -23,6 +23,7 @@ export default function SessionEdit({ currentName, onSave, onCancel }: SessionEd
         value={value}
         maxLength={200}
         onChange={(e) => setValue(e.target.value)}
+        onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
           if (e.key === "Enter") onSave(value.trim() || currentName);
           if (e.key === "Escape") onCancel();
@@ -30,8 +31,8 @@ export default function SessionEdit({ currentName, onSave, onCancel }: SessionEd
         autoFocus
       />
       <span className="sidebar-rename-btns">
-        <button onClick={() => onSave(value.trim() || currentName)}>✓</button>
-        <button onClick={onCancel}>✗</button>
+        <button onMouseDown={(e) => e.stopPropagation()} onClick={() => onSave(value.trim() || currentName)}>✓</button>
+        <button onMouseDown={(e) => e.stopPropagation()} onClick={onCancel}>✗</button>
       </span>
     </>
   );

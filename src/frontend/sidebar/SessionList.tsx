@@ -37,6 +37,20 @@ export default function SessionList({
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const prevSessionsRef = useRef<Session[]>(sessions);
+
+  // When sessions change (e.g. after delete), carry hoveredId to the session at the same index
+  useEffect(() => {
+    if (hoveredId && !sessions.find((s) => s.id === hoveredId)) {
+      const prevIdx = prevSessionsRef.current.findIndex((s) => s.id === hoveredId);
+      if (prevIdx >= 0 && prevIdx < sessions.length) {
+        setHoveredId(sessions[prevIdx].id);
+      } else {
+        setHoveredId(null);
+      }
+    }
+    prevSessionsRef.current = sessions;
+  }, [sessions, hoveredId]);
 
   // Reset scroll position when sessions change
   useEffect(() => {
@@ -66,12 +80,9 @@ export default function SessionList({
   };
 
   // Close rename on outside click
-  const containerRef = useRef<HTMLDivElement>(null);
   const handleDocumentClick = useCallback(
     (e: MouseEvent) => {
-      if (renameTarget && !containerRef.current?.contains(e.target as Node)) {
-        setRenameTarget(null);
-      }
+      if (renameTarget) setRenameTarget(null);
     },
     [renameTarget],
   );
