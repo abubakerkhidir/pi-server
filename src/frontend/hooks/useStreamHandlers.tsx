@@ -22,7 +22,7 @@ export function useOnEntityUpdate(setChatState: Dispatch<SetStateAction<ChatStat
       const last = prev.records[prev.records.length - 1];
       if (!last) return prev;
       last.agentReply.entities = entities;
-      return { records: [...prev.records] };
+      return { records: [...prev.records],sessionStats:prev.sessionStats };
     });
   }, []);
 }

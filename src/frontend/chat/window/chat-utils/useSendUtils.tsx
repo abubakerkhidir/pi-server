@@ -48,7 +48,7 @@ export function useHandleSend(p: OnSendWrapperInput) {
 
       const userId = uuidv4();
       const userRecord: ChatRecord = {id: userId,userMsg: { content: finalPrompt },agentReply: { id: "", entities: [] }};
-      setChatState((prev) => ({ records: [...prev.records, userRecord] }));
+      setChatState((prev) => ({ records: [...prev.records, userRecord],sessionStats:prev.sessionStats }));
       setIsProcessing(true);
       handleSend({
         prompt: finalPrompt, files: files && files.length > 0 ? files : undefined, onEntityUpdate, onStreamEnd: handleStreamEnd,onSessionName: handleSessionName, 
