@@ -75,9 +75,24 @@ export function getSessionMetaByUser(sessionId, usId) {
 /**
  * Create a new session metadata record.
  */
-export function createSessionRecord(dbSessionId, userId, piSessionId, title,sessionFile) {
+export function createSessionRecord(dbSessionId, userId, piSessionId, title, sessionFile, homeDir, llmProvider, llmModel, thinkLevel) {
   const db = getDb();
-  db.prepare("INSERT INTO session_metadata (id, user_id, pi_session_id, name,pi_session_file) VALUES (?, ?, ?, ?,?)").run(dbSessionId, userId, piSessionId, title,sessionFile);
+  db.prepare("INSERT INTO session_metadata (id, user_id, pi_session_id, name, pi_session_file, home_dir, llm_provider, llm_model, think_level) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(dbSessionId, userId, piSessionId, title, sessionFile, homeDir, llmProvider, llmModel, thinkLevel);
+}
+
+export function updateSessionLlm(sessionId, provider, model) {
+  const db = getDb();
+  db.prepare("UPDATE session_metadata SET llm_provider = ?, llm_model = ?, updated_at = datetime('now') WHERE id = ?").run(provider, model, sessionId);
+}
+
+export function updateSessionThinkLevel(sessionId, thinkLevel) {
+  const db = getDb();
+  db.prepare("UPDATE session_metadata SET think_level = ?, updated_at = datetime('now') WHERE id = ?").run(thinkLevel, sessionId);
+}
+
+export function updateSessionHomeDir(sessionId, homeDir) {
+  const db = getDb();
+  db.prepare("UPDATE session_metadata SET home_dir = ?, updated_at = datetime('now') WHERE id = ?").run(homeDir, sessionId);
 }
 
 /**

@@ -51,6 +51,10 @@ function createSessionTables() {
       total_cache_write INTEGER DEFAULT 0,
       total_reasoning INTEGER DEFAULT 0,
       total_cost DOUBLE DEFAULT 0,
+      home_dir TEXT,
+      llm_provider TEXT,
+      llm_model TEXT,
+      think_level TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
