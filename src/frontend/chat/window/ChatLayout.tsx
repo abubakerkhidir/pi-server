@@ -13,7 +13,7 @@ import { useHandleSend } from "./chat-utils/useSendUtils";
 import ChatHeader from "./ChatHeader";
 import ChatWindow from "./ChatWindow";
 
-export default function ChatLayout({ onLogout }: ChatLayoutProps) {
+export default function ChatLayout({ onLogout, onShowFiles }: ChatLayoutProps) {
   //state
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -64,6 +64,7 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
         onRenameComplete={reloadSessions}
         onLoadMore={() => loadSessions(true)}
+        onShowFiles={onShowFiles}
       />
       <div className="main-area" id="mainArea">
         <ChatHeader

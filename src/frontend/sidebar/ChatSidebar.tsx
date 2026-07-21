@@ -14,6 +14,7 @@ interface SidebarProps {
   onToggle: () => void;
   onRenameComplete?: () => void;
   onLoadMore: () => void;
+  onShowFiles: () => void;
 }
 
 /**
@@ -31,6 +32,7 @@ export default function ChatSidebar({
   onToggle,
   onRenameComplete,
   onLoadMore,
+  onShowFiles,
 }: SidebarProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -61,6 +63,9 @@ export default function ChatSidebar({
       <div className="sidebar-header">
         <button className="sidebar-new" onClick={onNewChat}>
           + New chat
+        </button>
+        <button className="sidebar-files-btn" onClick={onShowFiles} title="Session Files">
+          {"\uD83D\uDCC1"}
         </button>
         <button className="sidebar-toggle" onClick={onToggle} title="Close sidebar">
           ◀

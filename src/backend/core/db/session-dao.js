@@ -105,7 +105,7 @@ export function updateCtxSizeAndPrecentage(ctxSize, ctxPrcnt, dbSessionId) {
 export function updateSessionStats(dbSessionId, s) {
   try {
     const db = getDb();
-    console.log('update session-stats: ',s)
+    //console.log('update session-stats: ',s)
     db.prepare("UPDATE session_metadata SET context_used = ?, context_percent = ?, context_size = ?,total_input=?,total_output=?, total_cache_read=?,total_cache_write=?,total_reasoning=?,total_cost=?  WHERE id = ?")
       .run(s.context_used, s.context_percent,s.context_size,s.total_input,s.total_output,s.total_cache_read,s.total_cache_write,s.total_reasoning,s.total_cost, dbSessionId);
   } catch (err){ 

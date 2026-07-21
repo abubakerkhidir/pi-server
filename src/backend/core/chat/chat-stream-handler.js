@@ -10,6 +10,7 @@ import { createSSEWriter, wrapOnEventForNaming, writeDoneEvent, writeErrorRespon
 import {initSessionMetadata,generateSessionNameIfNeeded} from "./session-setup.js";
 import { createChatRecord } from "../db/chat-record-dao.js";
 import { saveFileMetadata } from "../db/chat-files-dao.js";
+import { debug } from "../../utils/logger.js";
 
 const router = Router();
 
@@ -113,7 +114,7 @@ export async function handleChatStream(req, res){
     // Post-prompt tasks
     await generateSessionNameIfNeeded(dbSessionId, effectivePrompt, getFullText(), writeEvent,req);
 
-    console.log('session stats: ',session.getSessionStats(), session.getContextUsage())
+    debug('session stats: ',session.getSessionStats(), session.getContextUsage())
     
     // Signal completion
     writeDoneEvent(writeEvent, res, lastEvent);

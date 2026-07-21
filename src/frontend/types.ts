@@ -198,6 +198,7 @@ export interface AuthFormProps {
 
 export interface ChatLayoutProps {
   onLogout: () => void;
+  onShowFiles: () => void;
 }
 
 

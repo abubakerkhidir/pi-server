@@ -35,8 +35,11 @@ export async function createNewSession(userId, sessionCwd) {
 
   if (userMap.model_id) {
     try {
+      console.log('setting llm model to: ',userMap.model_id)
       await session.setModel(userMap.model_id);
-    } catch { }
+    } catch (err) {
+	console.log('error setting model: ',userMap.model_id,err)
+    }
   }
   return session;
 }

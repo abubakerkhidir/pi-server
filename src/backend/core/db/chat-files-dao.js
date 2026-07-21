@@ -34,3 +34,40 @@ export function getFilesBySession(sessionId) {
     return getDb().prepare("SELECT file_path FROM chat_files WHERE session_id = ?").all(sessionId);
 }
 
+/**
+ * Get paginated files with session names, search, and type filter.
+ */
+export function getAllFilesPaginated({ page = 1, limit = 20, search, type }) {
+    const db = getDb();
+    const conditions = [];
+    const params = [];
+
+    if (search) {
+        conditions.push("(f.file_name LIKE ? OR s.name LIKE ?)");
+        const q = `%${search}%`;
+        params.push(q, q);
+    }
+    if (type) {
+        conditions.push("f.mime_type LIKE ?");
+        params.push(`${type}%`);
+    }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const offset = (page - 1) * limit;
+
+    const countRow = db.prepare(`SELECT COUNT(*) as total FROM chat_files f LEFT JOIN session_metadata s ON f.session_id = s.id ${where}`).get(...params);
+    const total = countRow?.total || 0;
+
+    const rows = db.prepare(`
+        SELECT f.id, f.file_name, f.file_path, f.file_size, f.mime_type, f.type, f.tool_name, f.created_at,
+               s.name as session_name, s.id as session_id
+        FROM chat_files f
+        LEFT JOIN session_metadata s ON f.session_id = s.id
+        ${where}
+        ORDER BY f.created_at DESC
+        LIMIT ? OFFSET ?
+    `).all(...params, limit, offset);
+
+    return { files: rows, total, page, limit, totalPages: Math.ceil(total / limit) };
+}
+

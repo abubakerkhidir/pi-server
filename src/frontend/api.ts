@@ -134,6 +134,36 @@ export async function getCommands(sessionId: string | null): Promise<{ name: str
   return (await apiFetchWithPrms("/api/chat/commands",undefined,"sessionId",encodeURIComponent(sessionId))).data.commands ?? [];
 }
 
+export interface FileRecord {
+  id: string;
+  file_name: string;
+  file_path: string;
+  file_size: number;
+  mime_type: string;
+  type: "upload" | "download";
+  tool_name: string | null;
+  created_at: string;
+  session_name: string | null;
+  session_id: string;
+}
+
+export interface FilesResponse {
+  files: FileRecord[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export async function getFiles(page?: number, limit?: number, search?: string, type?: string): Promise<FilesResponse> {
+  return (await apiFetchWithPrms("/api/files", undefined,
+    page ? "page" : undefined, page,
+    limit ? "limit" : undefined, limit,
+    search ? "search" : undefined, search,
+    type ? "type" : undefined, type
+  )).data;
+}
+
 export async function getThinkingInfo(sessionId: string): Promise<{ current: string | null; available: string[] }> {
   return (await apiFetchWithPrms("/api/chat/thinking",undefined,"sessionId",encodeURIComponent(sessionId))).data;
 }

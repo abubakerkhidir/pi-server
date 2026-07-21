@@ -14,6 +14,7 @@ import "./styles/components/model.css";
 import "./styles/components/tools.css";
 import "./styles/components/diff.css";
 import "./styles/components/extracting.css";
+import "./styles/components/files.css";
 
 const root = createRoot(document.getElementById("root")!);
 root.render(<App />);

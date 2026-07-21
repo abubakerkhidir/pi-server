@@ -49,6 +49,7 @@ export function calculateTokenStats(usageData, responseStartTime, state, session
   // If provider didn't report reasoning tokens but thinking content exists, estimate from char count
   if (usageData && !usageData.think_tokens && state.thinkChars > 0) {
     usageData.think_tokens = Math.round(state.thinkChars / 4);
+    state.sessionTotals.total_reasoning += usageData.think_tokens;
   }
   const totalDurationMs = Date.now() - responseStartTime;
   const ttftMs = state.firstTokenTime ? state.firstTokenTime - responseStartTime : totalDurationMs;
@@ -76,7 +77,7 @@ export function calculateTokenStats(usageData, responseStartTime, state, session
     } catch {}
   }     
   const tokenUsage= { prompt_tokens, think_tokens, output_tokens,ttft_ms: ttftMs, totalDurationMs,prompt_token_s, output_token_s,sessionTotals:state.sessionTotals};
-  console.log('token-stats: ',tokenUsage, ' \nsdk-tokens: ',sdkTokens, ' \nbefore-compact: ',state.beforeCompact)
+  //console.log('token-stats: ',tokenUsage, ' \nsdk-tokens: ',sdkTokens, ' \nbefore-compact: ',state.beforeCompact)
   return tokenUsage
 }
 
