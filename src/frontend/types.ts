@@ -111,6 +111,7 @@ export interface CompactData {
   startedAt?: number;
   duration?: number; // milliseconds
   sealed?: boolean;
+  failed?: boolean;
 }
 
 export type AgentReplyEntity = MsgData | ToolData | ThinkData | CompactData;
@@ -137,18 +138,19 @@ export interface TokenStats {
   context_used?: number;  // actual context tokens used (from pi SDK)
   context_percent?: number;  // percentage of context used (from pi SDK)
   ttft_avg_ms: number;
+  sessionTotals?:SessionTokenStats
 }
 
 export interface SessionTokenStats {
-  total_prompt: number;
-  total_think: number;
+  total_input: number;
+  total_cache_read: number;
+  total_cache_write: number;
+  total_reasoning: number;
   total_output: number;
-  total_text: number;
-  context_used_pct: number;
+  total_cost: number;
   context_size: number;
   context_used?: number;  // actual context tokens used (from pi SDK)
   context_percent?: number;  // percentage of context used (from pi SDK)
-  ttft_avg_ms: number;
 }
 
 export interface AgentReply {

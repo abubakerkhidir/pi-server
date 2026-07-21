@@ -156,16 +156,10 @@ export class PiSessionManager {
         case "compaction_end": {
           if (event.result && !event.aborted) {
             const { summary, tokensBefore, estimatedTokensAfter } = event.result;
-            const savedPct = tokensBefore > 0
-              ? Math.round((1 - estimatedTokensAfter / tokensBefore) * 100)
-              : 0;
-            onEvent?.({
-              type: "compact_result",
-              summary,
-              tokensBefore,
-              tokensAfter: estimatedTokensAfter,
-              savedPct,
-            });
+            const savedPct = tokensBefore > 0 ? Math.round((1 - estimatedTokensAfter / tokensBefore) * 100): 0;
+            onEvent?.({type: "compact_result",summary,tokensBefore,tokensAfter: estimatedTokensAfter,savedPct,failed:false});
+          }else{
+            onEvent?.({type: "compact_result",summary:event.errorMessage??'Compact failed due to unkown err',failed:true});
           }
           break;
         }

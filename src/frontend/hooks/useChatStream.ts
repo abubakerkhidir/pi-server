@@ -156,8 +156,8 @@ function getStreamHandler(sessionIdRef: RefObject<string | null>, onSessionCreat
         break;
       }
       case "compact_result": {
-        const { summary, tokensBefore, tokensAfter, savedPct, duration } = data as {
-          summary: string; tokensBefore: number; tokensAfter: number; savedPct: number; duration?: number;
+        const { summary, tokensBefore, tokensAfter, savedPct, duration,failed } = data as {
+          summary: string; tokensBefore: number; tokensAfter: number; savedPct: number; duration?: number; failed?:boolean
         };
         const compact = getLastEntity<CompactData>("compact", entitiesRef.current);
         if (compact && !compact.sealed) {
@@ -165,6 +165,7 @@ function getStreamHandler(sessionIdRef: RefObject<string | null>, onSessionCreat
           compact.tokensBefore = tokensBefore;
           compact.tokensAfter = tokensAfter;
           compact.savedPct = savedPct;
+          compact.failed = failed
           if (duration != null) {
             compact.duration = duration;
             entityStartTimes.current.delete(compact.id);

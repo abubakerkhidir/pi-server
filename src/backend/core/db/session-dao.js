@@ -101,3 +101,13 @@ export function updateCtxSizeAndPrecentage(ctxSize, ctxPrcnt, dbSessionId) {
     db.prepare("UPDATE session_metadata SET context_used = ?, context_percent = ? WHERE id = ?").run(ctxSize, ctxPrcnt, dbSessionId);
   } catch { }
 }
+
+export function updateSessionStats(dbSessionId, s) {
+  try {
+    const db = getDb();
+    db.prepare("UPDATE session_metadata SET context_used = ?, context_percent = ?, context_size = ?,total_input=?,total_output=?, total_cache_read=?,total_cache_write=?,total_reasoning=?,total_cost=?  WHERE id = ?")
+      .run(s.context_used, s.context_percent,s.context_size,s.total_input,s.total_output,s.total_cache_read,s.total_cache_write,s.total_reasoning,s.total_cost, dbSessionId);
+  } catch (err){ 
+    console.log('update-session-states err: ',err)
+  }
+}

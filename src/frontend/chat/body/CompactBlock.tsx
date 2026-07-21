@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import type { CompactData } from "@/frontend/types";
 
-function CompactBlock({ id, summary, tokensBefore, tokensAfter, savedPct, startedAt, duration, sealed }: CompactData) {
+function CompactBlock({ id, summary, tokensBefore, tokensAfter, savedPct, startedAt, duration, sealed,failed }: CompactData) {
   const [expanded, setExpanded] = useState(true);
   const maxH = expanded ? "" : "0px";
   const disVal = expanded ? "block" : "none";
@@ -12,19 +12,12 @@ function CompactBlock({ id, summary, tokensBefore, tokensAfter, savedPct, starte
     ? `${tokensBefore.toLocaleString()} → ${tokensAfter.toLocaleString()} tokens${savedPct != null ? ` (${savedPct}% saved)` : ""}`
     : null;
 
-  const title = [
-    durationSec != null ? `compacted in ${durationSec}s` : "compacting...",
-    tokenInfo,
-  ].filter(Boolean).join(" · ");
+  const title = [failed?'compaction failed!':(durationSec != null ? `compacted in ${durationSec}s` : "compacting..."), tokenInfo,].filter(Boolean).join(" · ");
 
   return (
     <div className="compact-block">
       <div className="cb-header">
-        <span
-          className="arr-btn"
-          title={expanded ? "Collapse" : "Expand"}
-          onClick={() => setExpanded(!expanded)}
-        >
+        <span className="arr-btn" title={expanded ? "Collapse" : "Expand"} onClick={() => setExpanded(!expanded)}>
           {expanded ? "▲" : "▶"}
         </span>
         {!sealed && <span className="spinner" />}

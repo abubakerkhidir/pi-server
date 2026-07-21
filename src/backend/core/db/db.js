@@ -141,6 +141,13 @@ function addMissingColumns() {
   // Context usage from pi SDK
   try { db.exec("ALTER TABLE session_metadata ADD COLUMN context_used INTEGER"); } catch {}
   try { db.exec("ALTER TABLE session_metadata ADD COLUMN context_percent REAL"); } catch {}
+//total_input=?,total_output=?, total_cache_read=?,total_cache_write=?,total_reasoning=?,total_cost=?
+  try { db.exec("ALTER TABLE session_metadata ADD COLUMN total_input INTEGER DEFAULT 0"); } catch {}
+  try { db.exec("ALTER TABLE session_metadata ADD COLUMN total_output INTEGER DEFAULT 0"); } catch {}
+  try { db.exec("ALTER TABLE session_metadata ADD COLUMN total_cache_read INTEGER DEFAULT 0"); } catch {}
+  try { db.exec("ALTER TABLE session_metadata ADD COLUMN total_cache_write INTEGER DEFAULT 0"); } catch {}
+  try { db.exec("ALTER TABLE session_metadata ADD COLUMN total_reasoning INTEGER DEFAULT 0"); } catch {}
+  try { db.exec("ALTER TABLE session_metadata ADD COLUMN total_cost DOUBLE DEFAULT 0"); } catch {}
 
   // Session file path for loading sessions after restart
   try { db.exec("ALTER TABLE session_metadata ADD COLUMN pi_session_file TEXT"); } catch {}

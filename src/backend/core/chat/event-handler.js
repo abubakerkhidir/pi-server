@@ -1,5 +1,5 @@
+import { getSessionMeta, updateSessionStats } from "../db/session-dao.js";
 import { fillUsageData,calculateTokenStats, saveTokenStats, updateSessionContextUsage } from "./token-stats.js";
-
 
 /**
  * Handle text event from pi session.
@@ -86,15 +86,8 @@ function handleCompactStartEvent(entityBuffer, writeEvent, state) {
   entityBuffer.sealAndSave('think');
   entityBuffer.sealAndSave('msg');
   state.compactStartedAt = Date.now();
-  entityBuffer.addEntity({
-    type: 'compact',
-    summary: null,
-    tokensBefore: null,
-    tokensAfter: null,
-    savedPct: null,
-    startedAt: state.compactStartedAt,
-    saved: false,
-  });
+  state.beforeCompact = {...state.sessionTotals}
+  entityBuffer.addEntity({type: 'compact', summary: null, tokensBefore: null, tokensAfter: null, savedPct: null, startedAt: state.compactStartedAt, saved: false});
 }
 
 /**
@@ -111,25 +104,15 @@ function handleCompactResultEvent(event, entityBuffer, writeEvent, state) {
   entityBuffer.sealAndSave('compact');
   const duration = state.compactStartedAt ? Date.now() - state.compactStartedAt : null;
   state.compactStartedAt = null;
-  state.compactOccurred = true;
-  writeEvent("compact_result", {
-    summary: event.summary,
-    tokensBefore: event.tokensBefore,
-    tokensAfter: event.tokensAfter,
-    savedPct: event.savedPct,
-    duration,
-  });
+  handleUsageEvent({input:event.tokensBefore, output:event.tokensAfter,cacheRead:0,cacheWrite:0,reasoning:0}, state);
+  writeEvent("compact_result", {summary: event.summary,tokensBefore: event.tokensBefore,tokensAfter: event.tokensAfter,savedPct: event.savedPct,duration});
 }
 
 /**
  * Handle context_usage event from pi session.
  */
 function handleContextUsageEvent(event, state) {
-  state.contextUsage = {
-    contextSize: event.contextSize,
-    contextWindow: event.contextWindow,
-    contextPercent: event.contextPercent,
-  };
+  state.contextUsage = {contextSize: event.contextSize,contextWindow: event.contextWindow,contextPercent: event.contextPercent};
 }
 
 /**
@@ -137,14 +120,10 @@ function handleContextUsageEvent(event, state) {
  */
 function handleDoneEvent(entityBuffer, recordId, dbSessionId, responseStartTime, state, session) {
   entityBuffer.flushAll();
-  // If provider didn't report reasoning tokens but thinking content exists, estimate from char count
-  if (state.usageData && !state.usageData.think_tokens && state.thinkChars > 0) {
-    state.usageData.think_tokens = Math.round(state.thinkChars / 4);
-  }
   const tokenStats = calculateTokenStats(state.usageData, responseStartTime, state, session);
   saveTokenStats(recordId, tokenStats);
-  updateSessionContextUsage(dbSessionId, state.contextUsage);
-
+  updateSessionStats(dbSessionId, tokenStats.sessionTotals)
+  //updateSessionContextUsage(dbSessionId, state.contextUsage);
   return tokenStats
 }
 
@@ -155,16 +134,11 @@ function handleDoneEvent(entityBuffer, recordId, dbSessionId, responseStartTime,
  */
 export function createStreamEventHandler(params) {
   const {writeEvent,entityBuffer,dbSessionId,recordId,responseStartTime,userId,req,session} = params;
-
-  const state = {
-    firstTokenTime: null,
-    usageData: null,
-    contextUsage: null,
-    thinkChars: 0,
-    cumulativeInput: 0, cumulativeCacheRead:0, cumulativeCacheWrite:0, cumulativeReasoning: 0, cumulativeOutput: 0,
-    compactOccurred: false,
-    compactStartedAt: null,
-  };
+  const s = getSessionMeta(dbSessionId)
+  const sessionTotals = s.total_input?{total_input: s.total_input, total_cache_read:s.total_cache_read, total_cache_write:s.total_cache_write,total_cost:s.total_cost, 
+                          total_reasoning: s.total_reasoning, total_output: s.total_output,context_used:s.context_used, context_size:s.context_size, context_percent:s.context_percent}:
+                        {total_input: 0, total_cache_read:0, total_cache_write:0, total_reasoning: 0, total_output: 0,context_used:0,context_size:128000,context_percent:0,total_cost:0}
+  const state = {firstTokenTime: null, usageData: null, contextUsage: null, thinkChars: 0, compactStartedAt: null, sessionTotals, beforeCompact:null};
 
   // Handler params that need to be passed to async handlers
   const handlerParams = {recordId,dbSessionId,userId,req,};

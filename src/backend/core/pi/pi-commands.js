@@ -31,23 +31,17 @@ export function parseBuiltinCommand(text) {
  */
 export async function executeBuiltinCommand(commandName, args, session, onEvent) {
   if (commandName === "compact") {
-    onEvent?.({ type: "text", content: "Compacting session context…" });
+    onEvent?.({ type: "compact_start", content: "Compacting session context…" });
     try {
       const result = await session.compact(args || undefined);
       const tokensBefore = result?.tokensBefore ?? 0;
       const tokensAfter = result?.estimatedTokensAfter ?? 0;
       const saved = tokensBefore > 0 ? Math.round((1 - tokensAfter / tokensBefore) * 100) : 0;
-      onEvent?.({
-        type: "compact_result",
-        summary: result?.summary ?? "",
-        tokensBefore,
-        tokensAfter,
-        savedPct: saved,
-      });
+      onEvent?.({type:'usage', input:event.tokensBefore, output:event.tokensAfter,cacheRead:0,cacheWrite:0,reasoning:0})
+      onEvent?.({type: "compact_result",summary: result?.summary ?? "",tokensBefore,tokensAfter,savedPct: saved,failed:false});
       console.log('session stats: ',session.getSessionStats(), session.getContextUsage())
-      //onEvent?.({ type: "text", content: `\nDone. Context compacted from ${tokensBefore} → ${tokensAfter} tokens (${saved}% saved).` });
     } catch (err) {
-      onEvent?.({ type: "text", content: `\nCompaction failed: ${err.message}` });
+      onEvent?.({ type: "compact_result", summary: `Compaction failed: ${err.message}`,failed:true });
     }
     onEvent?.({ type: "done", sendDirectly:true });
     return;

@@ -3,7 +3,6 @@ import type { ChatLayoutProps, ChatState, ModelInfo, Session, UserSettings } fro
 import { Dispatch, SetStateAction, useCallback, useEffect, useRef, useState } from "react";
 import { getLoadSessionHandler, getMoreSessionHndlr, getReloadSessionsHndlr, getResumeSessionHandler } from "@/frontend/chat/window/chat-utils/sessionMngmtUtils";
 import { getSettingsLoaderFun } from "@/frontend/chat/window/chat-utils/settingsUtils";
-import { computeSessionStats } from "@/frontend/chat/window/chat-utils/tokenStatsUtil";
 import { useChatStream } from "@/frontend/hooks/useChatStream";
 import { useStopStream } from "@/frontend/hooks/useStreamHandlers";
 import SettingsModal from "../../config/settings/SettingsModal";
@@ -34,7 +33,6 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
   
   //callback functions
   const { handleSend, stopStream, resetState } = useChatStream({currentSessionId,userSettings});
-  const sessionStats = computeSessionStats(chatState.records);
   const loadSessions = useCallback(getMoreSessionHndlr(loadMoreOffsetRef, setSessions, setSessionTotal), []);
   const reloadSessions = useCallback(getReloadSessionsHndlr(loadMoreOffsetRef, loadSessions), [loadSessions]);
   const handleSendWrapper = useHandleSend({ isProcessing, setUserPrompt, setUploadedFiles, pendingSummaryRef, setChatState, setIsProcessing, handleSend, setSessions, setCurrentSessionId,currentSessionId });
@@ -90,7 +88,7 @@ export default function ChatLayout({ onLogout }: ChatLayoutProps) {
           uploadedFiles={uploadedFiles}
           onAddFile={(files) => setUploadedFiles((prev) => [...prev, ...files])}
           onRemoveFile={(index) => setUploadedFiles((prev) => prev.filter((_, i) => i !== index))}
-          sessionStats={sessionStats}
+          sessionStats={chatState.sessionStats}
           showScrollDown={showScrollDown}
           setShowScrollDown={setShowScrollDown}
           sessionId={currentSessionId}

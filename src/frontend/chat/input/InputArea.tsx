@@ -80,13 +80,12 @@ export default function InputArea({
       )}
       {/* ── Session-level token stats bar ── */}
       {sessionStats && (
-        <div className="session-stats-bar" title={`Context: ${sessionStats.context_percent ?? sessionStats.context_used_pct}% of ${sessionStats.context_size.toLocaleString()} tokens · TTFT avg: ${sessionStats.ttft_avg_ms}ms`}>
-          <span className="session-stat">total-prompt: {fmt(sessionStats.total_prompt)}</span>
-          <span className="session-stat">total-think: {fmt(sessionStats.total_think)}</span>
-          <span className="session-stat">total-text: {fmt(sessionStats.total_text)}</span>
-          <span className="session-stat">total-output: {fmt(sessionStats.total_output)}</span>
-          <span className="session-stat">ctx: {sessionStats.context_percent != null ? Math.round(sessionStats.context_percent) : sessionStats.context_used_pct}%/{fmt(sessionStats.context_size)}</span>
-          <span className="session-stat">ttft-avg: {sessionStats.ttft_avg_ms}ms</span>
+        <div className="session-stats-bar" title={`Context: ${sessionStats.context_percent ??0}% of ${sessionStats.context_size.toLocaleString()} tokens`}>
+          <span className="session-stat">total-prompt: {fmt(sessionStats.total_input)}</span>
+          <span className="session-stat">total-think: {fmt(sessionStats.total_reasoning)}</span>
+          <span className="session-stat">total-text: {fmt(sessionStats.total_output)}</span>
+          <span className="session-stat">total-output: {fmt(sessionStats.total_output||0+sessionStats.total_reasoning||0)}</span>
+          <span className="session-stat">ctx: {Math.round(sessionStats.context_percent||0)}%/{fmt(sessionStats.context_size)}</span>
         </div>
       )}
       <div className="input-wrapper">

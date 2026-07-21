@@ -9,28 +9,6 @@ function calculateTtftSeconds(firstTokenTime, responseStartTime) {
   return ttftMs / 1000;
 }
 
-/**
- * Calculate generation time in seconds (total duration minus TTFT).
- */
-function calculateGenerationSeconds(totalDurationMs, ttftMs) {
-  const generationMs = totalDurationMs - ttftMs;
-  return generationMs / 1000;
-}
-
-/**
- * Calculate tokens per second for prompt (during TTFT).
- */
-function calculatePromptTokensPerSecond(promptTokens, ttftSec) {
-  return ttftSec > 0 ? Math.round(promptTokens / ttftSec) : 0;
-}
-
-/**
- * Calculate tokens per second for output (during generation).
- */
-function calculateOutputTokensPerSecond(outputTokens, generationSec) {
-  return generationSec > 0 ? Math.round(outputTokens / generationSec) : 0;
-}
-
 //this is called whenever usage_data event is sent by pi-session-manager during message-end (one agentReply can have multiple msg-end event so we accumlate total on the state for the agentReply and for entire session)
 export function fillUsageData(event, state) {
   const input = event.input || 0;
@@ -53,15 +31,15 @@ export function fillUsageData(event, state) {
     state.usageData.cache_read += cacheRead;
     state.usageData.cache_write += cacheWrite;
   }
-  state.cumulativeInput += input;
-  state.cumulativeOutput += output;
-  state.cumulativeCacheRead += cacheRead;
-  state.cumulativeCacheWrite += cacheWrite;
-  state.cumulativeReasoning += reasoning;
+  state.sessionTotals.total_input += input;
+  state.sessionTotals.total_cache_write += output;
+  state.sessionTotals.total_cache_read += cacheRead;
+  state.sessionTotals.total_cache_write += cacheWrite;
+  state.sessionTotals.total_reasoning += reasoning;
 }   
 
 /**
- * Calculate token stats from usage data and timing.
+ * Calculate token stats from usage data and timing. this called at agentReply end
  * @param {Object} usageData - Accumulated usage data
  * @param {number} responseStartTime - Response start timestamp
  * @param {number} firstTokenTime - First token timestamp
@@ -75,42 +53,30 @@ export function calculateTokenStats(usageData, responseStartTime, state, session
   const totalDurationMs = Date.now() - responseStartTime;
   const ttftMs = state.firstTokenTime ? state.firstTokenTime - responseStartTime : totalDurationMs;
 
-  const promptTokens = usageData?.prompt_tokens ?? 0;
-  const thinkTokens = usageData?.think_tokens ?? 0;
-  const outputTokens = usageData?.output_tokens ?? 0;
+  const prompt_tokens = usageData?.prompt_tokens ?? 0;
+  const think_tokens = usageData?.think_tokens ?? 0;
+  const output_tokens = usageData?.output_tokens ?? 0;
 
   const ttftSec = ttftMs / 1000;
-  const generationSec = calculateGenerationSeconds(totalDurationMs, ttftMs);
+  const generationSec = (totalDurationMs - ttftMs) / 1000;
+  const output_token_s = generationSec > 0 ? Math.round(output_tokens / generationSec) : 0;
+  const prompt_token_s = ttftSec > 0 ? Math.round(prompt_tokens / ttftSec) : 0
 
   // Build session totals for lifetime tracking across compactions. After compaction, getSessionStats() only returns current-turn usage because
-  // previous messages were removed. We use cumulativeInput/Output (tracked in handleUsageEvent) to reconstruct the full lifetime total.
-  let sessionTotals = {};
+  // previous messages were removed. We use total_input/Output (tracked in handleUsageEvent) to reconstruct the full lifetime total.
+  let sdkTokens = {};
   if (session) {
     try {
       const sdkStats = session.getSessionStats();
-      const sdkTokens = sdkStats?.tokens || {};
-      const outputTotal = state.compactOccurred? (sdkTokens.output || 0) + state.cumulativeOutput: state.cumulativeOutput;
-      const inputTotal = state.compactOccurred? (sdkTokens.input || 0) + state.cumulativeInput: state.cumulativeInput;
-      const cacheReadTotal = state.compactOccurred? (sdkTokens.cacheRead || 0) + state.cumulativeCacheRead: state.cumulativeCacheRead;
-      const cacheWriteTotal = state.compactOccurred? (sdkTokens.cacheWrite || 0) + state.cumulativeCacheWrite: state.cumulativeCacheWrite;
-      const reasoningTotal = state.compactOccurred? (sdkTokens.reasoning || 0) + state.cumulativeReasoning: state.cumulativeReasoning;
-      const ctxSize = sdkStats?.contextUsage?.tokens || sdkTokens?.total || state.contextUsage.contextSize || 0
-      const ctxWin = sdkStats?.contextUsage?.contextWindow || state.contextUsage.contextWindow || 128000
-      const ctxPercent = sdkStats?.contextUsage?.percent || state.contextUsage.contextPercent || 0
-      sessionTotals = {ctxSize,ctxWin,ctxPercent,total_input: inputTotal,total_output: outputTotal,total_cache_read:cacheReadTotal,total_cache_write:cacheWriteTotal,total_reasoning:reasoningTotal, total_cost: sdkStats?.cost || 0};
+      sdkTokens = sdkStats?.tokens || {};
+      state.sessionTotals.context_used = sdkStats?.contextUsage?.tokens || sdkTokens?.total || state.contextUsage.contextSize || 0
+      state.sessionTotals.context_size = sdkStats?.contextUsage?.contextWindow || state.contextUsage.contextWindow || 128000
+      state.sessionTotals.context_percent = sdkStats?.contextUsage?.percent || state.contextUsage.contextPercent || 0
+      state.sessionTotals.currentCost = sdkStats?.cost || 0
     } catch {}
   }     
-  const tokenUsage= {
-    prompt_tokens: promptTokens,
-    think_tokens: thinkTokens,
-    output_tokens: outputTokens,
-    prompt_token_s: calculatePromptTokensPerSecond(promptTokens, ttftSec),
-    output_token_s: calculateOutputTokensPerSecond(outputTokens, generationSec),
-    ttft_ms: ttftMs,
-    totalDurationMs,
-    sessionTotals
-  };
-
+  const tokenUsage= { prompt_tokens, think_tokens, output_tokens,ttft_ms: ttftMs, totalDurationMs,prompt_token_s, output_token_s,sessionTotals:state.sessionTotals};
+  console.log('token-stats: ',tokenUsage, ' \nsdk-tokens: ',sdkTokens, ' \nbefore-compact: ',state.beforeCompact)
   return tokenUsage
 }
 
