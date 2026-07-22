@@ -74,7 +74,7 @@ export class PiSessionManager {
 
   async setModelOnSession(piSessionId, provider, modelId, userId) {
     console.log('setModelOnSession: ',provider,modelId)
-    verifySessionAccess(piSessionId,userId)
+    this.verifySessionAccess(piSessionId,userId)
     // Load session if not already in active list
     const session = await this.ensureSessionLoaded(piSessionId, userId);
     if (!session) throw new Error(`Session ${piSessionId} not found`);
@@ -90,7 +90,7 @@ export class PiSessionManager {
 
   async setThinkingLevel(piSessionId, level, userId) {
     console.log('set-think-level to : ',level)
-    verifySessionAccess(piSessionId,userId)
+    this.verifySessionAccess(piSessionId,userId)
     // Load session if not already in active list
     const session = await this.ensureSessionLoaded(piSessionId, userId);
     if (!session) throw new Error(`Session ${piSessionId} not found`);
