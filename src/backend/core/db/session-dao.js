@@ -77,7 +77,7 @@ export function getSessionMetaByUser(sessionId, usId) {
  */
 export function createSessionRecord(dbSessionId, userId, piSessionId, title, sessionFile,provider, model,thinkLevel,homeDir) {
   const db = getDb();
-  db.prepare("INSERT INTO session_metadata (id, user_id, pi_session_id, name, pi_session_file, home_dir, llm_provider, llm_model, think_level) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(dbSessionId, userId, piSessionId, title, sessionFile, homeDir, llmProvider, llmModel, thinkLevel);
+  db.prepare("INSERT INTO session_metadata (id, user_id, pi_session_id, name, pi_session_file, home_dir, llm_provider, llm_model, think_level) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(dbSessionId, userId, piSessionId, title, sessionFile, homeDir, provider, model, thinkLevel);
 }
 
 export function updateSessionLlm(sessionId, provider, model) {

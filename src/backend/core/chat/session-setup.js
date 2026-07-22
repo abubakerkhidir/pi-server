@@ -21,7 +21,7 @@ export function initSessionMetadata(dbSessionId, userId, piSessionId, effectiveP
   const existing = getSessionMeta(dbSessionId);
   if (!existing) {
     const title = generateInitialTitle(effectivePrompt);
-    createSessionRecord(dbSessionId, userId, piSessionId, title,sessionFile,provider, model,thinkLevel,homeDir);
+    createSessionRecord(dbSessionId, userId, piSessionId, title, sessionFile, provider, model,thinkLevel,homeDir);
   } else {
     updateSessionTimestamp(dbSessionId);
   }
