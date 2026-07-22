@@ -1,5 +1,5 @@
 import { SessionManager, createAgentSession, } from "@earendil-works/pi-coding-agent";
-import { error } from "../../utils/logger";
+import { error } from "../../utils/logger.js";
 
 const EXTENDED_THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"];
 
