@@ -26,7 +26,7 @@ router.post("/chat/thinking", authMiddleware, async (req, res) => {
   try {
     const piManager = getPiManager();
     const effective = await piManager.setThinkingLevel(sessionId, level, req.user.userId);
-    res.json({ level: effective });
+    res.json({ level: effective, status:'ok' });
   } catch (err) {
     res.status(404).json({ error: err.message });
   }

@@ -1,9 +1,9 @@
 import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
-import { getSessionMeta} from "../db/session-dao.js";
+import { getSessionMeta, getSessionMetaByUser, updateSessionLlm, updateSessionThinkLevel} from "../db/session-dao.js";
 import { loadExistingSession } from "./pi-session-loader.js";
 import { createNewSession } from "./pi-new-session.js";
-import { warning } from "../../utils/logger.js";
+import { error, warning } from "../../utils/logger.js";
 import { BUILTIN_COMMANDS, parseBuiltinCommand, executeBuiltinCommand } from "./pi-commands.js";
 import { getPiModelById, computeThinkingLevels, findFallbackLevel } from "./pi-model-mngmt.js";
 
@@ -74,12 +74,14 @@ export class PiSessionManager {
 
   async setModelOnSession(piSessionId, provider, modelId, userId) {
     console.log('setModelOnSession: ',provider,modelId)
+    verifySessionAccess(piSessionId,userId)
     // Load session if not already in active list
     const session = await this.ensureSessionLoaded(piSessionId, userId);
     if (!session) throw new Error(`Session ${piSessionId} not found`);
     const model = session.modelRegistry.find(provider, modelId);
     if (!model) throw new Error(`Model ${provider}/${modelId} not found`);
     await session.setModel(model);
+    updateSessionLlm(piSessionId,provider,modelId)
     // Determine available levels for new model
     const availableLevels = model.thinkingLevelMap?Object.keys(m.thinkingLevelMap):[];
     console.log(' >>> done setModelOnSession: ',provider,modelId, session.thinkingLevel,session.model)
@@ -88,11 +90,13 @@ export class PiSessionManager {
 
   async setThinkingLevel(piSessionId, level, userId) {
     console.log('set-think-level to : ',level)
+    verifySessionAccess(piSessionId,userId)
     // Load session if not already in active list
     const session = await this.ensureSessionLoaded(piSessionId, userId);
     if (!session) throw new Error(`Session ${piSessionId} not found`);
     try {
       await session.setThinkingLevel(level);
+      updateSessionThinkLevel(piSessionId,level)
     } catch (err) {
       throw new Error(`Failed to set thinking level: ${err.message}`);
     }
@@ -232,4 +236,11 @@ export class PiSessionManager {
     this.activeStreams.clear();
   }
 
+  verifySessionAccess(sessionId,userId){
+    const s = getSessionMetaByUser(sessionId,userId)
+    if(!s){
+      error('Security issue: session not found with user-id compination: ',sessionId,userId)
+      throw new Error('session not found!')
+    }
+  }
 }

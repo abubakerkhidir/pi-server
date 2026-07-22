@@ -1,5 +1,5 @@
 import { createAgentSession, SessionManager } from "@earendil-works/pi-coding-agent";
-import { trace } from "./logger.js";
+import { debug, trace } from "./logger.js";
 
 const NAME_GEN_PROMPT = `You are a helpful assistant that suggests concise, descriptive titles for chat conversations.
 
@@ -102,7 +102,7 @@ export async function generateSessionName(userPrompt, assistantResponse) {
     namingSession = result.session;
 
     const fullPrompt = buildNamingPrompt(userPrompt, assistantResponse);
-    console.log('naming-session created: ',fullPrompt.length)
+    debug('naming-session created: ',fullPrompt.length)
 
     let resolvePrompt;
     const promptDone = new Promise((r) => { resolvePrompt = r; });
@@ -113,12 +113,12 @@ export async function generateSessionName(userPrompt, assistantResponse) {
     //   subscriber.unsub(event);
     //   if (subscriber.isDone()) resolvePrompt();
     // };
-    console.log('naming-session sending prompt: ',fullPrompt.length)
+    debug('naming-session sending prompt: ',fullPrompt.length)
     await namingSession.prompt(fullPrompt, {});
-    console.log('got naming-session result: ',fullPrompt.length)
+    debug('got naming-session result: ',fullPrompt.length)
 
     if (!subscriber.isDone()) {
-      console.log('waiting for subs-done: ')
+      debug('waiting for subs-done: ')
       await promptDone;
     }
 
