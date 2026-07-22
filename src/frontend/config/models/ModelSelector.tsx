@@ -49,6 +49,7 @@ export default function ModelSelector({currentModel, onModelSelect, disabled = f
   const handleModelSelect = async (model: ModelInfo) => {
     if (disabled) return;
     try{
+      console.log('change model: ',sessionId, model)
       if(sessionId){
         const mr = await changeSessionModel(sessionId,model.provider,model.id)
       }
