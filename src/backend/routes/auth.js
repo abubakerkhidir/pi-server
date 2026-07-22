@@ -4,10 +4,9 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { generateToken, authMiddleware } from "../middleware/auth.js";
-import { insertUser, getUserByUsername } from "../core/db/user-dao.js";
-import { insertSettings } from "../core/db/settings-dao.js";
-
-export const USERS_DIR = path.join(os.homedir(), ".pi-server", "users");
+import { insertUser, getUserByUsername, getUserInitialHomeDir } from "../core/db/user-dao.js";
+import { getDefaultSettings, insertSettings } from "../core/db/settings-dao.js";
+import { getPiDefaultSettings } from "../core/pi/pi-model-mngmt.js";
 
 const router = Router();
 /**
@@ -38,12 +37,18 @@ function isUsernameTaken(username) {
  * Create a new user with home directory and default settings.
  */
 export async function createUser(username, password) {
+  const pi = await getPiDefaultSettings()
   const password_hash = await bcrypt.hash(password, 12);
-  const homeDir = path.join(USERS_DIR, username);
+  const homeDir = getUserInitialHomeDir(username);
   fs.mkdirSync(homeDir, { recursive: true });
   const userId = insertUser(username, password_hash, homeDir);
   // Create default settings
-  insertSettings(getDefaultSettings(), userId);
+  const s = getDefaultSettings();
+  s.home_dir = getUserInitialHomeDir(username)
+  s.model = pi.model
+  s.provider = pi.provider
+  s.think_level = pi.think_level
+  insertSettings(s, userId);
   return userId;
 }
 
@@ -51,20 +56,24 @@ const COOKIE_OPTS = { httpOnly: true, sameSite: "lax", path: "/" };
 
 router.post("/register", async (req, res) => {
   const { username, password } = req.body;
-
-  const validationError = validateRegistration(username, password);
-  if (validationError) {
-    return res.status(400).json(validationError);
+  try{
+    const validationError = validateRegistration(username, password);
+    if (validationError) {
+      return res.status(400).json(validationError);
+    }
+  
+    if (isUsernameTaken(username)) {
+      return res.status(409).json({ error: "Username already taken" });
+    }
+  
+    const userId = await createUser(username, password);
+    const token = generateToken({ id: userId, username });
+    res.cookie("token", token, COOKIE_OPTS);
+    res.json({ token, username });
+  }catch(err){
+    console.log('error creating new user: ',username, err)
+    return res.status(501).json({ error: "Error creating user: "+err });
   }
-
-  if (isUsernameTaken(username)) {
-    return res.status(409).json({ error: "Username already taken" });
-  }
-
-  const userId = await createUser(username, password);
-  const token = generateToken({ id: userId, username });
-  res.cookie("token", token, COOKIE_OPTS);
-  res.json({ token, username });
 });
 
 
@@ -94,3 +103,4 @@ router.get("/me", authMiddleware, (req, res) => {
 });
 
 export default router;
+

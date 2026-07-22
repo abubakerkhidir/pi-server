@@ -5,25 +5,8 @@ import { getDb } from "./db.js";
 
 const USERS_DIR = path.join(os.homedir(), ".pi-server", "users");
 
-/**
- * Get the user's home directory.
- */
-export function getUserHomeDir(userId) {
-  const db = getDb();
-  const user = db.prepare("SELECT home_dir, username FROM users WHERE id = ?").get(userId);
-  const userDir = path.join(USERS_DIR, user?.username || "default");
-  let sessionCwd = user?.home_dir || userDir;
-  try {
-    if (!fs.statSync(sessionCwd).isDirectory()) sessionCwd = userDir;
-  } catch {
-    sessionCwd = userDir;
-  }
-  return sessionCwd;
-}
-
-export function updateHomeDir(home_dir, userId) {
-  const db = getDb();
-  db.prepare("UPDATE users SET home_dir = ? WHERE id = ?").run(home_dir, userId);
+export function getUser(userId) {
+  return getDb().prepare("SELECT * FROM users WHERE id = ?").get(userId);
 }
 
 export function getUserByUsername(username) {
@@ -39,4 +22,12 @@ export function insertUser(username, password_hash, home_dir) {
 
 export function getUserById(idx_chat_files_asset) {
   return getDb().prepare("SELECT * FROM users WHERE id = ?").get(id);
+}
+
+export function getUserInitialHomeDirById(userId) {
+  return getUserInitialHomeDir(getUser(userId)?.username||'default')
+}
+
+export function getUserInitialHomeDir(username) {
+  return path.join(USERS_DIR, username);
 }

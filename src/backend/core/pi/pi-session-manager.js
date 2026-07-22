@@ -1,6 +1,5 @@
 import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
-import { getUserHomeDir } from "../db/user-dao.js";
 import { getSessionMeta} from "../db/session-dao.js";
 import { loadExistingSession } from "./pi-session-loader.js";
 import { createNewSession } from "./pi-new-session.js";
@@ -15,7 +14,7 @@ export class PiSessionManager {
     this.activeStreams = new Map();
   }
 
-  async getOrCreateSession(userId, piSessionId) {
+  async getOrCreateSession(userId, piSessionId,provider,model,thinkLevel,homeDir) {
     // Check in-memory cache first
     if (piSessionId && this.activeSessions.has(piSessionId)) {
       return { session: this.activeSessions.get(piSessionId), piSessionId };
@@ -42,8 +41,7 @@ export class PiSessionManager {
     }
 
     // Create a new session
-    const sessionCwd = getUserHomeDir(userId);
-    const session = await createNewSession(userId, sessionCwd);
+    const session = await createNewSession(userId, homeDir,provider,model,thinkLevel);
     console.log('created new sesion: ',session.sessionId,session.sessionFile)
     const newPiSessionId = session.sessionId || piSessionId || uuidv4();
 

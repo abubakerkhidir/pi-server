@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 import { getEntityBuffer } from "../chat/state.js";
 import { Html2PdfFileSaver } from "./fileSaver/html2pdf-handler.js";
 import { ComfyFileSaver } from "./fileSaver/comfy-handler.js";
-import { getUserHomeDir } from "../db/user-dao.js";
+import { getUserInitialHomeDirById } from "../db/user-dao.js";
 import { insertFile } from "../db/chat-files-dao.js";
 import { trace,debug } from "../../utils/logger.js";
 
@@ -180,7 +180,7 @@ function modifyToolResult(newUrl, result, fileId, filePath, fileInfo) {
 }
 
 function getUserDownloadsDir(userId) {
-    const userDir = getUserHomeDir(userId)
+    const userDir = getUserInitialHomeDirById(userId)
     const downloadsDir = path.join(userDir, "downloads");
     fs.mkdirSync(downloadsDir, { recursive: true });
     return downloadsDir;

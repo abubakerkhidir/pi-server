@@ -11,10 +11,11 @@ const nextCompactId = () => `compact-${++compactCounter}`;
 
 interface UseChatStreamOptions {
   currentSessionId: string | null;
-  userSettings: { tool_lines: number; thinking_lines: number };
+  userSettings: { tool_lines?: number; thinking_lines?: number };
   modelId?: string;
   modelProvider?: string;
   thinkLevel?: string;
+  homeDir?: string;
 }
 
 export type OnEntityUpdate = (entities: AgentReplyEntity[]) => void;
@@ -35,7 +36,7 @@ export interface OnSendInput{
   onSessionCreated?: OnSessionCreated, onTokenStats?: OnTokenStats
 }
 
-export function useChatStream({currentSessionId, modelId, modelProvider, thinkLevel}: UseChatStreamOptions): UseChatStreamResult {
+export function useChatStream({currentSessionId, modelId, modelProvider, thinkLevel,homeDir}: UseChatStreamOptions): UseChatStreamResult {
   const sessionIdRef = useRef<string | null>(null);
   const isProcessingRef = useRef(false);
   const entitiesRef = useRef<AgentReplyEntity[]>([]);
@@ -57,7 +58,7 @@ export function useChatStream({currentSessionId, modelId, modelProvider, thinkLe
     const markEnded = ()=> handleStreamEnded(isProcessingRef,abortRef,onStreamEnd)
     try {
       const streamHndlr = getStreamHandler(sessionIdRef, onSessionCreated, sealLastEntity, entitiesRef, entityStartTimes, onSessionName, onTokenStats, markEnded, onEntityUpdate);
-      const abort = createChatStream(currentSessionId, prompt, files?.length ? files : undefined, streamHndlr, getErrHandler(entitiesRef, markEnded), modelId, modelProvider, thinkLevel);
+      const abort = createChatStream(currentSessionId, prompt, files?.length ? files : undefined, streamHndlr, getErrHandler(entitiesRef, markEnded), modelId, modelProvider, thinkLevel,homeDir);
       abortRef.current = abort;
     } catch (er) {
       console.log('Error in create chat-stream: ',er)

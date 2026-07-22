@@ -1,5 +1,5 @@
-import ModelSelector from "../../config/models/ModelSelector";
 import type { ModelInfo, UserSettings } from "@/frontend/types";
+import ModelSelector from "../../config/models/ModelSelector";
 import ThinkLevelSelector from "./ThinkLevelSelector";
 
 interface ChatHeaderProps {
@@ -12,10 +12,10 @@ interface ChatHeaderProps {
   sidebarCollapsed: boolean;
   onSidebarToggle: () => void;
   modelInfo: ModelInfo | null;
-  currentThinkLevel: string | null;
+  currentThinkLevel?: string ;
   onSummarizeAndNew: () => void;
   summarizing: boolean;
-  sessionId?: string | null;
+  sessionId?: string;
   isProcessing: boolean;
   userSettings: UserSettings
 }
@@ -41,7 +41,7 @@ export default function ChatHeader({
           <ModelSelector userSettings={userSettings} currentModel={currentModel} onModelSelect={onModelSelect} disabled={isProcessing}/>
         </div>
         {hasReasoning && (
-          <ThinkLevelSelector sessionId={sessionId ?? null} modelId={modelInfo?.id} modelProvider={modelInfo?.provider} currentLevel={currentThinkLevel} onLevelChange={onThinkLevelChange} disabled={isProcessing}/>
+          <ThinkLevelSelector sessionId={sessionId} model={modelInfo} level={currentThinkLevel} onLevelChange={onThinkLevelChange} disabled={isProcessing}/>
         )}
         <span className="model-tags">
           {hasVision && <span className="model-tag vision">vision</span>}

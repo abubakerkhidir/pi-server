@@ -36,7 +36,7 @@ function extractModelInfo(session) {
 
 export async function handleChatStream(req, res){
   const piManager = getPiManager();
-  const { prompt, sessionId } = req.body;
+  const { prompt, sessionId, provider, model,thinkLevel,homeDir } = req.body;
 
   if (!prompt && (!req.files || req.files.length === 0)) {
     return res.status(400).json({ error: "Prompt or files are required" });
@@ -69,7 +69,7 @@ export async function handleChatStream(req, res){
     writeVideoMetadata(writeEvent, videoInfo, images.length);
 
     // Get or create session
-    const { session, piSessionId } = await piManager.getOrCreateSession(req.user.userId, sessionId);
+    const { session, piSessionId } = await piManager.getOrCreateSession(req.user.userId, sessionId,provider,model,thinkLevel,homeDir);
     dbSessionId = sessionId || piSessionId;
     console.log('got pi session: ', piSessionId, sessionId, dbSessionId);
 
@@ -93,7 +93,7 @@ export async function handleChatStream(req, res){
     }
 
     // Initialize session and record
-    initSessionMetadata(dbSessionId, req.user.userId, piSessionId, effectivePrompt,session.sessionFile);
+    initSessionMetadata(dbSessionId, req.user.userId, piSessionId, effectivePrompt,session.sessionFile,provider, model,thinkLevel,homeDir );
     const recordId = createChatRecord(dbSessionId, effectivePrompt);
     saveFileMetadata(recordId, dbSessionId, req.files);
 

@@ -1,8 +1,7 @@
 import path from "path";
 import os from "os";
 import { getDb } from "./db.js";
-
-const USERS_DIR = path.join(os.homedir(), ".pi-server", "users");
+import { getUser, getUserInitialHomeDir } from "./user-dao.js";
 
 const DEFAULT_TOOLS = ["read", "ls", "bash", "find", "grep", "get_search_content"];
 
@@ -14,8 +13,11 @@ export function getDefaultSettings() {
     tools_enabled: DEFAULT_TOOLS,
     thinking_lines: 3,
     tool_lines: 5,
-    model_id: "",
+    // model_id: "",
+    model: "",
+    provider: "",
     think_level: "medium",
+    home_dir: "",
     send_on_enter: true,
     copy_text_as_plain: true,
     enable_continue: true,
@@ -47,19 +49,16 @@ function parseSettingValue(row) {
  */
 export function loadUserSettings(userId) {
   const db = getDb();
-  const rows = db.prepare("SELECT key, value FROM user_settings WHERE user_id = ?").all(userId);
+  const user = db.prepare("SELECT username FROM users WHERE id = ?").get(userId);
   const settings = getDefaultSettings();
-
+  settings.home_dir = getUserInitialHomeDir(user?.username||'default')
+  const rows = db.prepare("SELECT key, value FROM user_settings WHERE user_id = ?").all(userId);
   for (const row of rows) {
     settings[row.key] = parseSettingValue(row);
   }
-
-  const user = db.prepare("SELECT home_dir, username FROM users WHERE id = ?").get(userId);
   if (user) {
-    settings.home_dir = user.home_dir || path.join(USERS_DIR, user.username);
     settings.username = user.username;
   }
-
   return settings;
 }
 
@@ -103,5 +102,24 @@ export function insertSettings(defaults, userId) {
   for (const [key, value] of Object.entries(defaults)) {
     upsert.run(userId, key, JSON.stringify(value));
   }
+}
+
+export function getUserHomeDir(userId) {
+  const db = getDb();
+  const s = loadSettingsFromDb(userId);
+  const user = getUser(userId);
+  const userDir = getUserInitialHomeDir(user?.username || "default");
+  let sessionCwd = s?.home_dir || userDir;
+  try {
+    if (!fs.statSync(sessionCwd).isDirectory()) sessionCwd = userDir;
+  } catch {
+    sessionCwd = userDir;
+  }
+  return sessionCwd;
+}
+
+export function updateHomeDir(home_dir, userId) {
+  const db = getDb();
+  db.prepare("UPDATE users SET home_dir = ? WHERE id = ?").run(home_dir, userId);
 }
 

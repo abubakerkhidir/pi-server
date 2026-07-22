@@ -1,12 +1,14 @@
 import { SessionManager, createAgentSession } from "@earendil-works/pi-coding-agent";
-import { loadSettingsFromDb } from "../db/settings-dao.js";
+import { getUserHomeDir, loadSettingsFromDb } from "../db/settings-dao.js";
 import { createResourceLoader } from "./pi-resource-loader.js";
 import { DEFAULT_TOOLS, bindSessionExtensions } from "./pi-session-utils.js";
 
 /**
  * Create a new pi session with user settings.
  */
-export async function createNewSession(userId, sessionCwd) {
+export async function createNewSession(userId, sessionCwdIn,provider,model,thinkLevel) {
+  const sessionCwd = sessionCwdIn?? getUserHomeDir(userId);
+    
   const userMap = loadSettingsFromDb(userId);
   const tools = userMap.tools_enabled || DEFAULT_TOOLS;
   console.log(`[PiSession] Creating session with tools:`, tools?.join(','));
@@ -21,34 +23,33 @@ export async function createNewSession(userId, sessionCwd) {
     console.log("[PiSession] Skill diagnostics:", diagnostics);
   }
 
-  const { session } = await createAgentSession({
-    sessionManager,
-    resourceLoader,
-    cwd: sessionCwd,
-    tools,
-    sessionStartEvent: { type: "session_start", reason: "new" },
-  });
+  const { session } = await createAgentSession({sessionManager,resourceLoader,cwd: sessionCwd,tools, sessionStartEvent: { type: "session_start", reason: "new" }});
 
   printSysPrompt(session);
 
   await bindSessionExtensions(session);
 
-  if (userMap.model_id) {
+  await setLLMModel(model, provider, userMap, session);
+
+  await session.setThinkingLevel(thinkLevel||'medium')
+  
+  return session;
+}
+
+async function setLLMModel(model, provider, userMap, session) {
+  const m = model && provider ? { provider, model } : { provider: userMap.llm_provider, model: userMap.llm_model };
+  if (m.model) {
     try {
-      const [provider, ...rest] = userMap.model_id.split("/");
-      const modelId = rest.join("/");
-      const model = session.modelRegistry.find(provider, modelId);
-      console.log('setting llm model to:', userMap.model_id, modelId, provider, model!==undefined?JSON.stringify(model):null);
-      if (model) {
-        await session.setModel(model);
+      const piModel = session.modelRegistry.find(m.provider, m.model);
+      if (piModel) {
+        await session.setModel(piModel);
       } else {
-        console.log('model not found in registry:', userMap.model_id);
+        console.log('model not found in registry:', m.model);
       }
     } catch (err) {
-      console.log('error setting model:', userMap.model_id, err.message);
+      console.log('error setting model:', m, err.message);
     }
   }
-  return session;
 }
 
 function printSysPrompt(session) {

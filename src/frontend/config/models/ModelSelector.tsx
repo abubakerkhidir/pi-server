@@ -1,21 +1,20 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { getModels } from "@/frontend/api";
+import { changeSessionModel } from "@/frontend/api";
+import { useEffect, useRef, useState } from "react";
 
 import type { ModelInfo, ModelProvider, UserSettings } from "@/frontend/types";
 
 interface ModelSelectorProps {currentModel?: string; onModelSelect: (model: ModelInfo) => void; disabled?: boolean; userSettings: UserSettings, sessionId?:string}
 
-export default function ModelSelector({currentModel, onModelSelect, disabled = false,userSettings}: ModelSelectorProps) {
+export default function ModelSelector({currentModel, onModelSelect, disabled = false,userSettings, sessionId}: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
 
-  const [providerList, setProviderList] = useState<ModelProvider[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<ModelProvider | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const providerList = userSettings.providers||[]
 
-  //useEffect(() => {getModels().then((r) => {setProviderList((r as { groups: typeof providerList }).groups || []);}).catch(e => {console.log('err: ',e)})}, []);
   useEffect(() => {
-    if(userSettings.providers && providerList && !currentModel){
-
+    if(userSettings.providers?.length && !currentModel){
+      onModelSelect(findModel(userSettings,{id:userSettings.model,provider:userSettings.provider}))
     }
   },[userSettings?.providers])
 
@@ -39,11 +38,18 @@ export default function ModelSelector({currentModel, onModelSelect, disabled = f
     setOpen(true);
   };
 
-  const handleModelSelect = (model: ModelInfo) => {
+  const handleModelSelect = async (model: ModelInfo) => {
     if (disabled) return;
-    onModelSelect(model);
-    setOpen(false);
-    setSelectedProvider(null);
+    try{
+      if(sessionId){
+        const mr = await changeSessionModel(sessionId,model.provider,model.id)
+      }
+      onModelSelect(model);
+      setOpen(false);
+      setSelectedProvider(null);
+    }catch(err){
+      console.log('error saving model: ',model,err)
+    }
   };
 
   return (
@@ -97,15 +103,7 @@ export default function ModelSelector({currentModel, onModelSelect, disabled = f
   );
 }
 
-function findModel(userSettings: UserSettings, model:any){
-  // const allModels = ((m as { groups: { models: ModelInfo[]; }[]; }).groups || []).flatMap((g) => g.models);
-  //     if (allModels.length > 0) {
-  //       let found;
-  //       if (settings.model_id) {
-  //         const [provider, ...rest] = settings.model_id.split("/");
-  //         const modelId = rest.join("/");
-  //         found = allModels.find((model) => model.provider === provider && model.id === modelId);
-  //       }
-  //       setCurrentModel(found || allModels[0]);
-  //     }
+function findModel(userSettings: UserSettings, model:{id?:string,provider?:string}):ModelInfo{
+  const m = userSettings.providers?.flatMap(p=>p.models).find(x=>x.id===model.id && x.provider===model.provider)
+  return m?? userSettings.providers?.flatMap(p=>p.models).find(x=>true)??{id:'1',provider:'1',name:'test'}
 }

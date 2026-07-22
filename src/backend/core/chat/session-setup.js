@@ -17,11 +17,11 @@ function generateInitialTitle(effectivePrompt) {
  * @param {string} piSessionId - The pi session ID
  * @param {string} effectivePrompt - The user prompt
  */
-export function initSessionMetadata(dbSessionId, userId, piSessionId, effectivePrompt, sessionFile) {
+export function initSessionMetadata(dbSessionId, userId, piSessionId, effectivePrompt, sessionFile,provider, model,thinkLevel,homeDir ) {
   const existing = getSessionMeta(dbSessionId);
   if (!existing) {
     const title = generateInitialTitle(effectivePrompt);
-    createSessionRecord(dbSessionId, userId, piSessionId, title,sessionFile);
+    createSessionRecord(dbSessionId, userId, piSessionId, title,sessionFile,provider, model,thinkLevel,homeDir);
   } else {
     updateSessionTimestamp(dbSessionId);
   }

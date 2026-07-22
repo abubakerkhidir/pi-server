@@ -20,9 +20,13 @@ export default function SettingsModal({ isOpen, onClose, onSave, onResumeSession
           getTools(),
           getModels(),
         ]);
-        setSettings(settingsData as Settings);
+        const ss = settingsData as Settings;
+        const s0 = settingsData as UserSettings;
+        ss.model_id = (s0.provider||'')+'/'+s0.model
+        ss.providers = modelsData.groups||[]
+        setSettings(ss);
         setToolGroups((toolsData as { groups: ToolGroup[] }).groups || []);
-        setModels((modelsData as { groups: typeof models }).groups || []);
+        setModels(modelsData.groups || []);
       } catch { /* ignore */ } finally { setLoading(false); }
     };
     loadData();
@@ -34,9 +38,13 @@ export default function SettingsModal({ isOpen, onClose, onSave, onResumeSession
 
   const handleSave = async () => {
     try {
-      await updateSettings(settings as Record<string, unknown>);
-      onSave(settings as Record<string, unknown>);
-      onSettingsChange(settings as UserSettings);
+      const mid = settings.model_id
+      delete settings.model_id
+      const s:UserSettings = {...settings,...parseModel(mid)}
+      settings.model_id = mid
+      await updateSettings(s);
+      onSave(s);
+      onSettingsChange(s);
     } catch { /* ignore */ }
   };
 
@@ -65,4 +73,16 @@ export default function SettingsModal({ isOpen, onClose, onSave, onResumeSession
       </div>
     </div>
   );
+}
+
+
+function parseModel(model_id?:string) {
+  if(model_id){
+    const [provider, ...rest] = model_id.split("/");
+    const model = rest.join("/");
+    const m = { provider, model };
+    return m;
+  }else{
+    return {}
+  }
 }

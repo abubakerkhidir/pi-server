@@ -1,3 +1,5 @@
+import { ModelInfo, ModelsApiRes } from "./types";
+
 const TOKEN_KEY = "pi_server_token";
 const USERNAME_KEY = "pi_server_username";
 
@@ -117,7 +119,7 @@ export async function renameSession(id: string, name: string): Promise<void> {
   await apiPut(`/api/sessions/${id}/name`, { name });
 }
 
-export async function getModels(): Promise<Record<string, unknown>> {
+export async function getModels(): Promise<ModelsApiRes> {
   return (await apiFetch("/api/models")).json();
 }
 
@@ -180,7 +182,7 @@ export async function setThinkingLevel(sessionId: string, level: string): Promis
   return (await apiPost("/api/chat/thinking", { sessionId, level })).data;
 }
 
-export async function changeSessionModel(sessionId: string, provider: string, modelId: string): Promise<{ model: { id: string; name: string; provider: string; input?: string[]; reasoning?: boolean }; availableLevels: string[]; currentLevel: string }> {
+export async function changeSessionModel(sessionId: string, provider: string, modelId: string): Promise<{ model: ModelInfo; availableLevels: string[]; currentLevel: string }> {
   return (await apiPost("/api/chat/session-model", { sessionId, provider, modelId })).data;
 }
 
@@ -196,16 +198,17 @@ export function createChatStream(
   onError: ChatStreamErrorCallback,
   modelId?: string,
   modelProvider?: string,
-  thinkLevel?: string,
+  thinkLevel?: string,homeDir?:string
 ): AbortChatStream {
   const abortController = new AbortController();
 
   const formData = new FormData();
   formData.append("prompt", prompt);
   if (sessionId) formData.append("sessionId", sessionId);
-  if (modelId) formData.append("modelId", modelId);
-  if (modelProvider) formData.append("modelProvider", modelProvider);
+  if (modelId) formData.append("model", modelId);
+  if (modelProvider) formData.append("provider", modelProvider);
   if (thinkLevel) formData.append("thinkLevel", thinkLevel);
+  if (homeDir) formData.append("homeDir", homeDir);
   if (files) {
     for (const f of files) {
       formData.append("files", f);

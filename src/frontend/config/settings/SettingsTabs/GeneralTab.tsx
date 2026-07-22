@@ -130,7 +130,7 @@ export default function GeneralTab({ settings, models, onChange }: GeneralTabPro
             Model
             <span style={{ fontSize: 11, color: "var(--text-muted)" }}>— Default AI model to use for responses.</span>
           </label>
-          <select id="model_id" style={{ maxWidth: 300, padding: "6px 10px", background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)", fontSize: 13 }} value={settings.model_id || ""} onChange={(e) => onChange("model_id", e.target.value)}>
+          <select id="model_id" style={{ maxWidth: 300, padding: "6px 10px", background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)", fontSize: 13 }} value={settings.model_id||""} onChange={(e) => onChange("model_id", e.target.value)}>
             <option value="">Default</option>
             {models.map((g) => (
               <optgroup key={g.provider} label={escapeHtmlSimple(g.provider)}>

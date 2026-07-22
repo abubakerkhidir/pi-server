@@ -1,4 +1,5 @@
-import { SessionManager, createAgentSession } from "@earendil-works/pi-coding-agent";
+import { SessionManager, createAgentSession, } from "@earendil-works/pi-coding-agent";
+import { error } from "../../utils/logger";
 
 const EXTENDED_THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"];
 
@@ -45,6 +46,7 @@ function groupModelsByProvider(models) {
       name: m.name,
       input: m.input,
       reasoning: !!m.reasoning,
+      thinkLevels:m.thinkingLevelMap?Object.keys(m.thinkingLevelMap):[]
     });
   }
 
@@ -128,4 +130,17 @@ async function getPiRawModels() {
   const models = session.modelRegistry.getAvailable();
   session.dispose();
   return models;
+}
+
+export async function getPiDefaultSettings() {
+  try {
+    const sm = SessionManager.inMemory();
+    const { session } = await createAgentSession({sessionManager: sm,cwd: process.cwd()});
+    const s = {model: session.model.id,provider:session.model.provider||'llama.cpp', think_level:session.thinkingLevel||'medium'};
+    tmp.dispose();
+    return s;
+  } catch (err){
+    error('error in getPiDefaultSettings: ',err)
+    return undefined;
+  }
 }

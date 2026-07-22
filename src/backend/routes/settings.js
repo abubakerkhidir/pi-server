@@ -3,7 +3,6 @@ import { authMiddleware } from "../middleware/auth.js";
 import { getGroupedTools } from "../core/pi/tool-cache.js";
 import { loadUserSettings, saveUserSettings } from "../core/db/settings-dao.js";
 import { getPiModelsGrouped } from "../core/pi/pi-model-mngmt.js";
-import { updateHomeDir } from "../core/db/user-dao.js";
 
 const router = Router();
 
@@ -61,42 +60,23 @@ function applyNumberUpdates(current, updates) {
  * Apply string field updates.
  */
 function applyStringUpdates(current, updates) {
-  if (updates.system_message !== undefined) {
-    if (typeof updates.system_message !== "string") {
-      return { error: "system_message must be a string" };
-    }
-    current.system_message = updates.system_message;
+  const keys = ['system_message','model','provider','home_dir','think_level']
+  for (let i = 0; i < keys.length; i++) {
+    const err = applyStringUpdForKey(current,updates,keys[i]);
+    if(!err)
+      return err
   }
-
-  if (updates.model_id !== undefined) {
-    if (typeof updates.model_id !== "string") {
-      return { error: "model_id must be a string" };
-    }
-    current.model_id = updates.model_id;
-  }
-
-  if (updates.think_level !== undefined) {
-    if (typeof updates.think_level !== "string") {
-      return { error: "think_level must be a string" };
-    }
-    current.think_level = updates.think_level;
-  }
-
   return null;
 }
 
-/**
- * Apply home_dir update.
- */
-function applyHomeDirUpdate(current, updates, userId) {
-  if (updates.home_dir !== undefined) {
-    if (typeof updates.home_dir !== "string" || !updates.home_dir.trim()) {
-      return { error: "home_dir must be a non-empty string" };
+function applyStringUpdForKey(current,updates,key){
+  if (updates[key] !== undefined) {
+    if (typeof updates[key] !== "string") {
+      return { error: key+" must be a string" };
     }
-    current.home_dir = updates.home_dir.trim();
-    updateHomeDir(current.home_dir, userId);
+    current[key] = updates[key];
   }
-  return null;
+  return undefined
 }
 
 /**
@@ -135,9 +115,6 @@ router.put("/settings", authMiddleware, (req, res) => {
 
   const stringError = applyStringUpdates(current, updates);
   if (stringError) return res.status(400).json(stringError);
-
-  const homeDirError = applyHomeDirUpdate(current, updates, req.user.userId);
-  if (homeDirError) return res.status(400).json(homeDirError);
 
   saveUserSettings(req.user.userId, current);
   res.json(current);

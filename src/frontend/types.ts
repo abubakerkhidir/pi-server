@@ -28,6 +28,7 @@ export interface ModelInfo {
   reasoning?: boolean;
   contextWindow?: number;
   maxTokens?: number;
+  thinkLevels?:string[]
 }
 
 export interface ModelGroup {
@@ -52,11 +53,11 @@ export interface Settings {
   max_image_resolution?: number;
   thinking_lines?: number;
   tool_lines?: number;
-  model_id?: string;
-  model_provider?: string;
-  home_dir?: string;
   tools_enabled?: string[];
+  model_id?: string;
+  home_dir?: string;
   think_level?: string;
+  providers?:ModelProvider[]
 }
 
 export interface ToolGroup {
@@ -172,6 +173,8 @@ export interface ChatState {
   records: ChatRecord[];
   sessionStats?: SessionTokenStats;
 }
+export interface ModelsApiRes { groups: ModelProvider[]; }
+
 export interface ModelProvider {provider: string; models: ModelInfo[];}
 
 export type UserSettings = {
@@ -185,12 +188,13 @@ export type UserSettings = {
   system_message?: string;
   paste_to_file_length?: number;
   max_image_resolution?: number;
-  thinking_lines: number;
-  tool_lines: number;
-  model_id?: string;
-  home_dir?: string;
+  thinking_lines?: number;
+  tool_lines?: number;
   tools_enabled?: string[];
-  think_level?: string;
+  home_dir?: string;
+  provider?: string;
+  model?: string;
+  think_level?: string; 
   providers?:ModelProvider[]
 };
 
