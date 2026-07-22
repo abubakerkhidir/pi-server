@@ -2,7 +2,7 @@ import { SessionManager, createAgentSession } from "@earendil-works/pi-coding-ag
 import { getUserHomeDir, loadSettingsFromDb } from "../db/settings-dao.js";
 import { createResourceLoader } from "./pi-resource-loader.js";
 import { DEFAULT_TOOLS, bindSessionExtensions } from "./pi-session-utils.js";
-import { warning } from "../../utils/logger.js";
+import { debug, warning } from "../../utils/logger.js";
 
 /**
  * Create a new pi session with user settings.
