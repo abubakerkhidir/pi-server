@@ -39,7 +39,7 @@ export default function ChatHeader({
         )}
         <span className="logo">pi-server</span>
         <div className="model-select-wrapper" style={{ display: "inline-block", position: "relative" }}>
-          <ModelSelector userSettings={userSettings} currentModel={currentModel} onModelSelect={onModelSelect} disabled={isProcessing} currentSession={currentSession}/>
+          <ModelSelector userSettings={userSettings} currentModel={currentModel} onModelSelect={onModelSelect} disabled={isProcessing} sessionId={sessionId} currentSession={currentSession}/>
         </div>
         {hasReasoning && (
           <ThinkLevelSelector sessionId={sessionId} model={modelInfo} level={currentThinkLevel} onLevelChange={onThinkLevelChange} disabled={isProcessing} currentSession={currentSession}/>
