@@ -2,7 +2,7 @@ import { getUsername } from "@/frontend/api";
 import { getLoadSessionHandler, getMoreSessionHndlr, getReloadSessionsHndlr, getResumeSessionHandler } from "@/frontend/chat/window/chat-utils/sessionMngmtUtils";
 import { useChatStream } from "@/frontend/hooks/useChatStream";
 import { useStopStream } from "@/frontend/hooks/useStreamHandlers";
-import type { ChatLayoutProps, ChatState, ModelInfo, Session, UserSettings } from "@/frontend/types";
+import type { BackendSession, ChatLayoutProps, ChatState, ModelInfo, Session, UserSettings } from "@/frontend/types";
 import { Dispatch, SetStateAction, useCallback, useEffect, useRef, useState } from "react";
 import SettingsModal from "../../config/settings/SettingsModal";
 import ChatSidebar from "../../sidebar/ChatSidebar";
@@ -16,6 +16,7 @@ import ChatWindow from "./ChatWindow";
 
 export default function ChatLayout({ onLogout, onShowFiles }: ChatLayoutProps) {
   //state
+  const [currentSession, setCurrentSession] = useState<BackendSession>();
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -40,11 +41,11 @@ export default function ChatLayout({ onLogout, onShowFiles }: ChatLayoutProps) {
   const loadSessions = useCallback(getMoreSessionHndlr(loadMoreOffsetRef, setSessions, setSessionTotal), []);
   const reloadSessions = useCallback(getReloadSessionsHndlr(loadMoreOffsetRef, loadSessions), [loadSessions]);
   const handleSendWrapper = useHandleSend({ isProcessing, setUserPrompt, setUploadedFiles, pendingSummaryRef, setChatState, setIsProcessing, handleSend, setSessions, setCurrentSessionId,currentSessionId });
-  const handleNewChat = getNewChatHandler(setChatState, setCurrentSessionId, resetState, reloadSessions, setShowScrollDown)
+  const handleNewChat = getNewChatHandler(setChatState, setCurrentSessionId, resetState, reloadSessions, setShowScrollDown,setCurrentSession)
   const handleSummarizeAndNew = useCallback(getSummarizeAndNewHandler(currentSessionId, handleNewChat, setSummarizing, pendingSummaryRef), [handleNewChat]);
-  const handleResumeSession = getResumeSessionHandler(setChatState, setCurrentSessionId, resetState);
+  const handleResumeSession = getResumeSessionHandler(setChatState, setCurrentSessionId, resetState,setCurrentSession);
   const handleStopStream = useStopStream(stopStream, setIsProcessing);
-  const loadAndShowSession = getLoadSessionHandler(currentSessionId, setChatState, setCurrentSessionId, reloadSessions);
+  const loadAndShowSession = getLoadSessionHandler(currentSessionId, setChatState, setCurrentSessionId, reloadSessions,setCurrentSession);
   const handleModelSelect = useCallback(async (model: ModelInfo) => {setCurrentModel(model);}, []);
   const handleThinkLevelChange = useCallback(async (level: string) => {setCurrentThinkLevel(level);}, []);
   const username = getUsername();
@@ -88,6 +89,7 @@ export default function ChatLayout({ onLogout, onShowFiles }: ChatLayoutProps) {
           sessionId={currentSessionId??undefined}
           isProcessing={isProcessing}
           userSettings={userSettings}
+          currentSession={currentSession}
         />
         <ChatWindow chatState={chatState} userSettings={userSettings} setShowScrollDown={setShowScrollDown} showScrollDown={showScrollDown}/>
         <InputArea

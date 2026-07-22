@@ -1,3 +1,4 @@
+import { debug, warning } from "../../utils/logger.js";
 
 
 /**
@@ -47,11 +48,11 @@ export function writeErrorResponse(res, message) {
  * Write done event and close response.
  */
 export function writeDoneEvent(writeEvent, res, lastEvent) {
-  console.log('writting done-event: ',res.writableEnded, lastEvent)
+  debug('writting done-event: ',res.writableEnded, lastEvent)
   if (!res.writableEnded) {
     const isErr = lastEvent?.event?.type !== 'done';
     if(isErr)
-      console.log('lastEvent is not done: ',lastEvent)
+      warning('lastEvent is not done: ',lastEvent)
     writeEvent(lastEvent?.event?.type??"done", isErr?lastEvent:{});
     res.end();
   }

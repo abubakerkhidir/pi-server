@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from "uuid";
 import { generateSessionName } from "../../utils/generateSessionName.js";
 import { createSessionRecord, getSessionMeta,  updateSessionName, updateSessionTimestamp } from "../db/session-dao.js";
 import { getSessionMessageCount } from "../db/chat-record-dao.js";
+import { debug } from "../../utils/logger.js";
 
 /**
  * Generate a truncated title from the user prompt.
@@ -36,17 +37,16 @@ export function initSessionMetadata(dbSessionId, userId, piSessionId, effectiveP
  */
 export async function generateSessionNameIfNeeded(dbSessionId, effectivePrompt, fullText, writeEvent,req) {
   const messageCount = getSessionMessageCount(dbSessionId);
-  console.log('trying to name session, recordCount: ',messageCount)
+  debug('trying to name session, recordCount: ',messageCount)
   if (messageCount === 1) {
     try {
-      console.log('generate session name... ',effectivePrompt?.length, fullText.length)
+      debug('generate session name... ',effectivePrompt?.length, fullText.length)
       const name = await generateSessionName(effectivePrompt, fullText);
-      console.log('got session name: ',name)
+      debug('got session name: ',name)
       updateSessionName(dbSessionId,req.user.userId, name);
       const sessionMeta = getSessionMeta(dbSessionId);
-      console.log('got session meta: ',name)
+      debug('got session meta: ',name)
       writeEvent("session_name", sessionMeta);
-      console.log("session-name event done: ",sessionMeta.name)
     } catch (err) {
       console.error("Session naming failed:", err);
     }

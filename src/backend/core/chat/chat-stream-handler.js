@@ -82,10 +82,7 @@ export async function handleChatStream(req, res){
     writeSessionEvent(writeEvent, dbSessionId, modelInfo, recordId);
 
     // Handle abort on client disconnect
-    req.on("close", () => {
-      piManager.abort(piSessionId).catch(() => { });
-      removeEntityBuffer(dbSessionId);
-    });
+    req.on("close", () => {piManager.abort(piSessionId).catch(() => { }); removeEntityBuffer(dbSessionId);});
 
     // Create entity buffer and stream handler
     const entityBuffer = createEntityBuffer(recordId, dbSessionId, req.user.userId);
@@ -100,10 +97,8 @@ export async function handleChatStream(req, res){
     // Run the prompt
     let startTime = new Date().getTime()
     console.log('running prompt: ',effectivePrompt)
-    await piManager.prompt(piSessionId, effectivePrompt, {
-      images: images.length > 0 ? images : undefined,
-      onEvent: wrappedOnEvent,
-    });
+    await piManager.prompt(piSessionId, effectivePrompt, { images: images.length > 0 ? images : undefined, onEvent: wrappedOnEvent});
+    
     console.log('prompt completed in pi... ',dbSessionId, new Date().getTime() - startTime)
     await onAgentEnd
     console.log('agent reply completed in pi... ',dbSessionId, new Date().getTime() - startTime)

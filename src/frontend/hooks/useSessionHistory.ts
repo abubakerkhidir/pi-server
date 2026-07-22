@@ -1,43 +1,5 @@
 import { getChatHistory } from "@/frontend/api";
-import type { ChatRecord, ChatState, TokenStats, SessionTokenStats } from "@/frontend/types";
-
-/**
- * Backend response for session history — new entity-based format.
- */
-interface BackendEntity {
-  type: "think" | "msg" | "tool" | "compact";
-  content?: string;
-  name?: string;
-  args?: Record<string, unknown>;
-  result?: unknown;
-  isError?: boolean;
-  isComplete?: boolean;
-  duration?: number;
-  totalLength?: number;
-  summary?: string;
-  tokensBefore?: number;
-  tokensAfter?: number;
-  savedPct?: number;
-  failed?: boolean;
-}
-
-interface BackendRecord {
-  id: string;
-  userMsg: { content: string };
-  agentReply: {
-    id: string;
-    entities: BackendEntity[];
-    tokenStats?: TokenStats;
-  };
-  created_at?: string;
-}
-
-interface BackendHistory {
-  sessionId: string;
-  name: string;
-  records: BackendRecord[];
-  sessionStats?: SessionTokenStats;
-}
+import type { ChatRecord, ChatState, TokenStats, SessionTokenStats, BackendRecord, BackendHistory, BackendSession } from "@/frontend/types";
 
 /**
  * Convert a backend entity to the frontend AgentReplyEntity type.
@@ -48,10 +10,7 @@ interface BackendHistory {
  *  ToolData  { type: "tool",  id: string,  name: string,  args, partialResult,
  *              result, isError, isComplete, sealed?: boolean }
  */
-function mapEntity(
-  e: BackendRecord["agentReply"]["entities"][0],
-  index: number,
-): ChatRecord["agentReply"]["entities"][0] {
+function mapEntity(e: BackendRecord["agentReply"]["entities"][0], index: number): ChatRecord["agentReply"]["entities"][0] {
   const base = { sealed: true };
   if (e.type === "think") {
     return {
@@ -103,14 +62,14 @@ function mapEntity(
  * The backend now returns records in the same entity-based format used
  * by the frontend, including tokenStats per record and sessionStats.
  */
-export async function loadSessionHistory(sessionId: string): Promise<ChatState> {
+export async function loadSessionHistory(sessionId: string): Promise<{meta?:BackendSession,chat:ChatState}> {
   try {
     const raw = await getChatHistory(sessionId);
     const history = raw as BackendHistory;
 
     if (!history.records || !Array.isArray(history.records)) {
       console.warn("[loadSessionHistory] No records in response", history);
-      return { records: [] };
+      return {chat:{ records: [] },meta:history.meta};
     }
 
     const records: ChatRecord[] = history.records.map((rec, ri) => {
@@ -121,23 +80,14 @@ export async function loadSessionHistory(sessionId: string): Promise<ChatState> 
         return mapped;
       });
 
-      return {
-        id: rec.id || `rec-${ri}`,
-        userMsg: { content: rec.userMsg?.content || "" },
-        agentReply: {
-          id: rec.agentReply?.id || "",
-          entities,
-          tokenStats: rec.agentReply?.tokenStats,
-        },
+      return { id: rec.id || `rec-${ri}`, userMsg: { content: rec.userMsg?.content || "" },
+        agentReply: { id: rec.agentReply?.id || "", entities, tokenStats: rec.agentReply?.tokenStats},
       };
     });
 
-    return {
-      records,
-      sessionStats: history.sessionStats,
-    };
+    return {chat:{records, sessionStats: history.sessionStats}, meta:history.meta};
   } catch (err) {
     console.error("[loadSessionHistory] Failed:", err);
-    return { records: [] };
+    return {chat:{ records: [] },meta:{id:sessionId,user_id:''}};
   }
 }

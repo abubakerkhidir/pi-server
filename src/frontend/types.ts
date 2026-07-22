@@ -173,6 +173,7 @@ export interface ChatState {
   records: ChatRecord[];
   sessionStats?: SessionTokenStats;
 }
+
 export interface ModelsApiRes { groups: ModelProvider[]; }
 
 export interface ModelProvider {provider: string; models: ModelInfo[];}
@@ -259,4 +260,21 @@ export interface InputAreaProps {
   uploadedFiles: File[];
   onAddFile?: (files: File[]) => void;
   onRemoveFile: (index: number) => void;
+}
+
+export interface BackendSession { id: string; created_at?: string; updated_at?: string; llm_provider?: string; llm_model?: string; think_level?: string; user_id: string;
+  pi_session_id?: string; name?: string; pi_session_file?: string; home_dir?: string; context_size?: number; context_used?: number; context_percent?: number;
+  total_input?: number; total_output?: number; total_cache_read?: number; total_cache_write?: number; total_reasoning?: number; total_cost?: number;
+}
+
+export interface BackendHistory {
+  sessionId: string; name: string; meta: BackendSession; records: BackendRecord[]; sessionStats?: SessionTokenStats;
+}
+export interface BackendEntity { type: "think" | "msg" | "tool" | "compact"; content?: string; name?: string; args?: Record<string, unknown>; result?: unknown;
+  isError?: boolean; isComplete?: boolean; duration?: number; totalLength?: number; summary?: string; tokensBefore?: number; tokensAfter?: number;
+  savedPct?: number; failed?: boolean;
+}
+
+export interface BackendRecord {
+  id: string; userMsg: { content: string }; agentReply: { id: string; entities: BackendEntity[]; tokenStats?: TokenStats;}; created_at?: string;
 }

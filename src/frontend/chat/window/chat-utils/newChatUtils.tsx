@@ -1,5 +1,5 @@
 import { summarizeSession } from "@/frontend/api";
-import type { ChatState } from "@/frontend/types";
+import type { BackendSession, ChatState } from "@/frontend/types";
 import { RefObject, Dispatch, SetStateAction } from "react";
 import { scrollToBtm } from "./scrollUtils";
 
@@ -27,10 +27,11 @@ export function getSummarizeAndNewHandler(currentSessionId: string | null, handl
   };
 }
 
-export function getNewChatHandler(setChatState: Dispatch<SetStateAction<ChatState>>, setCurrentSessionId: Dispatch<SetStateAction<string | null>>, resetState: () => void, reloadSessions: () => void, setShowScrollDown: Dispatch<SetStateAction<boolean>>) {
+export function getNewChatHandler(setChatState: Dispatch<SetStateAction<ChatState>>, setCurrentSessionId: Dispatch<SetStateAction<string | null>>, resetState: () => void, reloadSessions: () => void, setShowScrollDown: Dispatch<SetStateAction<boolean>>, setCurrentSession: Dispatch<SetStateAction<BackendSession | undefined>>) {
   return () => {
     setChatState({ records: [] });
     setCurrentSessionId(null);
+    setCurrentSession(undefined);
     resetState();
     reloadSessions();
     setShowScrollDown(false);
@@ -40,7 +41,9 @@ export function getNewChatHandler(setChatState: Dispatch<SetStateAction<ChatStat
     }
     setTimeout(() => { scrollToBtm(); setTimeout(() => { scrollToBtm(); }, 500); }, 500);
   };
-}export function getPageUrlHashEffect(isProcessing: boolean, loadAndShowSession: (sessionId: string) => Promise<void>): import("react").EffectCallback {
+}
+
+export function getPageUrlHashEffect(isProcessing: boolean, loadAndShowSession: (sessionId: string) => Promise<void>): import("react").EffectCallback {
   return () => {
     const handleHashChange = async () => {
       const hash = window.location.hash.replace("#", "");

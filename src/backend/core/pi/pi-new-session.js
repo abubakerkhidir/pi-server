@@ -2,6 +2,7 @@ import { SessionManager, createAgentSession } from "@earendil-works/pi-coding-ag
 import { getUserHomeDir, loadSettingsFromDb } from "../db/settings-dao.js";
 import { createResourceLoader } from "./pi-resource-loader.js";
 import { DEFAULT_TOOLS, bindSessionExtensions } from "./pi-session-utils.js";
+import { warning } from "../../utils/logger.js";
 
 /**
  * Create a new pi session with user settings.
@@ -56,14 +57,14 @@ function printSysPrompt(session) {
   const systemPrompt = session.systemPrompt;
   const hasSkillsSection = systemPrompt.includes('<available_skills>');
   const hasReadTool = systemPrompt.includes('- read:');
-  console.log(`[PiSession] System prompt has skills section: ${hasSkillsSection}`);
-  console.log(`[PiSession] System prompt has read tool: ${hasReadTool}`);
+  debug(`[PiSession] System prompt has skills section: ${hasSkillsSection}`);
+  debug(`[PiSession] System prompt has read tool: ${hasReadTool}`);
   if (hasSkillsSection) {
     const skillsStart = systemPrompt.indexOf('<available_skills>');
     const skillsEnd = systemPrompt.indexOf('</available_skills>') + 20;
     //console.log(`[PiSession] Skills section:`, systemPrompt.substring(skillsStart, skillsEnd));
   } else {
-    console.log(`[PiSession] WARNING: Skills NOT in system prompt!`);
+    warning(`[PiSession] WARNING: Skills NOT in system prompt!`);
     // Show what tools ARE in the prompt
     const toolsMatch = systemPrompt.match(/Available tools:\n([\s\S]*?)\n\n/);
     if (toolsMatch) {

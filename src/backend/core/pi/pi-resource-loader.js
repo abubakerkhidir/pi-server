@@ -1,6 +1,7 @@
 import { getAgentDir, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
 import { comfyViewImgExt } from "../ext/comfyViewImgExt.js";
 import { handleFileSaveEvent } from "../ext/fileSaverExt.js";
+import { debug, info } from "../../utils/logger.js";
 
 
 async function handleOnToolCallEvent(pi, event, ctx) {
@@ -29,16 +30,16 @@ export async function createResourceLoader(sessionCwd) {
       }
     ]
   });
-  console.log('loader created, reloading... ');
+  debug('[ResourceLoader] loader created, reloading... ');
 
   // IMPORTANT: Must call reload() to actually discover skills!
   await loader.reload();
 
   // Debug: Check what skills were discovered
   const { skills, diagnostics } = loader.getSkills();
-  console.log(`[ResourceLoader] Discovered ${skills.length} skills:`);
+  debug(`[ResourceLoader] Discovered ${skills.length} skills:`);
   for (const skill of skills) {
-    console.log(`  - ${skill.name}: filePath: ${skill.filePath}...`);
+    info(`  - ${skill.name}: filePath: ${skill.filePath}...`);
   }
   return loader;
 }

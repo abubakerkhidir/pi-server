@@ -1,22 +1,30 @@
 import { changeSessionModel } from "@/frontend/api";
 import { useEffect, useRef, useState } from "react";
 
-import type { ModelInfo, ModelProvider, UserSettings } from "@/frontend/types";
+import type { BackendSession, ModelInfo, ModelProvider, UserSettings } from "@/frontend/types";
 
-interface ModelSelectorProps {currentModel?: string; onModelSelect: (model: ModelInfo) => void; disabled?: boolean; userSettings: UserSettings, sessionId?:string}
+interface ModelSelectorProps {currentModel?: string; onModelSelect: (model: ModelInfo) => void; disabled?: boolean; userSettings: UserSettings, sessionId?:string,  currentSession?: BackendSession}
 
-export default function ModelSelector({currentModel, onModelSelect, disabled = false,userSettings, sessionId}: ModelSelectorProps) {
+export default function ModelSelector({currentModel, onModelSelect, disabled = false,userSettings, sessionId,currentSession}: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
 
   const [selectedProvider, setSelectedProvider] = useState<ModelProvider | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const providerList = userSettings.providers||[]
 
+  //set model on page load (after setting providers are loaded)
   useEffect(() => {
     if(userSettings.providers?.length && !currentModel){
       onModelSelect(findModel(userSettings,{id:userSettings.model,provider:userSettings.provider}))
     }
   },[userSettings?.providers])
+
+  //set the model on session-resume (using session meta-data)
+  useEffect(() => {
+    if(currentSession?.id && currentSession?.llm_model && currentSession?.llm_provider){
+      onModelSelect(findModel(userSettings,{id:currentSession?.llm_model,provider:currentSession?.llm_provider}))
+    }
+  },[currentSession?.id])
 
   // Close dropdown when clicking outside
   useEffect(() => {

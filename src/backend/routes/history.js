@@ -128,7 +128,7 @@ router.get("/chat/history/:sessionId", authMiddleware, (req, res) => {
   let sessionStats = {total_input:s.total_input,total_cache_read:s.total_cache_read,total_cache_write:s.total_cache_write,total_reasoning:s.total_reasoning,
     total_output:s.total_output,context_size:s.context_size,context_used:s.context_used, context_percent:s.context_percent
   }
-  res.json({ sessionId: s.id, name: s.name, records, sessionStats });
+  res.json({ sessionId: s.id, name: s.name,meta:s, records, sessionStats });
 });
 
 export default router;

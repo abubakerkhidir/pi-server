@@ -1,5 +1,5 @@
 import { Dispatch, RefObject, SetStateAction } from "react";
-import type { ChatState, Session } from "../../../types";
+import type { BackendSession, ChatState, Session } from "../../../types";
 import { getSessions } from "../../../api";
 import { loadSessionHistory } from "@/frontend/hooks/useSessionHistory";
 
@@ -51,23 +51,25 @@ export function getReloadSessionsHndlr(loadMoreOffsetRef: RefObject<number>, loa
     loadSessions(false);
   };
 }
-export function getResumeSessionHandler(setChatState: Dispatch<SetStateAction<ChatState>>, setCurrentSessionId: Dispatch<SetStateAction<string | null>>, resetState: () => void) {
+export function getResumeSessionHandler(setChatState: Dispatch<SetStateAction<ChatState>>, setCurrentSessionId: Dispatch<SetStateAction<string | null>>, resetState: () => void, setCurrentSession: Dispatch<SetStateAction<BackendSession | undefined>>) {
   return async (sessionId: string | null) => {
     if (sessionId === null) {
       setChatState({ records: [] });
       setCurrentSessionId(null);
+      setCurrentSession(undefined);
       resetState();
       return;
     }
     window.location.hash = sessionId;
   };
 }
-export function getLoadSessionHandler(currentSessionId: string | null, setChatState: Dispatch<SetStateAction<ChatState>>, setCurrentSessionId: Dispatch<SetStateAction<string | null>>, reloadSessions: () => void) {
+export function getLoadSessionHandler(currentSessionId: string | null, setChatState: Dispatch<SetStateAction<ChatState>>, setCurrentSessionId: Dispatch<SetStateAction<string | null>>, reloadSessions: () => void,setCurrentSession: Dispatch<SetStateAction<BackendSession | undefined>>) {
   return async (sessionId: string) => {
     if (sessionId === currentSessionId) return;
     try {
       const state = await loadSessionHistory(sessionId);
-      setChatState(state);
+      setChatState(state.chat);
+      setCurrentSession(state.meta)
       setCurrentSessionId(sessionId);
       reloadSessions();
     } catch (err) {

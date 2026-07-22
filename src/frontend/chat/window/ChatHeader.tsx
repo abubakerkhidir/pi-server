@@ -1,4 +1,4 @@
-import type { ModelInfo, UserSettings } from "@/frontend/types";
+import type { BackendSession, ModelInfo, UserSettings } from "@/frontend/types";
 import ModelSelector from "../../config/models/ModelSelector";
 import ThinkLevelSelector from "./ThinkLevelSelector";
 
@@ -18,11 +18,12 @@ interface ChatHeaderProps {
   sessionId?: string;
   isProcessing: boolean;
   userSettings: UserSettings
+  currentSession?: BackendSession
 }
 
 export default function ChatHeader({
   username,onSettingsClick, onLogout, currentModel, onModelSelect, onThinkLevelChange, sidebarCollapsed, onSidebarToggle, modelInfo, currentThinkLevel, onSummarizeAndNew,
-  summarizing, sessionId, isProcessing, userSettings
+  summarizing, sessionId, isProcessing, userSettings,currentSession
 }: ChatHeaderProps) {
   const inputTypes = modelInfo?.input || [];
   const hasVision = inputTypes.includes("image");
@@ -38,10 +39,10 @@ export default function ChatHeader({
         )}
         <span className="logo">pi-server</span>
         <div className="model-select-wrapper" style={{ display: "inline-block", position: "relative" }}>
-          <ModelSelector userSettings={userSettings} currentModel={currentModel} onModelSelect={onModelSelect} disabled={isProcessing}/>
+          <ModelSelector userSettings={userSettings} currentModel={currentModel} onModelSelect={onModelSelect} disabled={isProcessing} currentSession={currentSession}/>
         </div>
         {hasReasoning && (
-          <ThinkLevelSelector sessionId={sessionId} model={modelInfo} level={currentThinkLevel} onLevelChange={onThinkLevelChange} disabled={isProcessing}/>
+          <ThinkLevelSelector sessionId={sessionId} model={modelInfo} level={currentThinkLevel} onLevelChange={onThinkLevelChange} disabled={isProcessing} currentSession={currentSession}/>
         )}
         <span className="model-tags">
           {hasVision && <span className="model-tag vision">vision</span>}
