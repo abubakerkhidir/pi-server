@@ -5,12 +5,12 @@ import { debug, info } from "../../utils/logger.js";
 
 
 async function handleOnToolCallEvent(pi, event, ctx) {
-  console.log('Got event for toolCall: ', ctx?.sessionManager?.sessionId);
+  debug('Got event for toolCall: ', ctx?.sessionManager?.sessionId);
   await comfyViewImgExt(pi, event, ctx);
 }
 
 async function handleOnToolOuptutEvent(pi, event, ctx) {
-  console.log('Got event for toolOutput: ', ctx?.sessionManager?.sessionId, event.toolName, Object.keys(event).join(','));
+  debug('Got event for toolOutput: ', ctx?.sessionManager?.sessionId, event.toolName, Object.keys(event).join(','));
   return await handleFileSaveEvent(pi, event, ctx);
 }
 /**
@@ -18,7 +18,7 @@ async function handleOnToolOuptutEvent(pi, event, ctx) {
  */
 export async function createResourceLoader(sessionCwd) {
   const agentDir = getAgentDir();
-  console.log(`[PiSession] Creating resource loader with cwd: ${sessionCwd}, agentDir: ${agentDir}`);
+  debug(`[PiSession] Creating resource loader with cwd: ${sessionCwd}, agentDir: ${agentDir}`);
 
   const loader = new DefaultResourceLoader({
     cwd: sessionCwd,
