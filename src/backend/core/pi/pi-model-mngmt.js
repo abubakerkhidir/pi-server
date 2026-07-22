@@ -90,40 +90,6 @@ export async function getPiModelById(provider, modelId) {
   }
 }
 
-/**
- * Get available thinking levels for a given model.
- */
-export async function getPiModelThinkingLevels(provider, modelId) {
-  const model = await getPiModelById(provider, modelId);
-  if (!model) return [];
-  return computeThinkingLevels(model);
-}
-
-/**
- * Set model on a session and optionally set think level.
- * If new model has fewer levels than current, adjust to next lower available.
- * Returns: { model, availableLevels, currentLevel }
- */
-export async function setModelOnSession(session, provider, modelId, currentThinkLevel, availableLevels) {
-  const model = session.modelRegistry.find(provider, modelId);
-  if (!model) throw new Error(`Model ${provider}/${modelId} not found`);
-
-  await session.setModel(model);
-
-  const newLevels = computeThinkingLevels(model);
-
-  // Adjust think level if current is not available
-  let effectiveLevel = currentThinkLevel;
-  if (effectiveLevel && !newLevels.includes(effectiveLevel)) {
-    effectiveLevel = findFallbackLevel(effectiveLevel, newLevels);
-  }
-  if (!effectiveLevel || effectiveLevel === "off" && newLevels.length > 0) {
-    effectiveLevel = newLevels[0] || "off";
-  }
-
-  return { model, availableLevels: newLevels, currentLevel: effectiveLevel };
-}
-
 async function getPiRawModels() {
   const sm = SessionManager.inMemory();
   const { session } = await createAgentSession({ sessionManager: sm, cwd: process.cwd() });

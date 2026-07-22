@@ -47,7 +47,6 @@ export class PiSessionManager {
 
     this.activeSessions.set(newPiSessionId, session);
     this.activeStreams.set(newPiSessionId, new Set());
-
     return { session, piSessionId: newPiSessionId };
   }
 
@@ -73,60 +72,22 @@ export class PiSessionManager {
     ];
   }
 
-  getThinkingInfo(piSessionId, model) {
-    const session = this.activeSessions.get(piSessionId);
-    // If we have a model but no active session (e.g., model changed but no message sent yet),
-    // compute available levels from the model itself
-    if (model && !session) {
-      return {
-        current: null,
-        available: computeThinkingLevels(model),
-      };
-    }
-    if (!session) return null;
-    return {
-      current: session.thinkingLevel ?? null,
-      available: session.getAvailableThinkingLevels?.() ?? [],
-    };
-  }
-
-  async setModelOnSession(piSessionId, provider, modelId, userId, currentThinkLevel) {
+  async setModelOnSession(piSessionId, provider, modelId, userId) {
+    console.log('setModelOnSession: ',provider,modelId)
     // Load session if not already in active list
     const session = await this.ensureSessionLoaded(piSessionId, userId);
     if (!session) throw new Error(`Session ${piSessionId} not found`);
-
     const model = session.modelRegistry.find(provider, modelId);
     if (!model) throw new Error(`Model ${provider}/${modelId} not found`);
-
     await session.setModel(model);
-
     // Determine available levels for new model
-    const availableLevels = computeThinkingLevels(model);
-    
-    // Adjust think level if current is not available
-    let effectiveLevel = currentThinkLevel;
-    if (effectiveLevel && !availableLevels.includes(effectiveLevel)) {
-      effectiveLevel = findFallbackLevel(effectiveLevel, availableLevels);
-    }
-    if (!effectiveLevel || (effectiveLevel === "off" && availableLevels.length > 0)) {
-      effectiveLevel = availableLevels[0] || "off";
-    }
-
-    // Set the thinking level
-    try {
-      await session.setThinkingLevel(effectiveLevel);
-    } catch {
-      // Some models may not support setThinkingLevel
-    }
-
-    return { 
-      model: { id: model.id, name: model.name, provider: model.provider, input: model.input, reasoning: model.reasoning },
-      availableLevels, 
-      currentLevel: session.thinkingLevel || effectiveLevel 
-    };
+    const availableLevels = model.thinkingLevelMap?Object.keys(m.thinkingLevelMap):[];
+    console.log(' >>> done setModelOnSession: ',provider,modelId, session.thinkingLevel,session.model)
+    return { model: { id: model.id, name: model.name, provider: model.provider, input: model.input, reasoning: model.reasoning }, availableLevels};
   }
 
   async setThinkingLevel(piSessionId, level, userId) {
+    console.log('set-think-level to : ',level)
     // Load session if not already in active list
     const session = await this.ensureSessionLoaded(piSessionId, userId);
     if (!session) throw new Error(`Session ${piSessionId} not found`);
@@ -135,6 +96,7 @@ export class PiSessionManager {
     } catch (err) {
       throw new Error(`Failed to set thinking level: ${err.message}`);
     }
+    console.log('>>>> done set-think-level to : ',level)
     return session.thinkingLevel;
   }
 
@@ -142,25 +104,6 @@ export class PiSessionManager {
     const session = this.activeSessions.get(piSessionId);
     if (!session) {
       throw new Error(`Session ${piSessionId} not found`);
-    }
-
-    // Apply model override if provided (from top-bar during no-session state)
-    if (modelId && modelProvider && session.model?.id !== modelId) {
-      try {
-        const model = session.modelRegistry.find(modelProvider, modelId);
-        if (model) {
-          await session.setModel(model);
-          // Apply think level override
-          if (thinkLevel) {
-            const available = computeThinkingLevels(model);
-            if (available.includes(thinkLevel)) {
-              await session.setThinkingLevel(thinkLevel);
-            }
-          }
-        }
-      } catch (err) {
-        console.warn('Failed to apply model override on prompt:', err.message);
-      }
     }
 
     // Intercept built-in slash commands (e.g. /compact)

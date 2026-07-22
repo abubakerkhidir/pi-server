@@ -170,14 +170,6 @@ export async function deleteFile(fileId: string): Promise<void> {
   return (await apiFetchWithPrms(`/api/files/${fileId}`, { method: "DELETE" })).data;
 }
 
-export async function getThinkingInfo(sessionId?: string | null, modelId?: string, modelProvider?: string): Promise<{ current: string | null; available: string[] }> {
-  const params: string[] = [];
-  if (sessionId && sessionId !== "") { params.push("sessionId", encodeURIComponent(sessionId)); }
-  if (modelId) { params.push("modelId", modelId); }
-  if (modelProvider) { params.push("modelProvider", modelProvider); }
-  return (await apiFetchWithPrms("/api/chat/thinking", undefined, ...params)).data;
-}
-
 export async function setThinkingLevel(sessionId: string, level: string): Promise<{ level: string }> {
   return (await apiPost("/api/chat/thinking", { sessionId, level })).data;
 }

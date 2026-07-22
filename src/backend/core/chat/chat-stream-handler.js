@@ -10,7 +10,6 @@ import {initSessionMetadata,generateSessionNameIfNeeded} from "./session-setup.j
 import { createChatRecord } from "../db/chat-record-dao.js";
 import { saveFileMetadata } from "../db/chat-files-dao.js";
 import { debug } from "../../utils/logger.js";
-import { computeThinkingLevels } from "../../core/pi/pi-model-mngmt.js";
 
 /**
  * Cleanup temp directories after delay.
@@ -72,25 +71,6 @@ export async function handleChatStream(req, res){
     const { session, piSessionId } = await piManager.getOrCreateSession(req.user.userId, sessionId,provider,model,thinkLevel,homeDir);
     dbSessionId = sessionId || piSessionId;
     console.log('got pi session: ', piSessionId, sessionId, dbSessionId);
-
-    // Apply model/think-level overrides from top-bar (when no session was active before)
-    if (req.body.modelId && req.body.modelProvider && session.model?.id !== req.body.modelId) {
-      try {
-        const model = session.modelRegistry.find(req.body.modelProvider, req.body.modelId);
-        if (model) {
-          await session.setModel(model);
-          // Apply think level if provided
-          if (req.body.thinkLevel) {
-            const available = computeThinkingLevels(model);
-            if (available.includes(req.body.thinkLevel)) {
-              await session.setThinkingLevel(req.body.thinkLevel);
-            }
-          }
-        }
-      } catch (err) {
-        console.warn('Failed to apply model override:', err.message);
-      }
-    }
 
     // Initialize session and record
     initSessionMetadata(dbSessionId, req.user.userId, piSessionId, effectivePrompt,session.sessionFile,provider, model,thinkLevel,homeDir );

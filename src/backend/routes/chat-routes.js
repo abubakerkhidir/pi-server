@@ -1,9 +1,8 @@
 import { Router } from "express";
-import { authMiddleware } from "../middleware/auth.js";
-import upload from "../middleware/upload.js";
 import { handleChatStream } from "../core/chat/chat-stream-handler.js";
 import { getPiManager } from "../core/chat/state.js";
-import { getPiModelById, computeThinkingLevels } from "../core/pi/pi-model-mngmt.js";
+import { authMiddleware } from "../middleware/auth.js";
+import upload from "../middleware/upload.js";
 
 const router = Router();
 
@@ -20,26 +19,12 @@ router.get("/chat/commands", authMiddleware, (req, res) => {
   }
 });
 
-// Get available/current thinking levels for a session (or model-only)
-router.get("/chat/thinking", authMiddleware, async (req, res) => {
-  const { sessionId, modelId, modelProvider } = req.query;
-  const piManager = getPiManager();
-
-  let model = null;
-  if (modelId && modelProvider) {
-    model = await getPiModelById(modelProvider, modelId);
-  }
-
-  const info = piManager.getThinkingInfo(sessionId, model);
-  res.json(info ?? { current: null, available: [] });
-});
-
 // Set thinking level on a session
 router.post("/chat/thinking", authMiddleware, async (req, res) => {
   const { sessionId, level } = req.body;
   if (!sessionId || !level) return res.status(400).json({ error: "sessionId and level required" });
-  const piManager = getPiManager();
   try {
+    const piManager = getPiManager();
     const effective = await piManager.setThinkingLevel(sessionId, level, req.user.userId);
     res.json({ level: effective });
   } catch (err) {
