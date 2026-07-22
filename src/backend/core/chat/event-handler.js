@@ -150,17 +150,17 @@ export function createStreamEventHandler(params) {
   let onAgentEndResolve = undefined
   let lastEvent = {event:undefined}
   const onAgentEnd = new Promise((r) => { onAgentEndResolve = r; });
-  const s = {thinkCount:0, textCount:0};
+  const ss = {thinkCount:0, textCount:0};
 
   function onEvent(event) {
     switch (event.type) {
       case "text":
-        s.textCount=s.textCount+1;
+        ss.textCount=ss.textCount+1;
         handleTextEvent(event, entityBuffer, writeEvent, state);
         break;
 
       case "thinking":
-        s.thinkCount=s.thinkCount+1;
+        ss.thinkCount=ss.thinkCount+1;
         handleThinkingEvent(event, entityBuffer, writeEvent, state);
         break;
 
@@ -197,7 +197,7 @@ export function createStreamEventHandler(params) {
         const tokenStats = handleDoneEvent(entityBuffer, recordId, dbSessionId, responseStartTime, state, session);
         writeEvent("record_stats", tokenStats);
         lastEvent.event = event
-        console.log('got done-event, thinkCount: ',s.thinkCount,', textCount: ',s.textCount)
+        console.log('got done-event, thinkCount: ',ss.thinkCount,', textCount: ',ss.textCount)
         onAgentEndResolve();
         break;
       }
