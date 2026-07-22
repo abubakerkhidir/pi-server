@@ -215,7 +215,7 @@ export interface ChatLayoutProps {
 
 export interface ToolBlockProps {
   entity: ToolData;
-  userSettings: { tool_lines: number; thinking_lines: number };
+  userSettings: { tool_lines?: number; thinking_lines?: number };
   content?:any
   sealed?:boolean
 }
@@ -226,7 +226,7 @@ export interface ThinkingBlockProps {
   sealed?: boolean;
   duration?: number;
   totalLength?: number;
-  userSettings: { tool_lines: number; thinking_lines: number };
+  userSettings: { tool_lines?: number; thinking_lines?: number };
 }
 
 export interface SettingsModalProps {
