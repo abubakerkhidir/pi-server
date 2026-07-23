@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { getSessionMeta, getSessionMetaByUser, updateSessionLlm, updateSessionThinkLevel} from "../db/session-dao.js";
 import { loadExistingSession } from "./pi-session-loader.js";
 import { createNewSession } from "./pi-new-session.js";
-import { error, warning } from "../../utils/logger.js";
+import { debug, error, info, warning } from "../../utils/logger.js";
 import { BUILTIN_COMMANDS, parseBuiltinCommand, executeBuiltinCommand } from "./pi-commands.js";
 import { getPiModelById, computeThinkingLevels, findFallbackLevel } from "./pi-model-mngmt.js";
 
@@ -19,35 +19,49 @@ export class PiSessionManager {
     if (piSessionId && this.activeSessions.has(piSessionId)) {
       return { session: this.activeSessions.get(piSessionId), piSessionId };
     }
-    console.log('getOrCreateSession: ',userId, piSessionId)
+
+    debug('getOrCreateSession: ',userId, piSessionId)
+
     // If we have a piSessionId, try to load the session from the database
     if (piSessionId) {
-      const meta = getSessionMeta(piSessionId);
-      console.log('found session meta in db: ', meta)
-      if (meta?.pi_session_file && fs.existsSync(meta.pi_session_file)) {
-        try {
-          const session = await loadExistingSession(meta.pi_session_file, userId);
-          this.activeSessions.set(piSessionId, session);
-          this.activeStreams.set(piSessionId, new Set());
-
-          console.log("Loaded existing pi session:", piSessionId, "from:", meta.pi_session_file);
-          return { session, piSessionId };
-        } catch (err) {
-          console.warn("Failed to load session from file:", err.message);
-        }
-      }else{
-        warning('session file not found: ',meta?.pi_session_file)
-      }
+      let dbSession = await this.loadExistingSession(piSessionId, userId);
+      if(dbSession)
+        return dbSession
     }
 
     // Create a new session
     const session = await createNewSession(userId, homeDir,provider,model,thinkLevel);
-    console.log('created new sesion: ',session.sessionId,session.sessionFile)
+    info('created new sesion: ',userId,session.sessionId,session.sessionFile)
     const newPiSessionId = session.sessionId || piSessionId || uuidv4();
 
-    this.activeSessions.set(newPiSessionId, session);
-    this.activeStreams.set(newPiSessionId, new Set());
+    //save session in memory and return
+    this.saveSessionInMemory(newPiSessionId, session);
     return { session, piSessionId: newPiSessionId };
+  }
+
+  async loadExistingSession(piSessionId, userId) {
+    let dbSession = undefined;
+    const meta = getSessionMeta(piSessionId);
+    info('found session in db: ', userId, piSessionId, meta.updated_at);
+    debug('found session meta in db: ', meta);
+    if (meta?.pi_session_file && fs.existsSync(meta.pi_session_file)) {
+      try {
+        const session = await loadExistingSession(meta.pi_session_file, userId);
+        this.saveSessionInMemory(piSessionId, session);
+        debug("Loaded existing pi session:", piSessionId, "from:", meta.pi_session_file);
+        dbSession = { session, piSessionId };
+      } catch (err) {
+        warning("Failed to load session from file:", err.message);
+      }
+    } else {
+      warning('session file not found: ', meta?.pi_session_file);
+    }
+    return dbSession;
+  }
+
+  saveSessionInMemory(sessionId, session) {
+    this.activeSessions.set(sessionId, session);
+    this.activeStreams.set(sessionId, new Set());
   }
 
   /**
