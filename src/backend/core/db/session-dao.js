@@ -75,9 +75,10 @@ export function getSessionMetaByUser(sessionId, usId) {
 /**
  * Create a new session metadata record.
  */
-export function createSessionRecord(dbSessionId, userId, piSessionId, title, sessionFile,provider, model,thinkLevel,homeDir) {
+export function createSessionRecord(dbSessionId, userId, piSessionId, title, sessionFile,provider, model,thinkLevel,homeDir, samplingParams) {
   const db = getDb();
-  db.prepare("INSERT INTO session_metadata (id, user_id, pi_session_id, name, pi_session_file, home_dir, llm_provider, llm_model, think_level) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(dbSessionId, userId, piSessionId, title, sessionFile, homeDir, provider, model, thinkLevel);
+  const { temperature, top_p, top_k } = samplingParams || {};
+  db.prepare("INSERT INTO session_metadata (id, user_id, pi_session_id, name, pi_session_file, home_dir, llm_provider, llm_model, think_level, sampling_temperature, sampling_top_p, sampling_top_k) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(dbSessionId, userId, piSessionId, title, sessionFile, homeDir, provider, model, thinkLevel, temperature ?? null, top_p ?? null, top_k ?? null);
 }
 
 export function updateSessionLlm(sessionId, provider, model) {
@@ -88,6 +89,12 @@ export function updateSessionLlm(sessionId, provider, model) {
 export function updateSessionThinkLevel(sessionId, thinkLevel) {
   const db = getDb();
   db.prepare("UPDATE session_metadata SET think_level = ?, updated_at = datetime('now') WHERE id = ?").run(thinkLevel, sessionId);
+}
+
+export function updateSessionSamplingParams(sessionId, { temperature, top_p, top_k }) {
+  const db = getDb();
+  db.prepare("UPDATE session_metadata SET sampling_temperature = ?, sampling_top_p = ?, sampling_top_k = ?, updated_at = datetime('now') WHERE id = ?")
+    .run(temperature ?? null, top_p ?? null, top_k ?? null, sessionId);
 }
 
 export function updateSessionHomeDir(sessionId, homeDir) {

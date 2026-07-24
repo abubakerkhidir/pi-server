@@ -1,6 +1,11 @@
-import type { BackendSession, ModelInfo, UserSettings } from "@/frontend/types";
-import ModelSelector from "../../config/models/ModelSelector";
+import type { BackendSession, ModelInfo, SamplingParams, UserSettings } from "@/frontend/types";
+import ModelSelector from "./ModelSelector";
 import ThinkLevelSelector from "./ThinkLevelSelector";
+import SamplingParamsModal from "./SamplingParamsModal";
+import "./ChatHeader.css";
+import "./ModelSelector.css";
+import "./ThinkLevelSelector.css";
+import "./SamplingParamsModal.css";
 
 interface ChatHeaderProps {
   username: string | null;
@@ -9,6 +14,7 @@ interface ChatHeaderProps {
   currentModel?: string;
   onModelSelect: (model: ModelInfo) => void;
   onThinkLevelChange: (level: string) => void;
+  onSamplingChange: (params: SamplingParams) => void;
   sidebarCollapsed: boolean;
   onSidebarToggle: () => void;
   modelInfo: ModelInfo | null;
@@ -22,7 +28,7 @@ interface ChatHeaderProps {
 }
 
 export default function ChatHeader({
-  username,onSettingsClick, onLogout, currentModel, onModelSelect, onThinkLevelChange, sidebarCollapsed, onSidebarToggle, modelInfo, currentThinkLevel, onSummarizeAndNew,
+  username,onSettingsClick, onLogout, currentModel, onModelSelect, onThinkLevelChange, onSamplingChange, sidebarCollapsed, onSidebarToggle, modelInfo, currentThinkLevel, onSummarizeAndNew,
   summarizing, sessionId, isProcessing, userSettings,currentSession
 }: ChatHeaderProps) {
   const inputTypes = modelInfo?.input || [];
@@ -44,6 +50,13 @@ export default function ChatHeader({
         {hasReasoning && (
           <ThinkLevelSelector sessionId={sessionId} model={modelInfo} level={currentThinkLevel} onLevelChange={onThinkLevelChange} disabled={isProcessing} currentSession={currentSession}/>
         )}
+        <SamplingParamsModal
+          sessionId={sessionId}
+          userSettings={userSettings}
+          currentSession={currentSession}
+          onSamplingChange={onSamplingChange}
+          disabled={isProcessing}
+        />
         <span className="model-tags">
           {hasVision && <span className="model-tag vision">vision</span>}
           {hasReasoning && <span className="model-tag reasoning">reasoning</span>}

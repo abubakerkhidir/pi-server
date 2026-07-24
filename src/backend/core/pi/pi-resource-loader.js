@@ -1,6 +1,7 @@
 import { getAgentDir, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
 import { comfyViewImgExt } from "../ext/comfyViewImgExt.js";
 import { handleFileSaveEvent } from "../ext/fileSaverExt.js";
+import { samplingExt } from "../ext/sampling-ext.js";
 import { debug, info } from "../../utils/logger.js";
 
 
@@ -27,7 +28,8 @@ export async function createResourceLoader(sessionCwd) {
       (pi) => {
         pi.on("tool_call", async (event, ctx) => { await handleOnToolCallEvent(pi, event, ctx); });
         pi.on("tool_result", async (event, ctx) => { return await handleOnToolOuptutEvent(pi, event, ctx); });
-      }
+      },
+      samplingExt,
     ]
   });
   debug('[ResourceLoader] loader created, reloading... ');

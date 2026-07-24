@@ -2,7 +2,7 @@ import { getUsername } from "@/frontend/api";
 import { getLoadSessionHandler, getMoreSessionHndlr, getReloadSessionsHndlr, getResumeSessionHandler } from "@/frontend/chat/window/chat-utils/sessionMngmtUtils";
 import { useChatStream } from "@/frontend/hooks/useChatStream";
 import { useStopStream } from "@/frontend/hooks/useStreamHandlers";
-import type { BackendSession, ChatLayoutProps, ChatState, ModelInfo, Session, UserSettings } from "@/frontend/types";
+import type { BackendSession, ChatLayoutProps, ChatState, ModelInfo, SamplingParams, Session, UserSettings } from "@/frontend/types";
 import { Dispatch, SetStateAction, useCallback, useEffect, useRef, useState } from "react";
 import SettingsModal from "../../config/settings/SettingsModal";
 import ChatSidebar from "../../sidebar/ChatSidebar";
@@ -10,7 +10,7 @@ import InputArea from "../input/InputArea";
 import { getNewChatHandler, getPageUrlHashEffect, getSummarizeAndNewHandler } from "./chat-utils/newChatUtils";
 import { getSettingsLoaderFun } from "./chat-utils/settingsUtils";
 import { useHandleSend } from "./chat-utils/useSendUtils";
-import ChatHeader from "./ChatHeader";
+import ChatHeader from "../header/ChatHeader";
 import ChatWindow from "./ChatWindow";
 
 
@@ -25,6 +25,7 @@ export default function ChatLayout({ onLogout, onShowFiles }: ChatLayoutProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [currentModel, setCurrentModel] = useState<ModelInfo | null>(null);
   const [currentThinkLevel, setCurrentThinkLevel] = useState<string | undefined>();
+  const [currentSamplingParams, setCurrentSamplingParams] = useState<SamplingParams>({});
   const [summarizing, setSummarizing] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(window.innerWidth < 800);
   const [userPrompt, setUserPrompt] = useState("");
@@ -36,8 +37,8 @@ export default function ChatLayout({ onLogout, onShowFiles }: ChatLayoutProps) {
   const allModelsRef = useRef<{ provider: string; models: ModelInfo[] }[]>([]);
 
   //callback functions
-  //currentSessionId, modelId, modelProvider, thinkLevel,homeDir
-  const { handleSend, stopStream, resetState } = useChatStream({currentSessionId,userSettings,modelId: currentModel?.id,modelProvider: currentModel?.provider,thinkLevel: currentThinkLevel,homeDir:userSettings.home_dir });
+  //currentSessionId, modelId, modelProvider, thinkLevel,homeDir,samplingParams
+  const { handleSend, stopStream, resetState } = useChatStream({currentSessionId,userSettings,modelId: currentModel?.id,modelProvider: currentModel?.provider,thinkLevel: currentThinkLevel,homeDir:userSettings.home_dir,samplingParams: currentSamplingParams });
   const loadSessions = useCallback(getMoreSessionHndlr(loadMoreOffsetRef, setSessions, setSessionTotal), []);
   const reloadSessions = useCallback(getReloadSessionsHndlr(loadMoreOffsetRef, loadSessions), [loadSessions]);
   const handleSendWrapper = useHandleSend({ isProcessing, setUserPrompt, setUploadedFiles, pendingSummaryRef, setChatState, setIsProcessing, handleSend, setSessions, setCurrentSessionId,currentSessionId });
@@ -48,6 +49,7 @@ export default function ChatLayout({ onLogout, onShowFiles }: ChatLayoutProps) {
   const loadAndShowSession = getLoadSessionHandler(currentSessionId, setChatState, setCurrentSessionId, reloadSessions,setCurrentSession);
   const handleModelSelect = useCallback(async (model: ModelInfo) => {setCurrentModel(model);}, []);
   const handleThinkLevelChange = useCallback(async (level: string) => {setCurrentThinkLevel(level);}, []);
+  const handleSamplingChange = useCallback(async (params: SamplingParams) => {setCurrentSamplingParams(params);}, []);
   const username = getUsername();
 
   //effects
@@ -80,6 +82,7 @@ export default function ChatLayout({ onLogout, onShowFiles }: ChatLayoutProps) {
           currentModel={currentModel?.name}
           onModelSelect={handleModelSelect}
           onThinkLevelChange={handleThinkLevelChange}
+          onSamplingChange={handleSamplingChange}
           modelInfo={currentModel}
           currentThinkLevel={currentThinkLevel}
           onSummarizeAndNew={handleSummarizeAndNew}

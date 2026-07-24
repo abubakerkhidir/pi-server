@@ -28,6 +28,9 @@ export function getDefaultSettings() {
     system_message: "",
     paste_to_file_length: 0,
     max_image_resolution: 0,
+    sampling_temperature: 1.0,
+    sampling_top_p: 1.0,
+    sampling_top_k: 100,
   };
 }
 

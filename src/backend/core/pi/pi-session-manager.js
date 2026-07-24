@@ -1,11 +1,12 @@
 import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
-import { getSessionMeta, getSessionMetaByUser, updateSessionLlm, updateSessionThinkLevel} from "../db/session-dao.js";
+import { getSessionMeta, getSessionMetaByUser, updateSessionLlm, updateSessionThinkLevel, updateSessionSamplingParams } from "../db/session-dao.js";
 import { loadExistingSession } from "./pi-session-loader.js";
 import { createNewSession } from "./pi-new-session.js";
 import { debug, error, info, warning } from "../../utils/logger.js";
 import { BUILTIN_COMMANDS, parseBuiltinCommand, executeBuiltinCommand } from "./pi-commands.js";
 import { getPiModelById, computeThinkingLevels, findFallbackLevel } from "./pi-model-mngmt.js";
+import { setSamplingParams, getSamplingParams, removeSamplingParams } from "../chat/state.js";
 
 export class PiSessionManager {
   constructor(cwd) {
@@ -36,6 +37,7 @@ export class PiSessionManager {
 
     //save session in memory and return
     this.saveSessionInMemory(newPiSessionId, session);
+    this._loadSamplingParams(newPiSessionId);
     return { session, piSessionId: newPiSessionId };
   }
 
@@ -48,6 +50,7 @@ export class PiSessionManager {
       try {
         const session = await loadExistingSession(meta.pi_session_file, userId);
         this.saveSessionInMemory(piSessionId, session);
+        this._loadSamplingParams(piSessionId, meta);
         debug("Loaded existing pi session:", piSessionId, "from:", meta.pi_session_file);
         dbSession = { session, piSessionId };
       } catch (err) {
@@ -248,6 +251,25 @@ export class PiSessionManager {
     }
     this.activeSessions.clear();
     this.activeStreams.clear();
+  }
+
+  _loadSamplingParams(piSessionId, meta) {
+    try {
+      const params = meta ? { temperature: meta.sampling_temperature, top_p: meta.sampling_top_p, top_k: meta.sampling_top_k } : null;
+      if (params && (params.temperature != null || params.top_p != null || params.top_k != null)) {
+        setSamplingParams(piSessionId, params);
+      }
+    } catch {}
+  }
+
+  async setSamplingConfig(piSessionId, { temperature, top_p, top_k }, userId) {
+    this.verifySessionAccess(piSessionId, userId);
+    const session = await this.ensureSessionLoaded(piSessionId, userId);
+    if (!session) throw new Error(`Session ${piSessionId} not found`);
+    const params = { temperature, top_p, top_k };
+    setSamplingParams(piSessionId, params);
+    updateSessionSamplingParams(piSessionId, params);
+    return params;
   }
 
   verifySessionAccess(sessionId,userId){

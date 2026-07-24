@@ -35,7 +35,7 @@ function extractModelInfo(session) {
 
 export async function handleChatStream(req, res){
   const piManager = getPiManager();
-  const { prompt, sessionId, provider, model,thinkLevel,homeDir } = req.body;
+  const { prompt, sessionId, provider, model,thinkLevel,homeDir, samplingTemperature, samplingTopP, samplingTopK } = req.body;
 
   if (!prompt && (!req.files || req.files.length === 0)) {
     return res.status(400).json({ error: "Prompt or files are required" });
@@ -73,7 +73,11 @@ export async function handleChatStream(req, res){
     console.log('got pi session: ', piSessionId, sessionId, dbSessionId);
 
     // Initialize session and record
-    initSessionMetadata(dbSessionId, req.user.userId, piSessionId, effectivePrompt,session.sessionFile,provider, model,thinkLevel,homeDir );
+    initSessionMetadata(dbSessionId, req.user.userId, piSessionId, effectivePrompt,session.sessionFile,provider, model,thinkLevel,homeDir, {
+      temperature: samplingTemperature,
+      top_p: samplingTopP,
+      top_k: samplingTopK,
+    });
     const recordId = createChatRecord(dbSessionId, effectivePrompt);
     saveFileMetadata(recordId, dbSessionId, req.files);
 
@@ -90,6 +94,19 @@ export async function handleChatStream(req, res){
     const responseStartTime = Date.now();
 
     const { onEvent,onAgentEnd, lastEvent } = createStreamEventHandler({ writeEvent, entityBuffer, res, dbSessionId, recordId, responseStartTime, userId: req.user.userId, req, session });
+
+    // Set sampling params if provided
+    if (samplingTemperature !== undefined || samplingTopP !== undefined || samplingTopK !== undefined) {
+      try {
+        await piManager.setSamplingConfig(piSessionId, {
+          temperature: samplingTemperature,
+          top_p: samplingTopP,
+          top_k: samplingTopK,
+        }, req.user.userId);
+      } catch (err) {
+        debug('Failed to set sampling params:', err.message);
+      }
+    }
 
     // Track full text for session naming
     const { wrappedOnEvent, getFullText } = wrapOnEventForNaming(onEvent);

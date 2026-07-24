@@ -55,6 +55,9 @@ function createSessionTables() {
       llm_provider TEXT,
       llm_model TEXT,
       think_level TEXT,
+      sampling_temperature REAL,
+      sampling_top_p REAL,
+      sampling_top_k INTEGER,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -140,6 +143,22 @@ function createEntityTables() {
 }
 
 /**
+ * On-the-fly migrations for existing databases.
+ * Adds new columns if they don't already exist.
+ */
+function migrateSessionTable() {
+  const columns = db.prepare("PRAGMA table_info(session_metadata)").all().map(c => c.name);
+  const addCol = (name, type) => {
+    if (!columns.includes(name)) {
+      db.exec(`ALTER TABLE session_metadata ADD COLUMN ${name} ${type}`);
+    }
+  };
+  addCol("sampling_temperature", "REAL");
+  addCol("sampling_top_p", "REAL");
+  addCol("sampling_top_k", "INTEGER");
+}
+
+/**
  * Create all database tables.
  */
 function createTables() {
@@ -147,6 +166,7 @@ function createTables() {
   createSessionTables();
   createFileTables();
   createEntityTables();
+  migrateSessionTable();
 }
 
 export function initDb() {

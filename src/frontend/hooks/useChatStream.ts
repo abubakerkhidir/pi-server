@@ -1,6 +1,6 @@
 import { useRef, useCallback, RefObject } from "react";
 import { createChatStream, type AbortChatStream } from "@/frontend/api";
-import type { AgentReplyEntity, MsgData, ToolData, ThinkData, CompactData, TokenStats } from "@/frontend/types";
+import type { AgentReplyEntity, MsgData, ToolData, ThinkData, CompactData, TokenStats, SamplingParams } from "@/frontend/types";
 
 let thinkCounter = 0;
 let msgCounter = 0;
@@ -16,6 +16,7 @@ interface UseChatStreamOptions {
   modelProvider?: string;
   thinkLevel?: string;
   homeDir?: string;
+  samplingParams?: SamplingParams;
 }
 
 export type OnEntityUpdate = (entities: AgentReplyEntity[]) => void;
@@ -36,7 +37,7 @@ export interface OnSendInput{
   onSessionCreated?: OnSessionCreated, onTokenStats?: OnTokenStats
 }
 
-export function useChatStream({currentSessionId, modelId, modelProvider, thinkLevel,homeDir}: UseChatStreamOptions): UseChatStreamResult {
+export function useChatStream({currentSessionId, modelId, modelProvider, thinkLevel,homeDir,samplingParams}: UseChatStreamOptions): UseChatStreamResult {
   const sessionIdRef = useRef<string | null>(null);
   const isProcessingRef = useRef(false);
   const entitiesRef = useRef<AgentReplyEntity[]>([]);
@@ -58,13 +59,13 @@ export function useChatStream({currentSessionId, modelId, modelProvider, thinkLe
     const markEnded = ()=> handleStreamEnded(isProcessingRef,abortRef,onStreamEnd)
     try {
       const streamHndlr = getStreamHandler(sessionIdRef, onSessionCreated, sealLastEntity, entitiesRef, entityStartTimes, onSessionName, onTokenStats, markEnded, onEntityUpdate);
-      const abort = createChatStream(currentSessionId, prompt, files?.length ? files : undefined, streamHndlr, getErrHandler(entitiesRef, markEnded), modelId, modelProvider, thinkLevel,homeDir);
+      const abort = createChatStream(currentSessionId, prompt, files?.length ? files : undefined, streamHndlr, getErrHandler(entitiesRef, markEnded), modelId, modelProvider, thinkLevel,homeDir,samplingParams);
       abortRef.current = abort;
     } catch (er) {
       console.log('Error in create chat-stream: ',er)
       markEnded();
     }
-  },[currentSessionId, modelId, modelProvider, thinkLevel]);
+  },[currentSessionId, modelId, modelProvider, thinkLevel,samplingParams]);
   
   return { sessionId: sessionIdRef.current, handleSend, stopStream, resetState };
 }

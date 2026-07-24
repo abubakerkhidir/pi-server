@@ -6,6 +6,21 @@ let piManager = null;
 let entityBufferMap = new Map();
 let logLevel = undefined
 
+// Sampling params map: piSessionId -> { temperature, top_p, top_k }
+const samplingParamsMap = new Map();
+
+export function setSamplingParams(piSessionId, params) {
+  samplingParamsMap.set(piSessionId, { ...params });
+}
+
+export function getSamplingParams(piSessionId) {
+  return samplingParamsMap.get(piSessionId) ?? null;
+}
+
+export function removeSamplingParams(piSessionId) {
+  samplingParamsMap.delete(piSessionId);
+}
+
 export function setPiManager(manager) {
   piManager = manager;
 }

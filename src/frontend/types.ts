@@ -40,6 +40,12 @@ export interface ModelsResponse {
   groups: ModelGroup[];
 }
 
+export interface SamplingParams {
+  temperature?: number | null;
+  top_p?: number | null;
+  top_k?: number | null;
+}
+
 export interface Settings {
   send_on_enter?: boolean;
   copy_text_as_plain?: boolean;
@@ -57,7 +63,10 @@ export interface Settings {
   model_id?: string;
   home_dir?: string;
   think_level?: string;
-  providers?:ModelProvider[]
+  providers?:ModelProvider[];
+  sampling_temperature?: number | null;
+  sampling_top_p?: number | null;
+  sampling_top_k?: number | null;
 }
 
 export interface ToolGroup {
@@ -196,7 +205,10 @@ export type UserSettings = {
   provider?: string;
   model?: string;
   think_level?: string; 
-  providers?:ModelProvider[]
+  providers?:ModelProvider[];
+  sampling_temperature?: number | null;
+  sampling_top_p?: number | null;
+  sampling_top_k?: number | null;
 };
 
 
@@ -265,6 +277,7 @@ export interface InputAreaProps {
 export interface BackendSession { id: string; created_at?: string; updated_at?: string; llm_provider?: string; llm_model?: string; think_level?: string; user_id: string;
   pi_session_id?: string; name?: string; pi_session_file?: string; home_dir?: string; context_size?: number; context_used?: number; context_percent?: number;
   total_input?: number; total_output?: number; total_cache_read?: number; total_cache_write?: number; total_reasoning?: number; total_cost?: number;
+  sampling_temperature?: number | null; sampling_top_p?: number | null; sampling_top_k?: number | null;
 }
 
 export interface BackendHistory {

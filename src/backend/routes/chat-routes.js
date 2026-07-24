@@ -47,4 +47,17 @@ router.post("/chat/session-model", authMiddleware, async (req, res) => {
   }
 });
 
+// Set sampling parameters on a session
+router.post("/chat/sampling", authMiddleware, async (req, res) => {
+  const { sessionId, temperature, top_p, top_k } = req.body;
+  if (!sessionId) return res.status(400).json({ error: "sessionId required" });
+  const piManager = getPiManager();
+  try {
+    const params = await piManager.setSamplingConfig(sessionId, { temperature, top_p, top_k }, req.user.userId);
+    res.json({ params, status: "ok" });
+  } catch (err) {
+    res.status(404).json({ error: err.message });
+  }
+});
+
 export default router;

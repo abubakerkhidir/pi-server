@@ -1,4 +1,4 @@
-import { ModelInfo, ModelsApiRes } from "./types";
+import { ModelInfo, ModelsApiRes, SamplingParams } from "./types";
 
 const TOKEN_KEY = "pi_server_token";
 const USERNAME_KEY = "pi_server_username";
@@ -190,7 +190,8 @@ export function createChatStream(
   onError: ChatStreamErrorCallback,
   modelId?: string,
   modelProvider?: string,
-  thinkLevel?: string,homeDir?:string
+  thinkLevel?: string,homeDir?:string,
+  samplingParams?: SamplingParams
 ): AbortChatStream {
   const abortController = new AbortController();
 
@@ -201,6 +202,17 @@ export function createChatStream(
   if (modelProvider) formData.append("provider", modelProvider);
   if (thinkLevel) formData.append("thinkLevel", thinkLevel);
   if (homeDir) formData.append("homeDir", homeDir);
+  if (samplingParams) {
+    if (samplingParams.temperature !== undefined && samplingParams.temperature !== null) {
+      formData.append("samplingTemperature", String(samplingParams.temperature));
+    }
+    if (samplingParams.top_p !== undefined && samplingParams.top_p !== null) {
+      formData.append("samplingTopP", String(samplingParams.top_p));
+    }
+    if (samplingParams.top_k !== undefined && samplingParams.top_k !== null) {
+      formData.append("samplingTopK", String(samplingParams.top_k));
+    }
+  }
   if (files) {
     for (const f of files) {
       formData.append("files", f);
