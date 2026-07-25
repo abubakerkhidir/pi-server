@@ -107,7 +107,7 @@ function numFieldFun(settings: Settings, onChange: (field: keyof Settings, value
         max={max}
         style={{ width: 60 }}
         step={step}
-        onChange={(e) => onChange(field, parseInt(e.target.value) || fallback)} />
+        onChange={(e) => onChange(field, (step && step <1? parseInt(e.target.value): parseFloat(e.target.value))|| fallback)} />
     </div>
   );
 }
