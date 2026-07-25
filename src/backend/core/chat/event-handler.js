@@ -197,7 +197,7 @@ export function createStreamEventHandler(params) {
         const tokenStats = handleDoneEvent(entityBuffer, recordId, dbSessionId, responseStartTime, state, session);
         writeEvent("record_stats", tokenStats);
         lastEvent.event = event
-        console.log('got done-event, thinkCount: ',ss.thinkCount,', textCount: ',ss.textCount)
+        console.log('got done-event, thinkCount: ',ss.thinkCount,', textCount: ',ss.textCount, event.type==='error'?event:'done')
         onAgentEndResolve();
         break;
       }

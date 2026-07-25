@@ -1,5 +1,5 @@
 import { getSamplingParams } from "../chat/state.js";
-import { trace } from "../../utils/logger.js";
+import {trace,debug} from "../../utils/logger.js"
 
 /**
  * Extension that injects sampling parameters (temperature, top_p, top_k)
@@ -13,23 +13,21 @@ export function samplingExt(pi) {
     if (!sessionId) return event.payload;
 
     const params = getSamplingParams(sessionId);
+    debug("got session sampling params",params)
     if (!params) return event.payload;
 
     const payload = { ...event.payload };
 
     if (params.temperature !== undefined && params.temperature !== null) {
-      payload.temperature = params.temperature;
-      trace("[sampling-ext] setting temperature:", params.temperature);
+      payload.temperature = Number(params.temperature);
     }
     if (params.top_p !== undefined && params.top_p !== null) {
-      payload.top_p = params.top_p;
-      trace("[sampling-ext] setting top_p:", params.top_p);
+      payload.top_p = Number(params.top_p);
     }
     if (params.top_k !== undefined && params.top_k !== null) {
-      payload.top_k = params.top_k;
-      trace("[sampling-ext] setting top_k:", params.top_k);
+      payload.top_k = Number(params.top_k);
     }
-
+    trace('payload after sampling:',payload)
     return payload;
   });
 }

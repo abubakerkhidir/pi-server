@@ -139,9 +139,12 @@ export class PiSessionManager {
     streams.add(abortController);
 
     const unsub = session.subscribe((event) => {
+      try {
+      info('[pi-session] event:', event.type, event.type === 'message_update' ? Object.keys(event) : '');
       switch (event.type) {
         case "message_update": {
           const ev = event.assistantMessageEvent;
+          if (!ev) { info('[pi-session] message_update with no assistantMessageEvent, keys:', Object.keys(event)); break; }
           if (ev.type === "text_delta") {
             onEvent?.({ type: "text", content: ev.delta });
           } else if (ev.type === "thinking_delta") {
@@ -220,6 +223,9 @@ export class PiSessionManager {
           onEvent?.({ type: "done" });
           break;
         }
+      }
+      } catch (err) {
+        debug('[pi-session] subscription callback error:', err.message, event?.type);
       }
     });
 
