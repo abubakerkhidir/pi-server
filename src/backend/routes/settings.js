@@ -15,6 +15,9 @@ const NUMBER_FIELDS = {
   tool_lines: { min: 0, max: 50 },
   paste_to_file_length: { min: 0, max: 1_000_000 },
   max_image_resolution: { min: 0, max: 1000 },
+  sampling_temperature: { min: 0, max: 2 },
+  sampling_top_p: { min: 0, max: 1 },
+  sampling_top_k: { min: 0, max: 1000 },
 };
 
 /**

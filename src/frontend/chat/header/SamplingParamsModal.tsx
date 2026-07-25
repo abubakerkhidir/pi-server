@@ -55,6 +55,7 @@ export default function SamplingParamsModal({
       if (userSettings.sampling_top_k != null) {
         setTopK(String(userSettings.sampling_top_k));
       }
+      applyParamsToState(userSettings.sampling_temperature, userSettings.sampling_top_p, userSettings.sampling_top_k, onSamplingChange);
     }
   }, [userSettings]);
 
@@ -72,12 +73,7 @@ export default function SamplingParamsModal({
   }, [open]);
 
   const handleApply = () => {
-    const params: SamplingParams = {
-      temperature: temperature !== "" ? Number(temperature) : null,
-      top_p: topP !== "" ? Number(topP) : null,
-      top_k: topK !== "" ? Number(topK) : null,
-    };
-    onSamplingChange(params);
+    applyParamsToState(temperature, topP, topK, onSamplingChange);
     setOpen(false);
   };
 
@@ -232,4 +228,15 @@ export default function SamplingParamsModal({
       )}
     </div>
   );
+}
+
+type Val = string | number | null | undefined;
+
+function applyParamsToState(temperature: Val, topP: Val, topK: Val, onSamplingChange: (params: SamplingParams) => void) {
+  const params: SamplingParams = {
+    temperature: temperature&&temperature.toString().length? Number(temperature) : null,
+    top_p: topP&&topP.toString().length? Number(topP) : null,
+    top_k: topK &&topK.toString().length ? Number(topK) : null,
+  };
+  onSamplingChange(params);
 }
