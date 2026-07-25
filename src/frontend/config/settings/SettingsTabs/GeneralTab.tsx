@@ -48,8 +48,8 @@ export default function GeneralTab({ settings, models, onChange }: GeneralTabPro
         {selectField("think_level",'Default Think Level',onChange,settings.model_id||"",'— Default thinking level for reasoning models (used when switching models without an active session).',THINK_LEVELS)}
         {selectField("model_id",'Model',onChange,settings.model_id||"",'— Default AI model to use for responses.',undefined,
           models.map(g=>{return {group:g.provider,values:g.models.map(m=>{return {value:`${g.provider}/${m.id}`,label:m.name}})}}))}
-        {numField("sampling_temperature", "Sampling Temperature", "- How deterministic or creative the agent should be in response, range 0-2  (0: deterministic, 2: creative)", 0, 2,true)}
-        {numField("sampling_top_p", "Sampling Top-P", "- % at which tokens should be selected, 0.9 means select samples with accumlative% > 90%.", 0.9, 1,true)}
+        {numField("sampling_temperature", "Sampling Temperature", "- How deterministic or creative the agent should be in response, range 0-2  (0: deterministic, 2: creative)", 0, 2,"0.1")}
+        {numField("sampling_top_p", "Sampling Top-P", "- % at which tokens should be selected, 0.9 means select samples with accumlative% > 90%.", 0.9, 1,"0.1")}
         {numField("sampling_top_k", "Sampling Top-K", "- number of tokens to be considered for sampling (after sorting), if 100 tokens are in the candidate list, and u set top-k to 20, the llm will only consider the top-20 tokens (after sorting by probability desc)", -1, 1000)}
         {textField("home_dir", "Current directory", "Working directory sent to pi.")}
       </div>
@@ -93,19 +93,20 @@ function textFieldFun(settings: Settings, onChange: (field: keyof Settings, valu
 }
 
 function numFieldFun(settings: Settings, onChange: (field: keyof Settings, value: unknown) => void) {
-  return (field: keyof Settings, label: string, desc: string, fallback: number, max: number, decimal?:boolean) => (
+  return (field: keyof Settings, label: string, desc: string, fallback: number, max: number, step?:string) => (
     <div className="setting-item" key={String(field)}>
       <label>
         {label}
         <span style={{ fontSize: 11, color: "var(--text-muted)" }}>— {desc}</span>
       </label>
       <input
+       id={field}
         type="number"
         value={settings[field] as number ?? fallback}
         min={0}
         max={max}
         style={{ width: 60 }}
-        step={decimal?'any':undefined}
+        step={step}
         onChange={(e) => onChange(field, parseInt(e.target.value) || fallback)} />
     </div>
   );
