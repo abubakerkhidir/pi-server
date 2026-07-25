@@ -48,7 +48,7 @@ export default function ChatHeader({
           <ModelSelector userSettings={userSettings} currentModel={currentModel} onModelSelect={onModelSelect} disabled={isProcessing} sessionId={sessionId} currentSession={currentSession}/>
         </div>
         {hasReasoning && (
-          <ThinkLevelSelector sessionId={sessionId} model={modelInfo} level={currentThinkLevel} onLevelChange={onThinkLevelChange} disabled={isProcessing} currentSession={currentSession}/>
+          <ThinkLevelSelector userSettings={userSettings} sessionId={sessionId} model={modelInfo} level={currentThinkLevel} onLevelChange={onThinkLevelChange} disabled={isProcessing} currentSession={currentSession}/>
         )}
         <SamplingParamsModal
           sessionId={sessionId}
