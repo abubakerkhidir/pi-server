@@ -15,8 +15,8 @@ const NUMBER_FIELDS = {
   tool_lines: { min: 0, max: 50 },
   paste_to_file_length: { min: 0, max: 1_000_000 },
   max_image_resolution: { min: 0, max: 1000 },
-  sampling_temperature: { min: 0, max: 2 },
-  sampling_top_p: { min: 0, max: 1 },
+  sampling_temperature: { min: 0, max: 2, decimal:true },
+  sampling_top_p: { min: 0, max: 1 ,decimal:true},
   sampling_top_k: { min: 0, max: 1000 },
 };
 
@@ -25,7 +25,10 @@ const NUMBER_FIELDS = {
  */
 function validateNumberField(field, value, opts) {
   const n = Number(value);
-  if (!Number.isInteger(n) || n < opts.min || n > opts.max) {
+  if (opts.decimal && (!Number.isFinite(n) || n < opts.min || n > opts.max)) {
+    return { valid: false, error: `${field} must be an decimal ${opts.min}-${opts.max}` };
+  }
+  if (!opts.decimal && (!Number.isInteger(n) || n < opts.min || n > opts.max)) {
     return { valid: false, error: `${field} must be an integer ${opts.min}-${opts.max}` };
   }
   return { valid: true, value: n };
