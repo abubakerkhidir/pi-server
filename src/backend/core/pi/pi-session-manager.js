@@ -101,7 +101,7 @@ export class PiSessionManager {
     await session.setModel(model);
     updateSessionLlm(piSessionId,provider,modelId)
     // Determine available levels for new model
-    const availableLevels = model.thinkingLevelMap?Object.keys(m.thinkingLevelMap):[];
+    const availableLevels = model.thinkingLevelMap?Object.keys(model.thinkingLevelMap):[];
     console.log(' >>> done setModelOnSession: ',provider,modelId, session.thinkingLevel,session.model)
     return { model: { id: model.id, name: model.name, provider: model.provider, input: model.input, reasoning: model.reasoning }, availableLevels};
   }

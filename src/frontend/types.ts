@@ -8,6 +8,7 @@ export interface AuthResponse {
 export interface Session {
   id: string;
   name: string | null;
+  created_at?: string;
   updated_at: string;
 }
 
@@ -200,6 +201,7 @@ export interface ChatRecord {
   id: string;
   userMsg: UserMsg;
   agentReply: AgentReply;
+  created_at?: string;
 }
 
 export interface ChatState {

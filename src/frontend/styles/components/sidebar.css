@@ -202,6 +202,32 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  position: relative;
+}
+
+/* ── Tooltip below session item ── */
+.sidebar-item[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: 100%;
+  left: 10px;
+  z-index: 100;
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: pre;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.sidebar-item[data-tooltip]:hover::after {
+  opacity: 1;
 }
 
 .sidebar-item:hover {

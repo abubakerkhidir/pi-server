@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "^0.80.3",
+    "@tanstack/react-virtual": "^3.14.8",
     "bcrypt": "^5.1.0",
     "better-sqlite3": "^11.0.0",
     "cookie-parser": "^1.4.7",

@@ -117,6 +117,7 @@ export async function loadSessionHistory(
         id: rec.id || `rec-${ri}`,
         userMsg: { content: rec.userMsg?.content || "" },
         agentReply: { id: rec.agentReply?.id || "", entities, tokenStats: rec.agentReply?.tokenStats },
+        created_at: rec.created_at,
       };
     });
 

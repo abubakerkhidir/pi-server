@@ -1,90 +1,9 @@
-import type { ChatState } from "../../../types";
-
-export function setupBtmVisibilityObserver(chatRef: any, setShowScrollDown: any) {
-  const btmDiv = chatRef.current;
-  if (!btmDiv || !setShowScrollDown) return;
-  const observer = new IntersectionObserver(
-    ([entry]) => {
-      if (entry.isIntersecting) {
-        setShowScrollDown(false);
-      }
-    },
-    { threshold: 0.1 }
-  );
-  observer.observe(btmDiv);
-  return () => observer.disconnect();
-}
-
-export function setupScrolListner(chatRef: any, setShowScrollDown: any) {
-  const myDiv = chatRef.current?.parentElement;
-  if (!myDiv) return;
-  const listner = (event: any) => {
-    //console.log('scrol-listner...')
-    if (event.deltaY < 0) {
-      //console.log('User scrolled UP');
-      setShowScrollDown(true);
-    }
-  };
-  myDiv.addEventListener('wheel', listner);
-  return () => {
-    if (myDiv)
-      myDiv.removeEventListener('wheel', listner);
-  };
-}
-
-export function autoScroll(chatState: ChatState, prevRecordCount: any, manualScroll: any, chatRef: any, setShowScrollDown: any, prevFirstRecordId?: React.MutableRefObject<string | null>) {
-  const lastRecord = chatState.records[chatState.records.length - 1];
-  if (!lastRecord) {
-    return;
-  }
-
-  const currentFirstId = chatState.records[0]?.id ?? null;
-  const prevFirstId = prevFirstRecordId?.current;
-  if (prevFirstRecordId) prevFirstRecordId.current = currentFirstId;
-
-  const recordsAdded = chatState.records.length > prevRecordCount.current;
-  prevRecordCount.current = chatState.records.length;
-
-  // Records were prepended (pagination) — don't auto-scroll
-  if (currentFirstId !== prevFirstId && prevFirstId !== null) {
-    return;
-  }
-
-  if (recordsAdded) {
-    setShowScrollDown?.(false);
-    handleScrolToBtm(chatRef, false);
-    return;
-  }
-
-  // During streaming: only auto-scroll if user hasn't scrolled up
-  const hasUnsealed = lastRecord.agentReply.entities.some((e: any) => !e.sealed);
-  if (!hasUnsealed) {
-    return;
-  }
-  if (manualScroll) {
-    return;
-  }
-
-  handleScrolToBtm(chatRef, false);
-}
-
-export function scrollToBtm() {
-  handleScrollToBtmDiv(document.getElementById("chatBtmRef"), false);
-}
-
-export function handleScrolToBtm(endRef: React.RefObject<HTMLDivElement | null>, small: boolean) {
-  handleScrollToBtmDiv(endRef.current, small);
-}
-
-export function handleScrollToBtmDiv(btmDiv: any | null, small: boolean) {
-  btmDiv?.scrollIntoView({ behavior: "smooth" });
-  setTimeout(() => {
-    btmDiv?.scrollIntoView({ behavior: "smooth" });
-    if (small) {
-      window.scrollTo(0, document.body.scrollHeight);
-    }
-  }, 100);
-}
+/**
+ * Scroll utilities for the chat window.
+ *
+ * autoScroll and btm-visibility logic is now handled natively by TanStack Virtual
+ * (anchorTo: 'end', followOnAppend, isAtEnd). Only top-scroll and manual helpers remain.
+ */
 
 /**
  * Observe the top sentinel div; when it enters the viewport, trigger loadMore
@@ -95,15 +14,15 @@ export function handleScrollToBtmDiv(btmDiv: any | null, small: boolean) {
  */
 export function setupTopScrollObserver(
   topSentinelRef: React.RefObject<HTMLDivElement | null>,
-  chatRef: React.RefObject<HTMLDivElement | null>,
+  scrollContainerRef: React.RefObject<HTMLDivElement | null>,
   hasMoreRecords: boolean,
   isLoadingMore: boolean,
   onLoadMoreRecords?: () => void,
   setIsLoadingMore?: (v: boolean) => void,
 ) {
   if (!hasMoreRecords || !onLoadMoreRecords || !topSentinelRef.current) return;
-  const chatEl = chatRef.current?.parentElement;
-  if (!chatEl) return;
+  const scrollEl = scrollContainerRef.current;
+  if (!scrollEl) return;
 
   let ready = false;
   const cooldown = setTimeout(() => { ready = true; }, 300);
@@ -112,19 +31,24 @@ export function setupTopScrollObserver(
     (entries) => {
       if (entries[0].isIntersecting && !isLoadingMore && ready) {
         setIsLoadingMore?.(true);
-        const scrollBottom = chatEl.scrollHeight - chatEl.scrollTop;
+        const scrollBottom = scrollEl.scrollHeight - scrollEl.scrollTop;
         onLoadMoreRecords();
         setTimeout(() => {
-          chatEl.scrollTop = chatEl.scrollHeight - scrollBottom;
+          scrollEl.scrollTop = scrollEl.scrollHeight - scrollBottom;
           setIsLoadingMore?.(false);
         }, 150);
       }
     },
-    { root: chatEl, threshold: 0.1 }
+    { root: scrollEl, threshold: 0.1 }
   );
   observer.observe(topSentinelRef.current);
   return () => {
     clearTimeout(cooldown);
     observer.disconnect();
   };
+}
+
+export function scrollToBtm() {
+  const el = document.getElementById("chatMessages");
+  if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
 }

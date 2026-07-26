@@ -1,8 +1,16 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import type { Session } from "@/frontend/types";
 import { deleteSession, renameSession } from "@/frontend/api";
+import { formatDateTime } from "@/frontend/lib/formatDateTime";
 import SessionView from "./SessionView";
 import SessionEdit from "./SessionEdit";
+
+function buildSessionTooltip(session: Session): string {
+  const parts: string[] = [];
+  if (session.created_at) parts.push(`Created: ${formatDateTime(session.created_at)}`);
+  if (session.updated_at) parts.push(`Updated: ${formatDateTime(session.updated_at)}`);
+  return parts.join("\n");
+}
 
 interface SessionListProps {
   sessions: Session[];
@@ -107,6 +115,7 @@ export default function SessionList({
           <div
             key={session.id}
             className={`sidebar-item ${session.id === currentSessionId ? "active" : ""}`}
+            data-tooltip={buildSessionTooltip(session)}
             onMouseEnter={() => setHoveredId(session.id)}
             onMouseLeave={() => setHoveredId(null)}
             onClick={() => {
