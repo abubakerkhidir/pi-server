@@ -1,7 +1,7 @@
 import { Dispatch, RefObject, SetStateAction } from "react";
 import type { BackendSession, ChatState, Session } from "../../../types";
 import { getSessions } from "../../../api";
-import { loadSessionHistory } from "@/frontend/hooks/useSessionHistory";
+import { loadSessionHistory, RECORDS_PAGE_SIZE } from "@/frontend/hooks/useSessionHistory";
 
 export const PAGE_SIZE = 20;
 
@@ -63,18 +63,63 @@ export function getResumeSessionHandler(setChatState: Dispatch<SetStateAction<Ch
     window.location.hash = sessionId;
   };
 }
-export function getLoadSessionHandler(currentSessionId: string | null, setChatState: Dispatch<SetStateAction<ChatState>>, setCurrentSessionId: Dispatch<SetStateAction<string | null>>, reloadSessions: () => void,setCurrentSession: Dispatch<SetStateAction<BackendSession | undefined>>) {
+export function getLoadSessionHandler(
+  currentSessionId: string | null,
+  setChatState: Dispatch<SetStateAction<ChatState>>,
+  setCurrentSessionId: Dispatch<SetStateAction<string | null>>,
+  reloadSessions: () => void,
+  setCurrentSession: Dispatch<SetStateAction<BackendSession | undefined>>,
+  setHasMoreRecords: Dispatch<SetStateAction<boolean>>,
+  setRecordsTotal: Dispatch<SetStateAction<number>>,
+) {
   return async (sessionId: string) => {
     if (sessionId === currentSessionId) return;
     try {
-      const state = await loadSessionHistory(sessionId);
+      const state = await loadSessionHistory(sessionId, RECORDS_PAGE_SIZE, 0);
       setChatState(state.chat);
-      setCurrentSession(state.meta)
+      setCurrentSession(state.meta);
       setCurrentSessionId(sessionId);
+      setHasMoreRecords(state.hasMore);
+      setRecordsTotal(state.total);
       reloadSessions();
     } catch (err) {
       console.error("Failed to load session:", err);
       window.location.hash = "";
+    }
+  };
+}
+
+/**
+ * Create a handler that loads older records when scrolling to the top.
+ * Returns a function that, when called, prepends older records to the chat state.
+ */
+export function getLoadMoreRecordsHandler(
+  currentSessionId: string | null,
+  setChatState: Dispatch<SetStateAction<ChatState>>,
+  setHasMoreRecords: Dispatch<SetStateAction<boolean>>,
+  setRecordsTotal: Dispatch<SetStateAction<number>>,
+  hasMoreRecordsRef: RefObject<boolean>,
+  recordsLoadedRef: RefObject<number>,
+) {
+  return async () => {
+    if (!currentSessionId || !hasMoreRecordsRef.current) return;
+    try {
+      const offset = recordsLoadedRef.current;
+      const state = await loadSessionHistory(currentSessionId, RECORDS_PAGE_SIZE, offset);
+      if (state.chat.records.length === 0) {
+        setHasMoreRecords(false);
+        return;
+      }
+      // Prepend older records to existing records
+      setChatState((prev) => ({
+        ...prev,
+        records: [...state.chat.records, ...prev.records],
+      }));
+      recordsLoadedRef.current += state.chat.records.length;
+      setHasMoreRecords(state.hasMore);
+      setRecordsTotal(state.total);
+    } catch (err) {
+      console.error("Failed to load more records:", err);
     }
   };
 }

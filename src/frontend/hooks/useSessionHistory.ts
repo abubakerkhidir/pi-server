@@ -1,6 +1,9 @@
 import { getChatHistory } from "@/frontend/api";
 import type { ChatRecord, ChatState, TokenStats, SessionTokenStats, BackendRecord, BackendHistory, BackendSession } from "@/frontend/types";
 
+/** Default page size for paginated session loading */
+export const RECORDS_PAGE_SIZE = 3;
+
 /**
  * Convert a backend entity to the frontend AgentReplyEntity type.
  *
@@ -82,19 +85,24 @@ function mapEntity(e: BackendRecord["agentReply"]["entities"][0], index: number)
 }
 
 /**
- * Load session history from the backend.
+ * Load session history from the backend (paginated).
  *
- * The backend now returns records in the same entity-based format used
- * by the frontend, including tokenStats per record and sessionStats.
+ * @param sessionId - Session to load
+ * @param limit - Max records to fetch (default RECORDS_PAGE_SIZE)
+ * @param offset - Number of newest records to skip (for loading older records)
  */
-export async function loadSessionHistory(sessionId: string): Promise<{meta?:BackendSession,chat:ChatState}> {
+export async function loadSessionHistory(
+  sessionId: string,
+  limit: number = RECORDS_PAGE_SIZE,
+  offset: number = 0,
+): Promise<{ meta?: BackendSession; chat: ChatState; total: number; hasMore: boolean }> {
   try {
-    const raw = await getChatHistory(sessionId);
-    const history = raw as BackendHistory;
+    const raw = await getChatHistory(sessionId, limit, offset);
+    const history = raw as BackendHistory & { total: number; hasMore: boolean };
 
     if (!history.records || !Array.isArray(history.records)) {
       console.warn("[loadSessionHistory] No records in response", history);
-      return {chat:{ records: [] },meta:history.meta};
+      return { chat: { records: [] }, meta: history.meta, total: 0, hasMore: false };
     }
 
     const records: ChatRecord[] = history.records.map((rec, ri) => {
@@ -105,14 +113,21 @@ export async function loadSessionHistory(sessionId: string): Promise<{meta?:Back
         return mapped;
       });
 
-      return { id: rec.id || `rec-${ri}`, userMsg: { content: rec.userMsg?.content || "" },
-        agentReply: { id: rec.agentReply?.id || "", entities, tokenStats: rec.agentReply?.tokenStats},
+      return {
+        id: rec.id || `rec-${ri}`,
+        userMsg: { content: rec.userMsg?.content || "" },
+        agentReply: { id: rec.agentReply?.id || "", entities, tokenStats: rec.agentReply?.tokenStats },
       };
     });
 
-    return {chat:{records, sessionStats: history.sessionStats}, meta:history.meta};
+    return {
+      chat: { records, sessionStats: history.sessionStats },
+      meta: history.meta,
+      total: history.total ?? records.length,
+      hasMore: history.hasMore ?? false,
+    };
   } catch (err) {
     console.error("[loadSessionHistory] Failed:", err);
-    return {chat:{ records: [] },meta:{id:sessionId,user_id:''}};
+    return { chat: { records: [] }, meta: { id: sessionId, user_id: "" }, total: 0, hasMore: false };
   }
 }

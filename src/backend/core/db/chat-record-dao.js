@@ -6,6 +6,23 @@ export function getChatRecordsBySession(sessionId) {
   return getDb().prepare("SELECT * FROM chat_records WHERE session_id = ? ORDER BY created_at ASC").all(sessionId);
 }
 
+/**
+ * Get paginated records for a session (newest first for offset, returns oldest-first order).
+ * @param {string} sessionId
+ * @param {number} limit - Max records to return
+ * @param {number} offset - Number of newest records to skip
+ * @returns {{ records: Array, total: number, hasMore: boolean }}
+ */
+export function getChatRecordsBySessionPaginated(sessionId, limit = 5, offset = 0) {
+  const db = getDb();
+  const total = db.prepare("SELECT COUNT(*) AS c FROM chat_records WHERE session_id = ?").get(sessionId)?.c || 0;
+  // Fetch newest-first, skip `offset`, take `limit`, then reverse to oldest-first
+  const rows = db.prepare(
+    "SELECT * FROM chat_records WHERE session_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?"
+  ).all(sessionId, limit, offset);
+  return { records: rows.reverse(), total, hasMore: offset + rows.length < total };
+}
+
 
 /**
  * Create a new chat record for this exchange.

@@ -32,30 +32,36 @@ export function setupScrolListner(chatRef: any, setShowScrollDown: any) {
   };
 }
 
-export function autoScroll(chatState: ChatState, prevRecordCount: any, manualScroll: any, chatRef: any, setShowScrollDown: any) {
+export function autoScroll(chatState: ChatState, prevRecordCount: any, manualScroll: any, chatRef: any, setShowScrollDown: any, prevFirstRecordId?: React.MutableRefObject<string | null>) {
   const lastRecord = chatState.records[chatState.records.length - 1];
   if (!lastRecord) {
-    console.log('skip as no record');
     return;
   }
+
+  const currentFirstId = chatState.records[0]?.id ?? null;
+  const prevFirstId = prevFirstRecordId?.current;
+  if (prevFirstRecordId) prevFirstRecordId.current = currentFirstId;
+
   const recordsAdded = chatState.records.length > prevRecordCount.current;
   prevRecordCount.current = chatState.records.length;
+
+  // Records were prepended (pagination) — don't auto-scroll
+  if (currentFirstId !== prevFirstId && prevFirstId !== null) {
+    return;
+  }
+
   if (recordsAdded) {
     setShowScrollDown?.(false);
     handleScrolToBtm(chatRef, false);
-    //console.log('scrolled due to new records')
     return;
   }
 
   // During streaming: only auto-scroll if user hasn't scrolled up
-  const hasUnsealed = lastRecord.agentReply.entities.some((e) => !e.sealed);
-  //console.log('unsealed: ',hasUnsealed)
+  const hasUnsealed = lastRecord.agentReply.entities.some((e: any) => !e.sealed);
   if (!hasUnsealed) {
-    //console.log('skip before unsealed')
     return;
   }
   if (manualScroll) {
-    //console.log('skipped due to manual scroll')
     return;
   }
 
@@ -78,4 +84,47 @@ export function handleScrollToBtmDiv(btmDiv: any | null, small: boolean) {
       window.scrollTo(0, document.body.scrollHeight);
     }
   }, 100);
+}
+
+/**
+ * Observe the top sentinel div; when it enters the viewport, trigger loadMore
+ * and preserve scroll position. Returns cleanup function for useEffect.
+ *
+ * Uses a short cooldown after setup so the initial intersection (from session
+ * load / auto-scroll) doesn't trigger a fetch.
+ */
+export function setupTopScrollObserver(
+  topSentinelRef: React.RefObject<HTMLDivElement | null>,
+  chatRef: React.RefObject<HTMLDivElement | null>,
+  hasMoreRecords: boolean,
+  isLoadingMore: boolean,
+  onLoadMoreRecords?: () => void,
+  setIsLoadingMore?: (v: boolean) => void,
+) {
+  if (!hasMoreRecords || !onLoadMoreRecords || !topSentinelRef.current) return;
+  const chatEl = chatRef.current?.parentElement;
+  if (!chatEl) return;
+
+  let ready = false;
+  const cooldown = setTimeout(() => { ready = true; }, 300);
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting && !isLoadingMore && ready) {
+        setIsLoadingMore?.(true);
+        const scrollBottom = chatEl.scrollHeight - chatEl.scrollTop;
+        onLoadMoreRecords();
+        setTimeout(() => {
+          chatEl.scrollTop = chatEl.scrollHeight - scrollBottom;
+          setIsLoadingMore?.(false);
+        }, 150);
+      }
+    },
+    { root: chatEl, threshold: 0.1 }
+  );
+  observer.observe(topSentinelRef.current);
+  return () => {
+    clearTimeout(cooldown);
+    observer.disconnect();
+  };
 }

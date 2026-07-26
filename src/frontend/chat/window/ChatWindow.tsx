@@ -1,5 +1,5 @@
 import { CopyBtn } from "@/frontend/lib/clipboard";
-import { autoScroll, setupBtmVisibilityObserver, setupScrolListner } from "@/frontend/chat/window/chat-utils/scrollUtils";
+import { autoScroll, setupBtmVisibilityObserver, setupScrolListner, setupTopScrollObserver } from "@/frontend/chat/window/chat-utils/scrollUtils";
 import type { ChatState, UserMsg, UserSettings } from "@/frontend/types";
 import { marked } from "marked";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -13,6 +13,9 @@ interface ChatWindowProps {
   setShowScrollDown?: (isAway: boolean) => void;
   showScrollDown?: boolean;
   onScrollDownClick?: () => void;
+  hasMoreRecords?: boolean;
+  recordsTotal?: number;
+  onLoadMoreRecords?: () => void;
 }
 
 function renderUserMsg(userMsg: UserMsg): string {
@@ -28,9 +31,20 @@ function escapeHtml(str: string): string {
     .replace(/'/g, "&#039;");
 }
 
-export default function ChatWindow({chatState,userSettings,setShowScrollDown,showScrollDown}: ChatWindowProps) {
+export default function ChatWindow({
+  chatState,
+  userSettings,
+  setShowScrollDown,
+  showScrollDown,
+  hasMoreRecords = false,
+  recordsTotal = 0,
+  onLoadMoreRecords,
+}: ChatWindowProps) {
   const chatRef = useRef<HTMLDivElement>(null);
+  const topSentinelRef = useRef<HTMLDivElement>(null);
   const prevRecordCount = useRef(chatState.records.length);
+  const prevFirstRecordId = useRef<string | null>(chatState.records[0]?.id ?? null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   // ── Global visibility controls (chat-level) ──
   const [globalToolsHidden, setGlobalToolsHidden] = useState(false);
@@ -44,7 +58,10 @@ export default function ChatWindow({chatState,userSettings,setShowScrollDown,sho
   useEffect(()=>setupBtmVisibilityObserver(chatRef,setShowScrollDown),[])
 
   // ── Auto-scroll during streaming ──
-  useEffect(() => autoScroll(chatState, prevRecordCount,showScrollDown, chatRef,setShowScrollDown), [chatState.records]);
+  useEffect(() => autoScroll(chatState, prevRecordCount,showScrollDown, chatRef,setShowScrollDown, prevFirstRecordId), [chatState.records]);
+
+  // ── Scroll-to-top detection for loading more records ──
+  useEffect(() => setupTopScrollObserver(topSentinelRef, chatRef, hasMoreRecords, isLoadingMore, onLoadMoreRecords, setIsLoadingMore), [hasMoreRecords, isLoadingMore, onLoadMoreRecords, chatState.records.length]);
   
   const renderedRecords = useMemo(() => {
     return chatState.records.map((record) => {
@@ -65,6 +82,17 @@ export default function ChatWindow({chatState,userSettings,setShowScrollDown,sho
   //console.log('render wind: ',renderedRecords.length)
   return (
     <div className="chat" id="chatMessages">
+      {/* ── Load more indicator at top ── */}
+      {hasMoreRecords && (
+        <div ref={topSentinelRef} className="load-more-records">
+          {isLoadingMore ? (
+            <span className="loading-indicator">Loading older messages...</span>
+          ) : (
+            <span className="load-more-hint">Scroll up to load older messages</span>
+          )}
+        </div>
+      )}
+
       {/* ── Global visibility controls ── */}
       {(hasAnyTools || hasAnyThink) && (
         <div className="global-agent-controls">

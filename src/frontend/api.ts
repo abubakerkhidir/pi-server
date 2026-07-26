@@ -127,8 +127,12 @@ export async function summarizeSession(sessionId: string): Promise<{ summary: st
   return (await apiPost(`/api/chat/session/${encodeURIComponent(sessionId)}/summarize`)).data;
 }
 
-export async function getChatHistory(sessionId: string): Promise<unknown> {
-  return (await apiFetch(`/api/chat/history/${sessionId}`)).json();
+export async function getChatHistory(sessionId: string, limit?: number, offset?: number): Promise<unknown> {
+  const params = new URLSearchParams();
+  if (limit != null) params.set('limit', String(limit));
+  if (offset != null) params.set('offset', String(offset));
+  const qs = params.toString();
+  return (await apiFetch(`/api/chat/history/${sessionId}${qs ? '?' + qs : ''}`)).json();
 }
 
 export async function getCommands(sessionId: string | null): Promise<{ name: string; description: string; source: string }[]> {

@@ -1,5 +1,5 @@
 import { getUsername } from "@/frontend/api";
-import { getLoadSessionHandler, getMoreSessionHndlr, getReloadSessionsHndlr, getResumeSessionHandler } from "@/frontend/chat/window/chat-utils/sessionMngmtUtils";
+import { getLoadSessionHandler, getLoadMoreRecordsHandler, getMoreSessionHndlr, getReloadSessionsHndlr, getResumeSessionHandler } from "@/frontend/chat/window/chat-utils/sessionMngmtUtils";
 import { useChatStream } from "@/frontend/hooks/useChatStream";
 import { useStopStream } from "@/frontend/hooks/useStreamHandlers";
 import type { BackendSession, ChatLayoutProps, ChatState, ModelInfo, SamplingParams, Session, UserSettings } from "@/frontend/types";
@@ -32,9 +32,17 @@ export default function ChatLayout({ onLogout, onShowFiles }: ChatLayoutProps) {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [showScrollDown, setShowScrollDown] = useState(false);
   const [chatState, setChatState] = useState<ChatState>({ records: [] });
+  const [hasMoreRecords, setHasMoreRecords] = useState(false);
+  const [recordsTotal, setRecordsTotal] = useState(0);
   const pendingSummaryRef = useRef<string | null>(null);
   const loadMoreOffsetRef = useRef(0);
   const allModelsRef = useRef<{ provider: string; models: ModelInfo[] }[]>([]);
+  const hasMoreRecordsRef = useRef(false);
+  const recordsLoadedRef = useRef(0);
+
+  // Keep refs in sync with state
+  useEffect(() => { hasMoreRecordsRef.current = hasMoreRecords; }, [hasMoreRecords]);
+  useEffect(() => { recordsLoadedRef.current = chatState.records.length; }, [chatState.records.length]);
 
   //callback functions
   //currentSessionId, modelId, modelProvider, thinkLevel,homeDir,samplingParams
@@ -46,7 +54,8 @@ export default function ChatLayout({ onLogout, onShowFiles }: ChatLayoutProps) {
   const handleSummarizeAndNew = useCallback(getSummarizeAndNewHandler(currentSessionId, handleNewChat, setSummarizing, pendingSummaryRef), [handleNewChat]);
   const handleResumeSession = getResumeSessionHandler(setChatState, setCurrentSessionId, resetState,setCurrentSession);
   const handleStopStream = useStopStream(stopStream, setIsProcessing);
-  const loadAndShowSession = getLoadSessionHandler(currentSessionId, setChatState, setCurrentSessionId, reloadSessions,setCurrentSession);
+  const loadAndShowSession = getLoadSessionHandler(currentSessionId, setChatState, setCurrentSessionId, reloadSessions, setCurrentSession, setHasMoreRecords, setRecordsTotal);
+  const loadMoreRecords = useCallback(getLoadMoreRecordsHandler(currentSessionId, setChatState, setHasMoreRecords, setRecordsTotal, hasMoreRecordsRef, recordsLoadedRef), [currentSessionId]);
   const handleModelSelect = useCallback(async (model: ModelInfo) => {setCurrentModel(model);}, []);
   const handleThinkLevelChange = useCallback(async (level: string) => {setCurrentThinkLevel(level);}, []);
   const handleSamplingChange = useCallback(async (params: SamplingParams) => {setCurrentSamplingParams(params);}, []);
@@ -94,7 +103,15 @@ export default function ChatLayout({ onLogout, onShowFiles }: ChatLayoutProps) {
           userSettings={userSettings}
           currentSession={currentSession}
         />
-        <ChatWindow chatState={chatState} userSettings={userSettings} setShowScrollDown={setShowScrollDown} showScrollDown={showScrollDown}/>
+        <ChatWindow
+          chatState={chatState}
+          userSettings={userSettings}
+          setShowScrollDown={setShowScrollDown}
+          showScrollDown={showScrollDown}
+          hasMoreRecords={hasMoreRecords}
+          recordsTotal={recordsTotal}
+          onLoadMoreRecords={loadMoreRecords}
+        />
         <InputArea
           onSend={handleSendWrapper}
           onStop={handleStopStream}

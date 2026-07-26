@@ -2,7 +2,7 @@ import { Router } from "express";
 import { authMiddleware } from "../middleware/auth.js";
 import { getChatFilesByRec } from "../core/db/chat-files-dao.js";
 import { getChatEntities } from "../core/db/chat-entities-dao.js";
-import { getChatRecordsBySession } from "../core/db/chat-record-dao.js";
+import { getChatRecordsBySession, getChatRecordsBySessionPaginated } from "../core/db/chat-record-dao.js";
 import { getSessionMetaByUser } from "../core/db/session-dao.js";
 
 const router = Router();
@@ -120,10 +120,20 @@ function formatFiles(files) {
 }
 
 /**
- * Load all records for a session with their entities and files.
+ * Load records for a session with their entities and files.
+ * @param {string} sessionId
+ * @param {number|null} limit - Max records to return (null = all)
+ * @param {number} offset - Number of newest records to skip
  */
-function loadSessionRecords(sessionId) {
-  const records = getChatRecordsBySession(sessionId);
+function loadSessionRecords(sessionId, limit = null, offset = 0) {
+  let records, total, hasMore;
+  if (limit !== null) {
+    ({ records, total, hasMore } = getChatRecordsBySessionPaginated(sessionId, limit, offset));
+  } else {
+    records = getChatRecordsBySession(sessionId);
+    total = records.length;
+    hasMore = false;
+  }
   const result = [];
   for (const rec of records) {
     const entities = getChatEntities(rec.id);
@@ -136,7 +146,7 @@ function loadSessionRecords(sessionId) {
       files: formatFiles(files),
     });
   }
-  return result;
+  return { records: result, total, hasMore };
 }
 
 /**
@@ -150,16 +160,19 @@ function extractRecordTokenStats(rec) {
 }
 
 //  GET /api/chat/history/:sessionId — load session history
+//  Query params: limit (default null=all), offset (default 0)
 router.get("/chat/history/:sessionId", authMiddleware, (req, res) => {
   const { sessionId } = req.params;
   const s = getSessionMetaByUser(sessionId, req.user.userId);
   if (!s) return res.status(404).json({ error: "Session not found" });
-  const records = loadSessionRecords(sessionId);
+  const limit = req.query.limit ? parseInt(req.query.limit, 10) : null;
+  const offset = req.query.offset ? parseInt(req.query.offset, 10) : 0;
+  const { records, total, hasMore } = loadSessionRecords(sessionId, limit, offset);
   const contextSize = s.context_size || 128000;
   let sessionStats = {total_input:s.total_input,total_cache_read:s.total_cache_read,total_cache_write:s.total_cache_write,total_reasoning:s.total_reasoning,
     total_output:s.total_output,context_size:s.context_size,context_used:s.context_used, context_percent:s.context_percent
   }
-  res.json({ sessionId: s.id, name: s.name,meta:s, records, sessionStats });
+  res.json({ sessionId: s.id, name: s.name,meta:s, records, sessionStats, total, hasMore });
 });
 
 export default router;
