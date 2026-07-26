@@ -127,7 +127,31 @@ export interface CompactData {
   failed?: boolean;
 }
 
-export type AgentReplyEntity = MsgData | ToolData | ThinkData | CompactData;
+export interface TurnData {
+  type: "turn";
+  id: string;
+  turn: number;
+  prompt_tokens: number;
+  output_tokens: number;
+  think_tokens: number;
+  cache_read: number;
+  cache_write: number;
+  ttft_ms: number | null;
+  duration_ms: number | null;
+  prompt_per_sec?: number;
+  output_per_sec?: number;
+  prompt_ms?: number;
+  predicted_ms?: number;
+  predicted_per_second?: number;
+  predicted_per_token_ms?: number;
+  draft_n?: number;
+  draft_n_accepted?: number;
+  stop_reason?: string;
+  tool_calls_count?: number;
+  sealed?: boolean;
+}
+
+export type AgentReplyEntity = MsgData | ToolData | ThinkData | CompactData | TurnData;
 
 export interface UserMsg {
   content: string;
@@ -283,9 +307,18 @@ export interface BackendSession { id: string; created_at?: string; updated_at?: 
 export interface BackendHistory {
   sessionId: string; name: string; meta: BackendSession; records: BackendRecord[]; sessionStats?: SessionTokenStats;
 }
-export interface BackendEntity { type: "think" | "msg" | "tool" | "compact"; content?: string; name?: string; args?: Record<string, unknown>; result?: unknown;
-  isError?: boolean; isComplete?: boolean; duration?: number; totalLength?: number; summary?: string; tokensBefore?: number; tokensAfter?: number;
+export interface BackendEntity {
+  type: "think" | "msg" | "tool" | "compact" | "turn";
+  content?: string; name?: string; args?: Record<string, unknown>; result?: unknown;
+  isError?: boolean; isComplete?: boolean; duration?: number; totalLength?: number;
+  summary?: string; tokensBefore?: number; tokensAfter?: number;
   savedPct?: number; failed?: boolean;
+  // Turn-specific fields
+  turn?: number; prompt_tokens?: number; output_tokens?: number; think_tokens?: number;
+  cache_read?: number; cache_write?: number; ttft_ms?: number | null; duration_ms?: number | null;
+  prompt_per_sec?: number; output_per_sec?: number; prompt_ms?: number;
+  predicted_ms?: number; predicted_per_second?: number; predicted_per_token_ms?: number;
+  draft_n?: number; draft_n_accepted?: number; stop_reason?: string; tool_calls_count?: number;
 }
 
 export interface BackendRecord {

@@ -88,6 +88,10 @@ initCompactionAtts()
 // Initialize database
 initDb();
 
+// Intercept LLM HTTP responses to capture raw usage/timings (before Pi parses them)
+// Must happen BEFORE PiSessionManager is created
+const { getAndClearRawResponse } = await import("./fetch-intercept.js");
+
 // Create and configure app
 const app = createApp();
 mountRoutes(app);

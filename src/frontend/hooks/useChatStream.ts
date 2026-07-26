@@ -1,13 +1,15 @@
 import { useRef, useCallback, RefObject } from "react";
 import { createChatStream, type AbortChatStream } from "@/frontend/api";
-import type { AgentReplyEntity, MsgData, ToolData, ThinkData, CompactData, TokenStats, SamplingParams } from "@/frontend/types";
+import type { AgentReplyEntity, MsgData, ToolData, ThinkData, CompactData, TurnData, TokenStats, SamplingParams } from "@/frontend/types";
 
 let thinkCounter = 0;
 let msgCounter = 0;
 let compactCounter = 0;
+let turnCounter = 0;
 const nextThinkId = () => `think-${++thinkCounter}`;
 const nextMsgId = () => `msg-${++msgCounter}`;
 const nextCompactId = () => `compact-${++compactCounter}`;
+const nextTurnId = () => `turn-${++turnCounter}`;
 
 interface UseChatStreamOptions {
   currentSessionId: string | null;
@@ -177,6 +179,38 @@ function getStreamHandler(sessionIdRef: RefObject<string | null>, onSessionCreat
           }
         }
         sealLastEntity("compact", entitiesRef.current);
+        break;
+      }
+      case "turn_end": {
+        const td = data as Record<string, unknown>;
+        const turnEntity: TurnData = {
+          type: "turn",
+          id: nextTurnId(),
+          turn: (td.turn as number) ?? 0,
+          prompt_tokens: (td.prompt_tokens as number) ?? 0,
+          output_tokens: (td.output_tokens as number) ?? 0,
+          think_tokens: (td.think_tokens as number) ?? 0,
+          cache_read: (td.cache_read as number) ?? 0,
+          cache_write: (td.cache_write as number) ?? 0,
+          ttft_ms: (td.ttft_ms as number) ?? null,
+          duration_ms: (td.duration_ms as number) ?? null,
+          prompt_per_sec: td.prompt_per_sec as number | undefined,
+          output_per_sec: td.output_per_sec as number | undefined,
+          prompt_ms: td.prompt_ms as number | undefined,
+          predicted_ms: td.predicted_ms as number | undefined,
+          predicted_per_second: td.predicted_per_second as number | undefined,
+          predicted_per_token_ms: td.predicted_per_token_ms as number | undefined,
+          draft_n: td.draft_n as number | undefined,
+          draft_n_accepted: td.draft_n_accepted as number | undefined,
+          stop_reason: td.stop_reason as string | undefined,
+          tool_calls_count: td.tool_calls_count as number | undefined,
+          sealed: true,
+        };
+        // Seal all entities before the turn (they belong to this turn)
+        for (const ent of entitiesRef.current) {
+          if (!ent.sealed) ent.sealed = true;
+        }
+        entitiesRef.current.push(turnEntity);
         break;
       }
       case "done":

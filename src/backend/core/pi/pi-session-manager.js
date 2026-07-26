@@ -3,10 +3,11 @@ import { v4 as uuidv4 } from "uuid";
 import { getSessionMeta, getSessionMetaByUser, updateSessionLlm, updateSessionThinkLevel, updateSessionSamplingParams } from "../db/session-dao.js";
 import { loadExistingSession } from "./pi-session-loader.js";
 import { createNewSession } from "./pi-new-session.js";
-import { debug, error, info, warning } from "../../utils/logger.js";
+import { debug,trace, error, info, warning } from "../../utils/logger.js";
 import { BUILTIN_COMMANDS, parseBuiltinCommand, executeBuiltinCommand } from "./pi-commands.js";
 import { getPiModelById, computeThinkingLevels, findFallbackLevel } from "./pi-model-mngmt.js";
 import { setSamplingParams, getSamplingParams, removeSamplingParams } from "../chat/state.js";
+import { clearRawResponses } from "../../../server/fetch-intercept.js";
 
 export class PiSessionManager {
   constructor(cwd) {
@@ -140,7 +141,7 @@ export class PiSessionManager {
 
     const unsub = session.subscribe((event) => {
       try {
-      info('[pi-session] event:', event.type, event.type === 'message_update' ? Object.keys(event) : '');
+      trace('[pi-session] event:', event.type, event.type === 'message_update' ? Object.keys(event) : '');
       switch (event.type) {
         case "message_update": {
           const ev = event.assistantMessageEvent;
@@ -165,6 +166,7 @@ export class PiSessionManager {
               cacheWrite: msg.usage.cacheWrite || 0,
             });
           }
+	  debug('message-end event keys: ',Object.keys(event).join(','), msg?Object.keys(msg).join(','):'no-msg')
           break;
         }
         case "tool_execution_start": {
@@ -210,6 +212,23 @@ export class PiSessionManager {
           }
           break;
         }
+        case "turn_end": {
+          const msg = event.message;
+          const toolCalls = msg?.content?.filter?.(c => c.type === "toolCall") || [];
+          onEvent?.({
+            type: "turn_end",
+            usage: msg?.usage ? {
+              input: msg.usage.input || 0,
+              output: msg.usage.output || 0,
+              reasoning: msg.usage.reasoning || 0,
+              cacheRead: msg.usage.cacheRead || 0,
+              cacheWrite: msg.usage.cacheWrite || 0,
+            } : null,
+            stopReason: msg?.stopReason || "stop",
+            toolCallsCount: toolCalls.length,
+          });
+          break;
+        }
         case "agent_end": {
           try {
             const ctxUsage = session.getContextUsage();
@@ -219,7 +238,10 @@ export class PiSessionManager {
               contextWindow: ctxUsage?.contextWindow ?? null,
               contextPercent: ctxUsage?.percent ?? null,
             });
-          } catch {}
+          } catch(ag_err) {
+		error('[pi-session] error sending context-usage on agent-end: ',ag_err)
+	  }
+          try { clearRawResponses(piSessionId); } catch(_) {}
           onEvent?.({ type: "done" });
           break;
         }

@@ -1,5 +1,6 @@
 import { getSessionMeta, updateSessionStats } from "../db/session-dao.js";
-import { fillUsageData,calculateTokenStats, saveTokenStats, updateSessionContextUsage } from "./token-stats.js";
+import { fillUsageData, calculateTokenStats, saveTokenStats, updateSessionContextUsage } from "./token-stats.js";
+import { getAndClearRawResponse } from "../../server/fetch-intercept.js";
 
 /**
  * Handle text event from pi session.
@@ -57,7 +58,6 @@ function handleToolUpdateEvent(event, entityBuffer, writeEvent) {
 
 /**
  * Handle tool_end event from pi session.
- * For file-generating tools, auto-save the file and modify the result.
  */
 async function handleToolEndEvent(event, entityBuffer, writeEvent, params) {
   const tool = entityBuffer.findToolEntity(event.id);
@@ -74,9 +74,109 @@ function saveToolToBuffer(tool, reslt, err, entityBuffer) {
   }
 }
 
-//Handle usage event from pi session - accumulate across multiple API calls. Also tracks cumulative lifetime tokens (survives compaction resets).
+/**
+ * Handle usage event from pi session — accumulate across multiple API calls.
+ * Also stores current-turn usage for the turn_end handler.
+ */
 function handleUsageEvent(event, state) {
-  fillUsageData(event,state)
+  fillUsageData(event, state);
+  // Track per-turn usage (accumulated if multiple message_end per turn, reset at turn_end)
+  if (!state.currentTurnUsage) {
+    state.currentTurnUsage = {
+      input: event.input || 0,
+      output: event.output || 0,
+      reasoning: event.reasoning || 0,
+      cacheRead: event.cacheRead || 0,
+      cacheWrite: event.cacheWrite || 0,
+    };
+  } else {
+    state.currentTurnUsage.input += event.input || 0;
+    state.currentTurnUsage.output += event.output || 0;
+    state.currentTurnUsage.reasoning += event.reasoning || 0;
+    state.currentTurnUsage.cacheRead += event.cacheRead || 0;
+    state.currentTurnUsage.cacheWrite += event.cacheWrite || 0;
+  }
+}
+
+/**
+ * Handle turn_end event — create a turn entity with usage + timing stats.
+ * This fires after all tools in the turn have finished executing.
+ */
+function handleTurnEndEvent(event, entityBuffer, writeEvent, state, dbSessionId) {
+  state.turnNumber++;
+
+  // Calculate turn duration
+  const turnDurationMs = state.turnStart ? Date.now() - state.turnStart : null;
+
+  // Calculate ttft for this turn (time from turn start to first token)
+  const ttftMs = (state.turnStart && state.firstTokenTime)
+    ? state.firstTokenTime - state.turnStart
+    : null;
+
+  // Get usage from the turn_end event (most authoritative)
+  const usage = event.usage || state.currentTurnUsage || {};
+
+  // Get raw timings from fetch-intercept (llama.cpp specific)
+  const rawResp = getAndClearRawResponse(dbSessionId);
+
+  // Build turn stats object
+  const turnStats = {
+    turn: state.turnNumber,
+    prompt_tokens: usage.input || 0,
+    output_tokens: usage.output || 0,
+    think_tokens: usage.reasoning || 0,
+    cache_read: usage.cacheRead || 0,
+    cache_write: usage.cacheWrite || 0,
+    ttft_ms: ttftMs,
+    duration_ms: turnDurationMs,
+    stop_reason: event.stopReason || "stop",
+    tool_calls_count: event.toolCallsCount || 0,
+  };
+
+  // Attach raw LLM provider timings if available
+  if (rawResp?.timings) {
+    turnStats.prompt_ms = rawResp.timings.prompt_ms;
+    turnStats.predicted_ms = rawResp.timings.predicted_ms;
+    turnStats.predicted_per_token_ms = rawResp.timings.predicted_per_token_ms;
+    turnStats.predicted_per_second = rawResp.timings.predicted_per_second;
+    turnStats.draft_n = rawResp.timings.draft_n || 0;
+    turnStats.draft_n_accepted = rawResp.timings.draft_n_accepted || 0;
+  }
+  if (rawResp?.usage) {
+    turnStats.raw_usage = rawResp.usage;
+  }
+
+  // Use raw LLM timings when available (inference speed, not wall-clock)
+  if (rawResp?.timings) {
+    turnStats.prompt_per_sec = rawResp.timings.prompt_per_second;
+    turnStats.output_per_sec = rawResp.timings.predicted_per_second;
+  } else if (turnStats.duration_ms > 0) {
+    // Fallback to computed values only if no raw timings
+    turnStats.output_per_sec = Math.round((turnStats.output_tokens / turnStats.duration_ms) * 1000);
+    if (ttftMs > 0) {
+      turnStats.prompt_per_sec = Math.round((turnStats.prompt_tokens / ttftMs) * 1000);
+    }
+  }
+
+  // Store turn stats for aggregate calculation
+  state.turns.push(turnStats);
+
+  // Create turn entity
+  entityBuffer.addEntity({
+    type: 'turn',
+    content: JSON.stringify(turnStats),
+    startedAt: state.turnStart,
+    saved: false,
+  });
+  entityBuffer.sealAndSave('turn');
+
+  // Reset per-turn state
+  state.currentTurnUsage = null;
+  state.firstTokenTime = null;
+  state.turnStart = Date.now();
+
+  // Send turn event to frontend
+  writeEvent("turn_end", turnStats);
 }
 
 /**
@@ -86,7 +186,7 @@ function handleCompactStartEvent(entityBuffer, writeEvent, state) {
   entityBuffer.sealAndSave('think');
   entityBuffer.sealAndSave('msg');
   state.compactStartedAt = Date.now();
-  state.beforeCompact = {...state.sessionTotals}
+  state.beforeCompact = {...state.sessionTotals};
   entityBuffer.addEntity({type: 'compact', summary: null, tokensBefore: null, tokensAfter: null, savedPct: null, startedAt: state.compactStartedAt, saved: false});
   writeEvent("compact_start", { startedAt: state.compactStartedAt });
 }
@@ -106,8 +206,6 @@ function handleCompactResultEvent(event, entityBuffer, writeEvent, state) {
   const duration = state.compactStartedAt ? Date.now() - state.compactStartedAt : null;
   state.compactStartedAt = null;
   handleUsageEvent({input:event.tokensBefore, output:event.tokensAfter,cacheRead:0,cacheWrite:0,reasoning:0}, state);
-  // Update contextUsage with post-compaction values so calculateTokenStats picks them up
-  // (session.getContextUsage() returns null tokens until next LLM response)
   const ctxWindow = state.contextUsage?.contextWindow || 128000;
   state.contextUsage = {contextSize: event.tokensAfter, contextWindow: ctxWindow, contextPercent: ctxWindow > 0 ? (event.tokensAfter / ctxWindow) * 100 : 0};
   writeEvent("compact_result", {summary: event.summary,tokensBefore: event.tokensBefore,tokensAfter: event.tokensAfter,savedPct: event.savedPct,duration,failed: event.failed});
@@ -121,15 +219,17 @@ function handleContextUsageEvent(event, state) {
 }
 
 /**
- * Handle done event - flush entities and save token stats.
+ * Handle done event - flush entities and save aggregate token stats.
+ * Turn-level stats are already saved by handleTurnEndEvent.
+ * This saves the per-record aggregate and session totals.
  */
 function handleDoneEvent(entityBuffer, recordId, dbSessionId, responseStartTime, state, session) {
   entityBuffer.flushAll();
   const tokenStats = calculateTokenStats(state.usageData, responseStartTime, state, session);
+
   saveTokenStats(recordId, tokenStats);
-  updateSessionStats(dbSessionId, tokenStats.sessionTotals)
-  //updateSessionContextUsage(dbSessionId, state.contextUsage);
-  return tokenStats
+  updateSessionStats(dbSessionId, tokenStats.sessionTotals);
+  return tokenStats;
 }
 
 /**
@@ -139,28 +239,41 @@ function handleDoneEvent(entityBuffer, recordId, dbSessionId, responseStartTime,
  */
 export function createStreamEventHandler(params) {
   const {writeEvent,entityBuffer,dbSessionId,recordId,responseStartTime,userId,req,session} = params;
-  const s = getSessionMeta(dbSessionId)
-  const sessionTotals = s.total_input?{total_input: s.total_input, total_cache_read:s.total_cache_read, total_cache_write:s.total_cache_write,total_cost:s.total_cost, 
-                          total_reasoning: s.total_reasoning, total_output: s.total_output,context_used:s.context_used, context_size:s.context_size, context_percent:s.context_percent}:
-                        {total_input: 0, total_cache_read:0, total_cache_write:0, total_reasoning: 0, total_output: 0,context_used:0,context_size:128000,context_percent:0,total_cost:0}
-  const state = {firstTokenTime: null, usageData: null, contextUsage: null, thinkChars: 0, compactStartedAt: null, sessionTotals, beforeCompact:null};
+  const s = getSessionMeta(dbSessionId);
+  const sessionTotals = s.total_input ? {
+    total_input: s.total_input, total_cache_read: s.total_cache_read, total_cache_write: s.total_cache_write, total_cost: s.total_cost,
+    total_reasoning: s.total_reasoning, total_output: s.total_output, context_used: s.context_used, context_size: s.context_size, context_percent: s.context_percent
+  } : {total_input: 0, total_cache_read: 0, total_cache_write: 0, total_reasoning: 0, total_output: 0, context_used: 0, context_size: 128000, context_percent: 0, total_cost: 0};
 
-  // Handler params that need to be passed to async handlers
-  const handlerParams = {recordId,dbSessionId,userId,req,};
-  let onAgentEndResolve = undefined
-  let lastEvent = {event:undefined}
+  const state = {
+    firstTokenTime: null,
+    usageData: null,
+    contextUsage: null,
+    thinkChars: 0,
+    compactStartedAt: null,
+    sessionTotals,
+    beforeCompact: null,
+    turnNumber: 0,
+    turns: [],
+    currentTurnUsage: null,
+    turnStart: responseStartTime,
+  };
+
+  const handlerParams = {recordId, dbSessionId, userId, req};
+  let onAgentEndResolve = undefined;
+  let lastEvent = {event: undefined};
   const onAgentEnd = new Promise((r) => { onAgentEndResolve = r; });
-  const ss = {thinkCount:0, textCount:0};
+  const ss = {thinkCount: 0, textCount: 0};
 
   function onEvent(event) {
     switch (event.type) {
       case "text":
-        ss.textCount=ss.textCount+1;
+        ss.textCount = ss.textCount + 1;
         handleTextEvent(event, entityBuffer, writeEvent, state);
         break;
 
       case "thinking":
-        ss.thinkCount=ss.thinkCount+1;
+        ss.thinkCount = ss.thinkCount + 1;
         handleThinkingEvent(event, entityBuffer, writeEvent, state);
         break;
 
@@ -180,6 +293,10 @@ export function createStreamEventHandler(params) {
         handleUsageEvent(event, state);
         break;
 
+      case "turn_end":
+        handleTurnEndEvent(event, entityBuffer, writeEvent, state, dbSessionId);
+        break;
+
       case "compact_start":
         handleCompactStartEvent(entityBuffer, writeEvent, state);
         break;
@@ -192,16 +309,15 @@ export function createStreamEventHandler(params) {
         handleContextUsageEvent(event, state);
         break;
 
-      case "error": 
+      case "error":
       case "done": {
         const tokenStats = handleDoneEvent(entityBuffer, recordId, dbSessionId, responseStartTime, state, session);
         writeEvent("record_stats", tokenStats);
-        lastEvent.event = event
-        console.log('got done-event, thinkCount: ',ss.thinkCount,', textCount: ',ss.textCount, event.type==='error'?event:'done')
+        lastEvent.event = event;
+        console.log('got done-event, thinkCount: ', ss.thinkCount, ', textCount: ', ss.textCount, ', turns: ', state.turnNumber, event.type === 'error' ? event : 'done');
         onAgentEndResolve();
         break;
       }
-
     }
   }
 

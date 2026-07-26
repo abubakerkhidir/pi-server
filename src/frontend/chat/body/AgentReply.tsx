@@ -5,6 +5,7 @@ import ToolBlock from "./ToolBlock";
 import ThinkingBlock from "./ThinkingBlock";
 import TextBlock from "./TextBlock";
 import CompactBlock from "./CompactBlock";
+import TurnSeparator from "./TurnSeparator";
 
 interface AgentReplyProps {
   recordId: string;
@@ -46,6 +47,12 @@ export default function AgentReply({
 
   const hasTools = entities.some((e) => e.type === "tool");
   const hasThink = entities.some((e) => e.type === "think");
+  const turnEntities = entities.filter((e): e is import("@/frontend/types").TurnData => e.type === "turn");
+  const totalTurns = turnEntities.length;
+  const avgTtft = totalTurns > 0
+    ? Math.round(turnEntities.reduce((sum, t) => sum + (t.ttft_ms ?? 0), 0) / totalTurns)
+    : null;
+  const totalCacheRead = turnEntities.reduce((sum, t) => sum + (t.cache_read ?? 0), 0);
 
   const entityJsx: React.ReactNode[] = [];
   for (const entity of entities) {
@@ -87,6 +94,12 @@ export default function AgentReply({
             sealed={entity.sealed}
             type="compact"
           />,
+        );
+      }
+    } else if (entity.type === "turn") {
+      if (!collapsed) {
+        entityJsx.push(
+          <TurnSeparator key={entity.id} entity={entity} />,
         );
       }
     }
@@ -143,12 +156,16 @@ export default function AgentReply({
           <div className="agent-reply-footer">
             {/* ── Always render token-stats span to keep footer layout stable ── */}
             <span className="token-stats">
+              {totalTurns > 0 && (
+                <span className="token-stat" title="Total turns">{totalTurns} turn{totalTurns !== 1 ? 's' : ''}</span>
+              )}
               {tokenStats ? (
                 <>
+                  {totalCacheRead > 0 && <span className="token-stat" title="Total cache read">cache:{totalCacheRead}</span>}
                   <span className="token-stat" title="Prompt tokens">p:{tokenStats.prompt_tokens}</span>
                   <span className="token-stat" title="Think tokens">t:{tokenStats.think_tokens}</span>
                   <span className="token-stat" title="Output tokens">o:{tokenStats.output_tokens}</span>
-                  <span className="token-stat" title="Time to first token">ttft:{tokenStats.ttft_ms}ms</span>
+                  <span className="token-stat" title="Avg time to first token">{avgTtft != null ? `ttft:${avgTtft}ms` : `ttft:${tokenStats.ttft_ms}ms`}</span>
                   <span className="token-stat" title="Prompt tokens per second">{tokenStats.prompt_token_s} p/s</span>
                   <span className="token-stat" title="Output tokens per second">{tokenStats.output_token_s} o/s</span>
                 </>

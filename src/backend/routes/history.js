@@ -60,6 +60,36 @@ function parseCompactEntity(entity) {
 }
 
 /**
+ * Parse a turn entity from database row.
+ * Content column stores JSON with turn stats.
+ */
+function parseTurnEntity(entity) {
+  let data = {};
+  try { data = JSON.parse(entity.content || '{}'); } catch {}
+  return {
+    type: 'turn',
+    turn: data.turn ?? 0,
+    prompt_tokens: data.prompt_tokens ?? 0,
+    output_tokens: data.output_tokens ?? 0,
+    think_tokens: data.think_tokens ?? 0,
+    cache_read: data.cache_read ?? 0,
+    cache_write: data.cache_write ?? 0,
+    ttft_ms: data.ttft_ms ?? null,
+    duration_ms: data.duration_ms ?? null,
+    prompt_per_sec: data.prompt_per_sec ?? null,
+    output_per_sec: data.output_per_sec ?? null,
+    prompt_ms: data.prompt_ms ?? null,
+    predicted_ms: data.predicted_ms ?? null,
+    predicted_per_second: data.predicted_per_second ?? null,
+    predicted_per_token_ms: data.predicted_per_token_ms ?? null,
+    draft_n: data.draft_n ?? 0,
+    draft_n_accepted: data.draft_n_accepted ?? 0,
+    stop_reason: data.stop_reason ?? 'stop',
+    tool_calls_count: data.tool_calls_count ?? 0,
+  };
+}
+
+/**
  * Parse entities from database rows.
  */
 function parseEntities(entities) {
@@ -69,6 +99,7 @@ function parseEntities(entities) {
       case 'msg':   return parseMessageEntity(entity);
       case 'tool':  return parseToolEntity(entity);
       case 'compact': return parseCompactEntity(entity);
+      case 'turn':  return parseTurnEntity(entity);
       default:      return null;
     }
   }).filter(Boolean);
